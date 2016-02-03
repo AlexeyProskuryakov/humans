@@ -1,0 +1,23 @@
+{% extends "layout.html" %}
+{% block body %}
+
+{% block content %}
+<div class="content">
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-6">
+                User : <span>{{user}}</span>
+                <br>
+                State : <span>{{state}}</span>
+                <br>
+                Info : <span>{{info}}</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<a href="{{url_for('human_auth_start')}}"> Go to add new human credentials</a>
+{% endblock %}
+
+{% endblock %}

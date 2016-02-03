@@ -1,0 +1,218 @@
+{% extends "layout.html" %}
+{% block body %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <div class="row">
+
+        <div class="col-md-6">
+            <div class="row">
+                <div class="col-md-3">
+                    <form action="{{url_for('humans_info', name=human_name)}}" method="post">
+                        <input type="hidden" name="start" value="!">
+                        <input type="submit" value="Start human" class="btn btn-info btn-lg">
+                    </form>
+                </div>
+
+                <div class="col-md-3">
+                    <form action="{{url_for('humans_info', name=human_name)}}" method="post">
+                        <input type="hidden" name="stop" value="!">
+                        <input type="submit" value="Stop human" class="btn btn-danger btn-lg">
+                    </form>
+                </div>
+                <div class="col-md-3">
+                    <button class="btn btn-success btn-big btn-lg" onclick="window.location.reload(0);">RELOAD THIS PAGE
+                    </button>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-10 col-md-offset-1">
+                    <h2>Параметры жизни чувака: <br>
+                        <small><kbd>%</kbd> - параметры предиката для желания. Будет запускаться
+                            random(0,<b>{{want_coefficient}}</b>) и если оно больше <kbd>%</kbd> и будет возможность это
+                            сделать, то чувак это сделает.                       </small>
+                    </h2>
+                    <form action="{{url_for('humans_info', name=human_name)}}" method="post" class="form-horizontal">
+                        <div class="form-group">
+                            <label for="max_wait_time">Максимальное время ожидания (на любой итерации)</label>
+                            <input name="max_wait_time" type="number" value="{{config['max_wait_time']}}"
+                                   id="max_wait_time">
+                        </div>
+                        <div class="form-group">
+                            <label for="max_post_near_commented">Какое максимальное число постов просматривать рядом с
+                                комментируемым</label>
+                            <input name="max_post_near_commented" type="number"
+                                   value="{{config['max_post_near_commented']}}"
+                                   id="max_post_near_commented">
+                        </div>
+                        <div class="form-group">
+                            <label for="post_vote">Желание воутить пост <kbd>%</kbd></label>
+                            <input name="post_vote" type="number" value="{{config['post_vote']}}" id="post_vote">
+                        </div>
+                        <div class="form-group">
+                            <label for="subscribe">Желание подписаться на саб <kbd>%</kbd></label>
+                            <input name="subscribe" type="number" value="{{config['subscribe']}}" id="subscribe">
+                        </div>
+                        <div class="form-group">
+                            <label for="author_friend">Желание зафрендить автора <kbd>%</kbd></label>
+                            <input name="author_friend" type="number" value="{{config['author_friend']}}"
+                                   id="author_friend">
+                        </div>
+                        <div class="form-group">
+                            <label for="comments">Желание поглядеть комментарии к посту <kbd>%</kbd></label>
+                            <input name="comments" type="number" value="{{config['comments']}}" id="comments">
+                        </div>
+                        <div class="form-group">
+                            <label for="comment_mwt">Минимальное время просмотра поста чтобы поглядеть комменты к
+                                посту</label>
+                            <input name="comment_mwt" type="number" value="{{config['comment_mwt']}}" id="comment_mwt">
+                        </div>
+                        <div class="form-group">
+                            <label for="comment_vote">Желание завоутить коммент <kbd>%</kbd> </label>
+                            <input name="comment_vote" type="number" value="{{config['comment_vote']}}"
+                                   id="comment_vote">
+                        </div>
+                        <div class="form-group">
+                            <label for="comment_friend">Желание зафрендить автоа комментария <kbd>%</kbd></label>
+                            <input name="comment_friend" type="number" value="{{config['comment_friend']}}"
+                                   id="comment_friend">
+                        </div>
+                        <div class="form-group">
+                            <label for="comment_url">Желание потреблять урлы в комментах <kbd>%</kbd></label>
+                            <input name="comment_url" type="number" value="{{config['comment_url']}}" id="comment_url">
+                        </div>
+
+                        <input type="submit" value="Apply parameters" class="btn btn-lg btn-primary">
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="row">
+                <h1>Information of {{human_name}}
+                    <small>(human state: {{human_live_state}})</small>
+                </h1>
+                <div class="accordion" id="info-accordion">
+                    <div class="accordion-group">
+                        <div class="accordion-heading">
+                            <a class="accordion-toggle" data-toggle="collapse" data-parent="#info-accordion"
+                               href="#statistic">
+                                <h3> Statistics of human actions:</h3>
+                            </a>
+                        </div>
+                        <div id="statistic" class="accordion-body collapse">
+                            <div class="accordion-inner">
+                                <table class="table table-stripped">
+                                    {% for row in human_stat %}
+                                    <tr>
+                                        <th>
+                                            {{row.get("_id")}}
+                                        </th>
+                                        <th>
+                                            {{row.get("count")}}
+                                        </th>
+                                    </tr>
+                                    {% endfor %}
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="accordion-group">
+                        <div class="accordion-heading">
+                            <a class="accordion-toggle" data-toggle="collapse" data-parent="#info-accordion"
+                               href="#subs">
+                                <h3>Subreddits:</h3>
+                            </a>
+                        </div>
+                        <div id="subs" class="accordion-body collapse">
+                            <div class="accordion-inner">
+                                <table class="table table-striped">
+                                    {% for sub in subs %}
+                                    <tr>
+                                        <td>{{sub}}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="accordion-group">
+                        <div class="accordion-heading">
+                            <a class="accordion-toggle" data-toggle="collapse" data-parent="#info-accordion"
+                               href="#friends">
+                                <h3>Friends:</h3>
+                            </a>
+                        </div>
+                        <div id="friends" class="accordion-body collapse">
+                            <div class="accordion-inner">
+                                <table class="table table-striped">
+                                    {% for friend in friends %}
+                                    <tr>
+                                        <td>{{friend}}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="accordion-group">
+                        <div class="accordion-heading">
+                            <a class="accordion-toggle" data-toggle="collapse" data-parent="#info-accordion"
+                               href="#s_subs">
+                                <h3>Subscribed subs:</h3>
+                            </a>
+                        </div>
+                        <div id="s_subs" class="accordion-body collapse">
+                            <div class="accordion-inner">
+                                <table class="table table-striped">
+                                    {% for s in ss %}
+                                    <tr>
+                                        <td>{{s}}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-md-6 col-md-offset-3">
+            <h3>human log (last 100 actions):</h3>
+        </div>
+        <table class="table table-striped">
+            <tbody>
+            {%for row in human_log%}
+            <tr>
+                <th class="col-md-2">
+                    {{row.get("action")}}
+                </th>
+                <th class="col-md-8">
+                    {% if "permalink" in row.get("info") %}
+                    <a href="{{row.get('info')['permalink']}}">{{row.get('info').get('fullname')}}</a>
+                    {%else%}
+                    {{row.get("info")}}
+                    {%endif%}
+                </th>
+                <th class="col-md-2">
+                    {{row.get("time")}}
+                </th>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+
+    </div>
+</div>
+
+{% endblock %}
+
+{% endblock %}

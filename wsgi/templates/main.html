@@ -1,0 +1,31 @@
+{% extends "layout.html" %}
+{% block body %}
+
+{% block content %}
+
+
+<div class="content">
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-3 col-md-offset-1">
+                <h1>
+                    HELLO {{username}}
+                </h1>
+            </div>
+        </div>
+        <div class="row">
+            <h1>Form for wake up</h1>
+            <form action="/" method="post">
+                <input type="text" name="url" placeholder="your url" value="{{ url }}">
+                <input type="submit" value="change">
+            </form>
+        </div>
+        <div class="row">
+
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% endblock %}

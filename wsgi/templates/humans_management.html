@@ -1,0 +1,93 @@
+{% extends "layout.html" %}
+{% block body %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <div class="row">
+    </div>
+    <div class="row">
+        <div class="col-md-6 col-md-offset-3">
+            <h2>Добавление бота (комментирование лишь). Процедура после добавления информации о приложении и заведении
+                пользователя
+                <a href="{{url_for('human_auth_start')}}"> тут</a>
+            </h2>
+            <form action="{{ url_for('humans_new')}}" method="post">
+                <div class="form-group">
+                    <label for="human-name">Select human name:</label>
+                    <select class="form-control" id="human-name" name="human-name">
+                        {% for human in humans %}
+                        <option>{{human.user}}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="sbrdts">Subreddits в которых будет тусоваться чувак (ентером разделяй):</label>
+                    <textarea id='sbrdts' name="sbrdts" class="form-control" rows="5">
+
+                    </textarea>
+
+                    <input type="submit" class="form-control" value="Начать">
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="row">
+        <h3> Worked humans: {{worked_humans}}</h3>
+    </div>
+    <div class="row">
+        <h3> humans states: </h3>
+    </div>
+    <div class="row">
+        <div class="col-md-8 col-md-offset-2">
+            <table class="table table-stripped">
+                <thead>
+                <tr>
+                    <td>
+                        Name:
+                    </td>
+                    <td>
+                        State:
+                    </td>
+                    <td>
+                        Credentials info:
+                    </td>
+                    <td>
+                        Subreddits:
+                    </td>
+                </tr>
+
+                </thead>
+                <tbody>
+                {% for human in humans %}
+                <tr>
+                    <td class="col-md-2">
+                        <a href="{{ url_for('humans_info', name=human.user) }}"> {{human.user}}</a>
+                    </td>
+                    <td class="col-md-2 ">
+                        {{human.live_state}}
+                        {%if human.live_state%}
+                        (At {{human.live_state_time | tst_to_dt}} by {{human.live_state_pid}})
+                        {%endif%}
+                    </td>
+                    <td>
+                        {% if human.info %}
+                        AT: {{human.info['access_token']}}<br>
+                        RT: {{human.info['refresh_token']}}<br>
+                        (At {{human.time | tst_to_dt }})
+                        {%endif%}
+                    </td>
+                    <td>
+                        {{human.subs}}
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% endblock %}
