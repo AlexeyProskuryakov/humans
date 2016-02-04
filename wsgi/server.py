@@ -12,6 +12,7 @@ from flask_login import LoginManager, login_user, login_required, logout_user
 from werkzeug.utils import redirect
 
 from wsgi.properties import want_coefficient_max
+from wsgi.rr_people import S_STOP, S_WORK
 from wsgi.rr_people.he import HumanConfiguration, HumanOrchestra
 from wsgi.db import DBHandler
 from wsgi.wake_up import WakeUp
@@ -184,7 +185,7 @@ C_SECRET = None
 
 
 
-@app.route("/rr_people/add_credential", methods=["GET", "POST"])
+@app.route("/humans/add_credential", methods=["GET", "POST"])
 @login_required
 def human_auth_start():
     global C_ID
@@ -232,9 +233,9 @@ human_orchestra = HumanOrchestra()
 
 
 
-@app.route("/humans/new", methods=["POST", "GET"])
+@app.route("/humans", methods=["POST", "GET"])
 @login_required
-def humans_new():
+def humans():
     global human_orchestra
 
     if request.method == "POST":
@@ -266,10 +267,11 @@ def humans_info(name):
 
     if request.method == "POST":
         if request.form.get("stop"):
-            human_orchestra.stop_human(name)
+            db.set_human_live_state(name, S_STOP, "web")
             return redirect(url_for('humans_info', name=name))
 
         if request.form.get("start"):
+            db.set_human_live_state(name, S_WORK, "web")
             human_orchestra.add_human(name)
             return redirect(url_for('humans_info', name=name))
 
@@ -279,14 +281,13 @@ def humans_info(name):
 
     human_log = db.get_log_of_human(name, 100)
     stat = db.get_log_of_human_statistics(name)
-    state = human_orchestra.get_human_state(name)
 
     human_cfg = db.get_human_config(name)
 
     return render_template("humans_info.html", **{"human_name": name,
                                                "human_stat": stat,
                                                "human_log": human_log,
-                                               "human_live_state": state,
+                                               "human_live_state": human_cfg.get("live_state"),
                                                "subs": human_cfg.get("subs", []),
                                                "config": human_cfg.get("live_config") or HumanConfiguration().data,
                                                "ss": human_cfg.get("ss", []),

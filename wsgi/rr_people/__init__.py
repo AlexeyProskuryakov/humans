@@ -39,4 +39,5 @@ S_BAN = "ban"
 S_WORK = "work"
 S_SLEEP = "sleep"
 S_UNKNOWN = "unknown"
+S_STOP = "stop"
 

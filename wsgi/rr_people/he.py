@@ -20,7 +20,7 @@ import time
 from wsgi import properties
 from wsgi.rr_people import USER_AGENTS, \
     A_CONSUME, A_VOTE, A_COMMENT, A_POST, A_SUBSCRIBE, A_FRIEND, \
-    S_UNKNOWN, S_SLEEP, S_WORK, S_BAN
+    S_UNKNOWN, S_SLEEP, S_WORK, S_BAN, S_STOP
 from wsgi.db import DBHandler
 
 re_url = re.compile("((https?|ftp)://|www\.)[^\s/$.?#].[^\s]*")
@@ -60,6 +60,27 @@ def check_any_login(login):
         return False
     return True
 
+def _get_random_near(slice, index, max):
+        slice_indices = map(lambda x:x[0], enumerate(slice))
+        r_count = random.randint(max/2, max)
+        l_count = random.randint(max/2, max)
+
+        temp_r = set()
+        for _ in slice_indices[index:]:
+            r_id = random.randint(index+1, slice_indices[-1])
+            temp_r.add(r_id)
+            if len(temp_r) >= r_count:
+                break
+        res_r = [slice[i] for i in temp_r]
+
+        temp_l = set()
+        for _ in slice_indices[:index]:
+            l_id = random.randint(0, index-1)
+            temp_l.add(l_id)
+            if len(temp_l) >= l_count:
+                break
+        res_l = [slice[i] for i in temp_l]
+        return res_l, res_r
 
 def _so_long(created, min_time):
     return (datetime.utcnow() - datetime.fromtimestamp(created)).total_seconds() > min_time
@@ -172,7 +193,7 @@ class CommentSearcher(Man):
                 end = time.time()
                 log.info(
                         "Was get all comments which found for [%s] at %s seconds... Will trying next." % (
-                        sub, end - start))
+                            sub, end - start))
                 time.sleep(properties.DEFAULT_SLEEP_TIME_AFTER_READ_SUBREDDIT)
 
         Process(name="[%s] comment founder" % sub, target=f).start()
@@ -478,7 +499,8 @@ class Consumer(Man):
 
             self.friends.add(post.author.name)
             self.register_step(A_FRIEND, info={"fullname": post.author.name, "from": "post"})
-            log.info("%s was add friend from post %s because want coefficient is: %s"%(self.user_name, post.fullname, self.configuration.author_friend))
+            log.info("%s was add friend from post %s because want coefficient is: %s" % (
+            self.user_name, post.fullname, self.configuration.author_friend))
             self.wait(self.configuration.max_wait_time / 5)
 
     def set_configuration(self, configuration):
@@ -492,15 +514,6 @@ class Consumer(Man):
             return wt
         return max_wait_time
 
-    def _get_random_near(self, slice, index, max):
-        rnd = lambda x: random.randint(x / 10, x / 2) or 1
-        max_ = lambda x: x if x < max and max_ != -1  else max
-        count_random_left = max_(rnd(len(slice[0:index])))
-        count_random_right = max_(rnd(len(slice[index:])))
-
-        return [random.choice(slice[0:index]) for _ in xrange(count_random_left)], \
-               [random.choice(slice[index:]) for _ in xrange(count_random_right)]
-
     def do_comment_post(self, post_fullname, subreddit_name, comment_text):
         log.info("[%s] will do comment post [%s] (%s) by this text:\n%s" % (
             self.user_name, post_fullname, subreddit_name, comment_text))
@@ -508,7 +521,7 @@ class Consumer(Man):
         near_posts = self.get_hot_and_new(subreddit_name)
         for i, _post in enumerate(near_posts):
             if _post.fullname == post_fullname:
-                see_left, see_right = self._get_random_near(near_posts, i, self.configuration.max_posts_near_commented)
+                see_left, see_right = _get_random_near(near_posts, i, self.configuration.max_posts_near_commented)
                 try:
                     for p_ind in see_left:
                         self.do_see_post(p_ind)
@@ -526,7 +539,8 @@ class Consumer(Man):
                 try:
                     response = _post.add_comment(comment_text)
                     self.db.set_post_commented(_post.fullname)
-                    self.register_step(A_COMMENT, info={"fullname": post_fullname, "text": comment_text, "sub": subreddit_name})
+                    self.register_step(A_COMMENT,
+                                       info={"fullname": post_fullname, "text": comment_text, "sub": subreddit_name})
                     log.info("[%s] Was comment post [%s] by: [%s] with response: %s" % (
                         self.user_name, _post.fullname, comment_text, response))
                 except Exception as e:
@@ -545,8 +559,6 @@ class Consumer(Man):
                 self.register_step(A_SUBSCRIBE, info={"sub": subreddit_name})
         except Exception as e:
             log.error(e)
-
-
 
     def live_random(self, max_iters=2000, max_actions=100, posts_limit=500, **kwargs):
         sub_posts = {}
@@ -599,7 +611,7 @@ class Kapellmeister(Process):
         return ok
 
     def get_human_state(self):
-        return self.db.get_human_live_state(self.human_name, self.pid)
+        return self.db.get_human_live_state(self.human_name)
 
     def run(self):
         while 1:
@@ -614,16 +626,19 @@ class Kapellmeister(Process):
                         to_comment_info = queue.get(timeout=60)
                         self.w_human.do_comment_post(to_comment_info.get("post"), sub, to_comment_info.get("comment"))
                     except Empty as e:
-                        log.info("%s can not comment at %s because they no found" % (self.human_name,sub))
+                        log.info("%s can not comment at %s because they no found at this moment" % (self.human_name, sub))
 
                     except Exception as e:
-                        log.info("%s can not comment at %s" % (self.human_name,sub))
+                        log.info("%s can not comment at %s" % (self.human_name, sub))
                         log.exception(e)
                     self.w_human.live_random(posts_limit=150)
 
-                sleep_time = random.randint(1, 50)
-                log.info("human [%s] will sleep %s seconds" % (self.human_name, sleep_time))
+                if self.get_human_state() == S_STOP:
+                    log.info("%s will stopped"%self.human_name)
+                    break
 
+                sleep_time = random.randint(1, self.r_human.configuration.max_wait_time*100)
+                log.info("human [%s] will sleep %s seconds" % (self.human_name, sleep_time))
                 self.db.set_human_live_state(self.human_name, S_SLEEP, self.pid)
                 time.sleep(sleep_time)
                 self.w_human.refresh_token()
@@ -638,12 +653,12 @@ class HumanOrchestra():
         self.__humans = {}
         self.read_human = CommentSearcher(DBHandler())
         self.lock = Lock()
+        self.db = DBHandler()
         Thread(target=self.start_humans, name="Orchestra Human Starter").start()
 
     def start_humans(self):
         log.info("Will auto start humans")
-        db = DBHandler()
-        for human in db.get_humans_available():
+        for human in self.db.get_humans_available():
             self.add_human(human.get("user"))
 
     @property
@@ -662,21 +677,6 @@ class HumanOrchestra():
                     log.info("Error at starting human %s", human_name, )
                     log.exception(e)
 
-    def get_human_state(self, human_name):
-        with self.lock:
-            result = S_UNKNOWN
-            if human_name in self.__humans:
-                result = self.__humans[human_name].get_human_state()
-            return result
-
-    def stop_human(self, human_name):
-        with self.lock:
-            human = self.__humans.get(human_name)
-            if human:
-                human.terminate()
-                human.join(1)
-                del self.__humans[human_name]
-
     def toggle_human_config(self, human_name):
         with self.lock:
             if human_name in self.__humans:
@@ -689,4 +689,6 @@ class HumanOrchestra():
 
 
 if __name__ == '__main__':
-    pass
+    l, r = _get_random_near(["a","b","c","d","e","f","g","h","i"], 5, 4)
+    print l
+    print r

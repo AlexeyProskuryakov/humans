@@ -12,7 +12,7 @@
                 пользователя
                 <a href="{{url_for('human_auth_start')}}"> тут</a>
             </h2>
-            <form action="{{ url_for('humans_new')}}" method="post">
+            <form action="{{ url_for('humans')}}" method="post">
                 <div class="form-group">
                     <label for="human-name">Select human name:</label>
                     <select class="form-control" id="human-name" name="human-name">
@@ -68,7 +68,7 @@
                     <td class="col-md-2 ">
                         {{human.live_state}}
                         {%if human.live_state%}
-                        (At {{human.live_state_time | tst_to_dt}} by {{human.live_state_pid}})
+                        (At {{human.live_state_time | tst_to_dt}} by {{human.live_pid}})
                         {%endif%}
                     </td>
                     <td>

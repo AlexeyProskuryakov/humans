@@ -113,8 +113,7 @@ class DBHandler(object):
         found = self.human_config.find_one({"user": name})
         if found:
             state_time = found.get("live_state_time")
-            _pid = found.get("live_pid")
-            if not state_time or (state_time and time.time() - state_time > 3600) or pid != _pid:
+            if not state_time or (state_time and time.time() - state_time > 3600):
                 return "unknown"
             else:
                 return found.get("live_state")
