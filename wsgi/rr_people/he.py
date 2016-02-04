@@ -1,5 +1,6 @@
 # coding=utf-8
 import traceback
+from Queue import Empty
 
 from datetime import datetime
 import logging
@@ -83,6 +84,7 @@ class HumanConfiguration(object):
             self.max_wait_time = 30
 
             self.max_posts_near_commented = 50
+
         elif isinstance(data, dict):
             for k, v in data.iteritems():
                 self.__dict__[k] = int(v)
@@ -207,7 +209,7 @@ class CommentSearcher(Man):
                         if copy.subreddit != post.subreddit and copy.fullname != post.fullname:
                             comment = self._retrieve_interested_comment(copy)
                             if comment and post.author != comment.author:
-                                log.info("Find comment: [%s] \nin post [%s] at subreddit [%s]" % (
+                                log.info("Find comment: [%s] in post: [%s] at subreddit: [%s]" % (
                                     comment, post.fullname, subreddit))
                                 break
                                 # else:
@@ -523,9 +525,10 @@ class Consumer(Man):
 
                 try:
                     response = _post.add_comment(comment_text)
+                    self.db.set_post_commented(_post.fullname)
+                    self.register_step(A_COMMENT, info={"fullname": post_fullname, "text": comment_text, "sub": subreddit_name})
                     log.info("[%s] Was comment post [%s] by: [%s] with response: %s" % (
                         self.user_name, _post.fullname, comment_text, response))
-                    self.db.set_post_commented(_post.fullname)
                 except Exception as e:
                     log.error(e)
 
@@ -543,7 +546,7 @@ class Consumer(Man):
         except Exception as e:
             log.error(e)
 
-        self.register_step(A_COMMENT, info={"fullname": post_fullname, "text": comment_text, "sub": subreddit_name})
+
 
     def live_random(self, max_iters=2000, max_actions=100, posts_limit=500, **kwargs):
         sub_posts = {}
@@ -610,8 +613,12 @@ class Kapellmeister(Process):
                     try:
                         to_comment_info = queue.get(timeout=60)
                         self.w_human.do_comment_post(to_comment_info.get("post"), sub, to_comment_info.get("comment"))
+                    except Empty as e:
+                        log.info("%s can not comment at %s because they no found" % (self.human_name,sub))
+
                     except Exception as e:
-                        log.info("can not find any comments at %s" % sub)
+                        log.info("%s can not comment at %s" % (self.human_name,sub))
+                        log.exception(e)
                     self.w_human.live_random(posts_limit=150)
 
                 sleep_time = random.randint(1, 50)
