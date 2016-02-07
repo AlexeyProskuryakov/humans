@@ -4,8 +4,9 @@ import os
 import sys
 
 __author__ = 'alesha'
-import urllib3.contrib.pyopenssl
-urllib3.contrib.pyopenssl.inject_into_urllib3()
+
+# import urllib3.contrib.pyopenssl
+# urllib3.contrib.pyopenssl.inject_into_urllib3()
 
 def module_path():
     if hasattr(sys, "frozen"):

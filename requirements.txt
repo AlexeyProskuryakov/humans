@@ -19,6 +19,4 @@ update-checker==0.11
 uritemplate==0.6
 Werkzeug==0.10.4
 wheel==0.24.0
-pyopenssl
-ndg-httpsclient
-pyasn1
+
