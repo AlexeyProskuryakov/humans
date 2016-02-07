@@ -1,3 +1,12 @@
+import logging
+import random
+
+import praw
+import re
+from praw.objects import MoreComments
+
+from wsgi import properties
+
 DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.106 Safari/537.36"
 
 USER_AGENTS = [
@@ -40,4 +49,52 @@ S_WORK = "work"
 S_SLEEP = "sleep"
 S_UNKNOWN = "unknown"
 S_STOP = "stop"
+S_SUSPEND = "suspend"
 
+
+re_url = re.compile("((https?|ftp)://|www\.)[^\s/$.?#].[^\s]*")
+
+log = logging.getLogger("man")
+
+class Man(object):
+    def __init__(self, user_agent=None):
+        self.reddit = praw.Reddit(user_agent=user_agent or random.choice(USER_AGENTS))
+
+    def get_hot_and_new(self, subreddit_name, sort=None):
+        try:
+            subreddit = self.reddit.get_subreddit(subreddit_name)
+            hot = list(subreddit.get_hot(limit=properties.DEFAULT_LIMIT))
+            new = list(subreddit.get_new(limit=properties.DEFAULT_LIMIT))
+            result_dict = dict(map(lambda x: (x.fullname, x), hot), **dict(map(lambda x: (x.fullname, x), new)))
+
+            log.info("Will search for dest posts candidates at %s posts in %s" % (len(result_dict), subreddit_name))
+            result = result_dict.values()
+            if sort:
+                result.sort(cmp=sort)
+            return result
+        except Exception as e:
+            return []
+
+    def retrieve_comments(self, comments, parent_id, acc=None):
+        if acc is None:
+            acc = []
+        for comment in comments:
+            if isinstance(comment, MoreComments):
+                try:
+                    self.retrieve_comments(comment.comments(), parent_id, acc)
+                except Exception as e:
+                    log.debug("Exception in unwind more comments: %s" % e)
+                    continue
+            else:
+                if comment.author and comment.parent_id == parent_id:
+                    acc.append(comment)
+        return acc
+
+
+class Singleton(type):
+    _instances = {}
+
+    def __call__(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
+        return cls._instances[cls]

@@ -12,7 +12,7 @@ from flask_login import LoginManager, login_user, login_required, logout_user
 from werkzeug.utils import redirect
 
 from wsgi.properties import want_coefficient_max
-from wsgi.rr_people import S_STOP, S_WORK
+from wsgi.rr_people import S_STOP, S_WORK, S_SUSPEND
 from wsgi.rr_people.he import HumanConfiguration, HumanOrchestra
 from wsgi.db import DBHandler
 from wsgi.wake_up import WakeUp
@@ -267,7 +267,7 @@ def humans_info(name):
 
     if request.method == "POST":
         if request.form.get("stop"):
-            db.set_human_live_state(name, S_STOP, "web")
+            db.set_human_live_state(name, S_SUSPEND, "web")
             return redirect(url_for('humans_info', name=name))
 
         if request.form.get("start"):

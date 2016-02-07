@@ -109,7 +109,7 @@ class DBHandler(object):
         self.human_config.update_one({"user": name},
                                      {"$set": {"live_state": state, "live_state_time": time.time(), "live_pid": pid}})
 
-    def get_human_live_state(self, name, pid):
+    def get_human_live_state(self, name):
         found = self.human_config.find_one({"user": name})
         if found:
             state_time = found.get("live_state_time")

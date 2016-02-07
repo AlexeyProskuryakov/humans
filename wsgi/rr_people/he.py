@@ -1,34 +1,26 @@
 # coding=utf-8
+import logging
+import random
+import time
 import traceback
 from Queue import Empty
-
-from datetime import datetime
-import logging
 from multiprocessing.process import Process
-from multiprocessing.queues import Queue
 from multiprocessing.synchronize import Lock
 from threading import Thread
 
 import praw
-from praw.objects import MoreComments
-import random
-import re
 import requests
 import requests.auth
-import time
+from praw.objects import MoreComments
 
 from wsgi import properties
+from wsgi.db import DBHandler
 from wsgi.rr_people import USER_AGENTS, \
     A_CONSUME, A_VOTE, A_COMMENT, A_POST, A_SUBSCRIBE, A_FRIEND, \
-    S_UNKNOWN, S_SLEEP, S_WORK, S_BAN, S_STOP
-from wsgi.db import DBHandler
-
-re_url = re.compile("((https?|ftp)://|www\.)[^\s/$.?#].[^\s]*")
+    S_UNKNOWN, S_SLEEP, S_WORK, S_BAN, Man, re_url, S_SUSPEND, Singleton
+from wsgi.rr_people.reader import CommentSearcher
 
 log = logging.getLogger("he")
-
-check_comment_text = lambda text: not re_url.match(text) and len(text) > 15 and len(text) < 120 and "Edit" not in text
-
 
 def net_tryings(fn):
     def wrapped(*args, **kwargs):
@@ -82,8 +74,6 @@ def _get_random_near(slice, index, max):
         res_l = [slice[i] for i in temp_l]
         return res_l, res_r
 
-def _so_long(created, min_time):
-    return (datetime.utcnow() - datetime.fromtimestamp(created)).total_seconds() > min_time
 
 
 class HumanConfiguration(object):
@@ -117,156 +107,6 @@ class HumanConfiguration(object):
     @property
     def data(self):
         return self.__dict__
-
-
-class Man(object):
-    def __init__(self, user_agent=None):
-        self.reddit = praw.Reddit(user_agent=user_agent or random.choice(USER_AGENTS))
-
-    def get_hot_and_new(self, subreddit_name, sort=None):
-        try:
-            subreddit = self.reddit.get_subreddit(subreddit_name)
-            hot = list(subreddit.get_hot(limit=properties.DEFAULT_LIMIT))
-            new = list(subreddit.get_new(limit=properties.DEFAULT_LIMIT))
-            result_dict = dict(map(lambda x: (x.fullname, x), hot), **dict(map(lambda x: (x.fullname, x), new)))
-
-            log.info("Will search for dest posts candidates at %s posts in %s" % (len(result_dict), subreddit_name))
-            result = result_dict.values()
-            if sort:
-                result.sort(cmp=sort)
-            return result
-        except Exception as e:
-            return []
-
-    def retrieve_comments(self, comments, parent_id, acc=None):
-        if acc is None:
-            acc = []
-        for comment in comments:
-            if isinstance(comment, MoreComments):
-                try:
-                    self.retrieve_comments(comment.comments(), parent_id, acc)
-                except Exception as e:
-                    log.debug("Exception in unwind more comments: %s" % e)
-                    continue
-            else:
-                if comment.author and comment.parent_id == parent_id:
-                    acc.append(comment)
-        return acc
-
-
-class Singleton(type):
-    _instances = {}
-
-    def __call__(cls, *args, **kwargs):
-        if cls not in cls._instances:
-            cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
-        return cls._instances[cls]
-
-
-class CommentSearcher(Man):
-    __metaclass__ = Singleton
-
-    def __init__(self, db, user_agent=None):
-        """
-        :param user_agent: for reddit non auth and non oauth client
-        :param lcp: low copies posts if persisted
-        :param cp:  commented posts if persisted
-        :return:
-        """
-        super(CommentSearcher, self).__init__(user_agent)
-        self.db = db
-        self.queues = {}
-        log.info("Read human inited!")
-
-    def start_retrieve_comments(self, sub):
-        if sub in self.queues:
-            return self.queues[sub]
-
-        self.queues[sub] = Queue()
-
-        def f():
-            while 1:
-                start = time.time()
-                log.info("Will start find comments for [%s]" % (sub))
-                for el in self.find_comment(sub):
-                    self.queues[sub].put(el)
-                end = time.time()
-                log.info(
-                        "Was get all comments which found for [%s] at %s seconds... Will trying next." % (
-                            sub, end - start))
-                time.sleep(properties.DEFAULT_SLEEP_TIME_AFTER_READ_SUBREDDIT)
-
-        Process(name="[%s] comment founder" % sub, target=f).start()
-        return self.queues[sub]
-
-    def find_comment(self, at_subreddit):
-        def cmp_by_created_utc(x, y):
-            result = x.created_utc - y.created_utc
-            if result > 0.5:
-                return 1
-            elif result < 0.5:
-                return -1
-            else:
-                return 0
-
-        subreddit = at_subreddit
-        all_posts = self.get_hot_and_new(subreddit, sort=cmp_by_created_utc)
-        for post in all_posts:
-            # log.info("Find comments in %s"%post.fullname)
-            if self.db.is_post_used(post.fullname):
-                # log.info("But post %s have low copies or commented yet"%post.fullname)
-                continue
-            try:
-                copies = self._get_post_copies(post)
-                copies = filter(
-                        lambda copy: _so_long(copy.created_utc, properties.min_comment_create_time_difference) and \
-                                     copy.num_comments > properties.min_donor_num_comments,
-                        copies)
-                if len(copies) >= properties.min_copy_count:
-                    copies.sort(cmp=cmp_by_created_utc)
-                    comment = None
-                    for copy in copies:
-                        # log.info("Validating copy %s for post %s"%(copy.fullname, post.fullname))
-                        if copy.subreddit != post.subreddit and copy.fullname != post.fullname:
-                            comment = self._retrieve_interested_comment(copy)
-                            if comment and post.author != comment.author:
-                                log.info("Find comment: [%s] in post: [%s] at subreddit: [%s]" % (
-                                    comment, post.fullname, subreddit))
-                                break
-                                # else:
-                                # log.info("But not valid comment found or authors are equals")
-                                # else:
-                                # log.info("But subreddits or fulnames are equals")
-                    if comment:
-                        yield {"post": post.fullname, "comment": comment.body}
-                    else:
-                        log.info("Can not find any valid comments for [%s]" % (post.fullname))
-                else:
-                    # log.info("But have low copies")
-                    self.db.set_post_low_copies(post.fullname)
-            except Exception as e:
-                log.error(e)
-
-    def _get_post_copies(self, post):
-        search_request = "url:\'%s\'" % post.url
-        copies = list(self.reddit.search(search_request))
-        return list(copies)
-
-    def _retrieve_interested_comment(self, copy):
-        # prepare comments from donor to selection
-        comments = self.retrieve_comments(copy.comments, copy.fullname)
-        after = len(comments) / properties.shift_copy_comments_part
-        for i in range(after, len(comments)):
-            comment = comments[i]
-            if comment.ups >= properties.min_donor_comment_ups and \
-                            comment.ups <= properties.max_donor_comment_ups and \
-                    check_comment_text(comment.body):
-                return comment
-
-    def _get_all_post_comments(self, post, filter_func=lambda x: x):
-        result = self.retrieve_comments(post.comments, post.fullname)
-        result = set(map(lambda x: x.body, result))
-        return result
 
 
 class Consumer(Man):
@@ -613,13 +453,24 @@ class Kapellmeister(Process):
     def get_human_state(self):
         return self.db.get_human_live_state(self.human_name)
 
+
+    def set_state(self, new_state):
+        state = self.get_human_state()
+        if state == S_SUSPEND:
+            return False
+        else:
+            self.db.set_human_live_state(self.human_name, new_state, self.pid)
+            return True
+
     def run(self):
         while 1:
             try:
                 if not self.human_check():
                     break
 
-                self.db.set_human_live_state(self.human_name, S_WORK, self.pid)
+                if not self.set_state(S_WORK):
+                    break
+
                 for sub in self.db.get_human_subs(self.human_name):
                     queue = self.r_human.start_retrieve_comments(sub)
                     try:
@@ -633,13 +484,12 @@ class Kapellmeister(Process):
                         log.exception(e)
                     self.w_human.live_random(posts_limit=150)
 
-                if self.get_human_state() == S_STOP:
-                    log.info("%s will stopped"%self.human_name)
-                    break
-
                 sleep_time = random.randint(1, self.r_human.configuration.max_wait_time*100)
                 log.info("human [%s] will sleep %s seconds" % (self.human_name, sleep_time))
-                self.db.set_human_live_state(self.human_name, S_SLEEP, self.pid)
+
+                if not self.set_state(S_SLEEP):
+                    break
+
                 time.sleep(sleep_time)
                 self.w_human.refresh_token()
             except Exception as e:
@@ -668,14 +518,13 @@ class HumanOrchestra():
 
     def add_human(self, human_name):
         with self.lock:
-            if human_name not in self.__humans:
-                try:
-                    human = Kapellmeister(human_name, DBHandler(), self.read_human)
-                    self.__humans[human_name] = human
-                    human.start()
-                except Exception as e:
-                    log.info("Error at starting human %s", human_name, )
-                    log.exception(e)
+            try:
+                human = Kapellmeister(human_name, DBHandler(), self.read_human)
+                self.__humans[human_name] = human
+                human.start()
+            except Exception as e:
+                log.info("Error at starting human %s", human_name, )
+                log.exception(e)
 
     def toggle_human_config(self, human_name):
         with self.lock:
