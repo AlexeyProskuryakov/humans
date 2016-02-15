@@ -179,25 +179,14 @@ class HumanStorage(DBHandler):
 
         ######POSTS###########################
 
-    def set_post_commented(self, post_fullname, info=None, by=None, text=None):
+    def set_post_commented(self, post_fullname, by, text, words_hash):
         found = self.human_posts.find_one({"fullname": post_fullname, "commented": {"$exists": False}})
         if not found:
-            to_add = {"fullname": post_fullname, "commented": True, "time": time.time()}
-            if info:
-                to_add["info"] = info
-            if by:
-                to_add['by'] = by
-            if text:
-                to_add["text"] = text
+            to_add = {"fullname": post_fullname, "commented": True, "time": time.time(), WORDS_HASH:words_hash, "text":text, "by":by}
             self.human_posts.insert_one(to_add)
         else:
-            to_set = {"commented": True}
-            if info:
-                to_set["info"] = info
-            if by:
-                to_set['by'] = by
-            self.human_posts.update_one({"fullname": post_fullname},
-                                        {"$set": to_set})
+            to_set = {"commented": True, WORDS_HASH:words_hash, "text":text, "by":by, "time": time.time()}
+            self.human_posts.update_one({"fullname": post_fullname}, {"$set": to_set})
 
     def can_comment_post(self, who, post_fullname=None, hash=None):
         q = {"by": who, "commented": True}

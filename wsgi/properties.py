@@ -67,7 +67,7 @@ min_copy_count = 2
 min_comment_create_time_difference = 3600 * 24 * 10
 
 shift_copy_comments_part = 5  # общее количество комментариев / это число  = сколько будет пропускаться
-min_donor_comment_ups = 3
+min_donor_comment_ups = 5
 max_donor_comment_ups = 100000
 min_donor_num_comments = 50
 

@@ -189,6 +189,7 @@ class CommentSearcher(Man):
         result = set(map(lambda x: x.body, result))
         return result
 
+
     def check_comment_text(self, text, post):
         """
         Checking in db, and by is good and found similar text in post comments.
