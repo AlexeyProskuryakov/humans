@@ -14,13 +14,14 @@ import requests.auth
 from praw.objects import MoreComments
 
 from wsgi import properties
-from wsgi.db import DBHandler
+from wsgi.db import HumanStorage
 from wsgi.rr_people import USER_AGENTS, \
     A_CONSUME, A_VOTE, A_COMMENT, A_POST, A_SUBSCRIBE, A_FRIEND, \
-    S_UNKNOWN, S_SLEEP, S_WORK, S_BAN, Man, re_url, S_SUSPEND, Singleton
-from wsgi.rr_people.reader import CommentSearcher
+    S_UNKNOWN, S_SLEEP, S_WORK, S_BAN, Man, re_url, S_SUSPEND, Singleton, info_words_hash, normalize_comment
+from wsgi.rr_people.reader import CommentSearcher, CommentQueue
 
 log = logging.getLogger("he")
+
 
 def net_tryings(fn):
     def wrapped(*args, **kwargs):
@@ -52,28 +53,28 @@ def check_any_login(login):
         return False
     return True
 
+
 def _get_random_near(slice, index, max):
-        slice_indices = map(lambda x:x[0], enumerate(slice))
-        r_count = random.randint(max/2, max)
-        l_count = random.randint(max/2, max)
+    slice_indices = map(lambda x: x[0], enumerate(slice))
+    r_count = random.randint(max / 2, max)
+    l_count = random.randint(max / 2, max)
 
-        temp_r = set()
-        for _ in slice_indices[index:]:
-            r_id = random.randint(index+1, slice_indices[-1])
-            temp_r.add(r_id)
-            if len(temp_r) >= r_count:
-                break
-        res_r = [slice[i] for i in temp_r]
+    temp_r = set()
+    for _ in slice_indices[index:]:
+        r_id = random.randint(index + 1, slice_indices[-1])
+        temp_r.add(r_id)
+        if len(temp_r) >= r_count:
+            break
+    res_r = [slice[i] for i in temp_r]
 
-        temp_l = set()
-        for _ in slice_indices[:index]:
-            l_id = random.randint(0, index-1)
-            temp_l.add(l_id)
-            if len(temp_l) >= l_count:
-                break
-        res_l = [slice[i] for i in temp_l]
-        return res_l, res_r
-
+    temp_l = set()
+    for _ in slice_indices[:index]:
+        l_id = random.randint(0, index - 1)
+        temp_l.add(l_id)
+        if len(temp_l) >= l_count:
+            break
+    res_l = [slice[i] for i in temp_l]
+    return res_l, res_r
 
 
 class HumanConfiguration(object):
@@ -340,7 +341,7 @@ class Consumer(Man):
             self.friends.add(post.author.name)
             self.register_step(A_FRIEND, info={"fullname": post.author.name, "from": "post"})
             log.info("%s was add friend from post %s because want coefficient is: %s" % (
-            self.user_name, post.fullname, self.configuration.author_friend))
+                self.user_name, post.fullname, self.configuration.author_friend))
             self.wait(self.configuration.max_wait_time / 5)
 
     def set_configuration(self, configuration):
@@ -377,12 +378,16 @@ class Consumer(Man):
                     log.error(e)
 
                 try:
-                    response = _post.add_comment(comment_text)
-                    self.db.set_post_commented(_post.fullname)
-                    self.register_step(A_COMMENT,
-                                       info={"fullname": post_fullname, "text": comment_text, "sub": subreddit_name})
-                    log.info("[%s] Was comment post [%s] by: [%s] with response: %s" % (
-                        self.user_name, _post.fullname, comment_text, response))
+                    if self.db.can_comment_post(self.user_name, post_fullname=_post.fullname) and \
+                            self.db.can_comment_post(self.user_name, hash=hash(normalize_comment(comment_text))):
+                        response = _post.add_comment(comment_text)
+                        self.db.set_post_commented(_post.fullname, by=self.user_name,
+                                                   info=dict(info_words_hash(comment_text), **{"text": comment_text}))
+                        self.register_step(A_COMMENT,
+                                           info={"fullname": post_fullname, "text": comment_text,
+                                                 "sub": subreddit_name})
+                        log.info("[%s] Was comment post [%s] by: [%s] with response: %s" % (
+                            self.user_name, _post.fullname, comment_text, response))
                 except Exception as e:
                     log.error(e)
 
@@ -437,6 +442,7 @@ class Kapellmeister(Process):
         self.state = S_UNKNOWN
 
         self.lock = Lock()
+        self.comment_queue = CommentQueue()
         log.info("human kapellmeister inited.")
 
     def set_config(self, data):
@@ -450,12 +456,8 @@ class Kapellmeister(Process):
             self.db.set_human_live_state(self.human_name, S_BAN, self.pid)
         return ok
 
-    def get_human_state(self):
-        return self.db.get_human_live_state(self.human_name)
-
-
     def set_state(self, new_state):
-        state = self.get_human_state()
+        state = self.db.get_human_live_state(self.human_name)
         if state == S_SUSPEND:
             return False
         else:
@@ -466,29 +468,37 @@ class Kapellmeister(Process):
         while 1:
             try:
                 if not self.human_check():
-                    break
+                    return
 
                 if not self.set_state(S_WORK):
-                    break
+                    return
 
                 for sub in self.db.get_human_subs(self.human_name):
-                    queue = self.r_human.start_retrieve_comments(sub)
+                    self.r_human.start_retrieve_comments(sub)
                     try:
-                        to_comment_info = queue.get(timeout=60)
-                        self.w_human.do_comment_post(to_comment_info.get("post"), sub, to_comment_info.get("comment"))
+                        to_comment_info = self.comment_queue.get(sub)
+                        if to_comment_info:
+                            post, text = to_comment_info
+                            self.w_human.do_comment_post(post, sub, text)
                     except Empty as e:
-                        log.info("%s can not comment at %s because they no found at this moment" % (self.human_name, sub))
+                        log.info(
+                                "%s can not comment at %s because they no found at this moment" % (
+                                self.human_name, sub))
 
                     except Exception as e:
                         log.info("%s can not comment at %s" % (self.human_name, sub))
                         log.exception(e)
+
+                    if not self.set_state(S_WORK):
+                        return
+
                     self.w_human.live_random(posts_limit=150)
 
-                sleep_time = random.randint(1, self.r_human.configuration.max_wait_time*100)
+                sleep_time = random.randint(1, self.r_human.configuration.max_wait_time * 100)
                 log.info("human [%s] will sleep %s seconds" % (self.human_name, sleep_time))
 
                 if not self.set_state(S_SLEEP):
-                    break
+                    return
 
                 time.sleep(sleep_time)
                 self.w_human.refresh_token()
@@ -501,9 +511,9 @@ class HumanOrchestra():
 
     def __init__(self):
         self.__humans = {}
-        self.read_human = CommentSearcher(DBHandler())
+        self.read_human = CommentSearcher(HumanStorage())
         self.lock = Lock()
-        self.db = DBHandler()
+        self.db = HumanStorage()
         Thread(target=self.start_humans, name="Orchestra Human Starter").start()
 
     def start_humans(self):
@@ -519,7 +529,7 @@ class HumanOrchestra():
     def add_human(self, human_name):
         with self.lock:
             try:
-                human = Kapellmeister(human_name, DBHandler(), self.read_human)
+                human = Kapellmeister(human_name, HumanStorage(), self.read_human)
                 self.__humans[human_name] = human
                 human.start()
             except Exception as e:
@@ -530,7 +540,7 @@ class HumanOrchestra():
         with self.lock:
             if human_name in self.__humans:
                 def f():
-                    db = DBHandler()
+                    db = HumanStorage()
                     human_config = db.get_human_live_configuration(human_name)
                     self.__humans[human_name].set_config(human_config)
 
@@ -538,6 +548,6 @@ class HumanOrchestra():
 
 
 if __name__ == '__main__':
-    l, r = _get_random_near(["a","b","c","d","e","f","g","h","i"], 5, 4)
+    l, r = _get_random_near(["a", "b", "c", "d", "e", "f", "g", "h", "i"], 5, 4)
     print l
     print r

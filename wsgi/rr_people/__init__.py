@@ -1,9 +1,10 @@
 import logging
 import random
+import re
 
 import praw
-import re
 from praw.objects import MoreComments
+from stemming.porter2 import stem
 
 from wsgi import properties
 
@@ -44,6 +45,8 @@ A_CONSUME = "consume"
 A_SUBSCRIBE = "subscribe"
 A_FRIEND = "friend"
 
+A_SLEEP = "sleep"
+
 S_BAN = "ban"
 S_WORK = "work"
 S_SLEEP = "sleep"
@@ -51,10 +54,12 @@ S_UNKNOWN = "unknown"
 S_STOP = "stop"
 S_SUSPEND = "suspend"
 
-
 re_url = re.compile("((https?|ftp)://|www\.)[^\s/$.?#].[^\s]*")
 
 log = logging.getLogger("man")
+
+WORDS_HASH = "words_hash"
+
 
 class Man(object):
     def __init__(self, user_agent=None):
@@ -63,8 +68,8 @@ class Man(object):
     def get_hot_and_new(self, subreddit_name, sort=None):
         try:
             subreddit = self.reddit.get_subreddit(subreddit_name)
-            hot = list(subreddit.get_hot(limit=properties.DEFAULT_LIMIT))
-            new = list(subreddit.get_new(limit=properties.DEFAULT_LIMIT))
+            hot = list(subreddit.get_hot(limit=random.randint(properties.DEFAULT_LIMIT / 10, properties.DEFAULT_LIMIT)))
+            new = list(subreddit.get_new(limit=random.randint(properties.DEFAULT_LIMIT / 10, properties.DEFAULT_LIMIT)))
             result_dict = dict(map(lambda x: (x.fullname, x), hot), **dict(map(lambda x: (x.fullname, x), new)))
 
             log.info("Will search for dest posts candidates at %s posts in %s" % (len(result_dict), subreddit_name))
@@ -73,6 +78,7 @@ class Man(object):
                 result.sort(cmp=sort)
             return result
         except Exception as e:
+            log.exception(e)
             return []
 
     def retrieve_comments(self, comments, parent_id, acc=None):
@@ -98,3 +104,24 @@ class Singleton(type):
         if cls not in cls._instances:
             cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
         return cls._instances[cls]
+
+
+reg = re.compile("[\\W\\d]+")
+
+
+def normalize_comment(comment_body):
+    res = []
+    if isinstance(comment_body, (str, unicode)):
+        tokens = reg.split(comment_body.lower().strip())
+        for token in tokens:
+            if len(token) > 2:
+                res.append(stem(token))
+    return " ".join(res)
+
+
+def info_words_hash(comment_body):
+    return {WORDS_HASH: hash(normalize_comment(comment_body))}
+
+
+if __name__ == '__main__':
+    print hash(normalize_comment(u"the thing."))

@@ -14,7 +14,8 @@ from werkzeug.utils import redirect
 from wsgi.properties import want_coefficient_max
 from wsgi.rr_people import S_STOP, S_WORK, S_SUSPEND
 from wsgi.rr_people.he import HumanConfiguration, HumanOrchestra
-from wsgi.db import DBHandler
+from wsgi.db import HumanStorage
+from wsgi.rr_people.reader import CommentSearcher, get_post_and_comment_text, SUB_QUEUE
 from wsgi.wake_up import WakeUp
 
 __author__ = '4ikist'
@@ -26,8 +27,10 @@ app = Flask("Humans", template_folder=cur_dir + "/templates", static_folder=cur_
 app.secret_key = 'foo bar baz'
 app.config['SESSION_TYPE'] = 'filesystem'
 
+
 def tst_to_dt(value):
     return datetime.fromtimestamp(value).strftime("%H:%M %d.%m.%Y")
+
 
 app.jinja_env.filters["tst_to_dt"] = tst_to_dt
 
@@ -44,16 +47,16 @@ wu.daemon = True
 wu.start()
 
 
-
 @app.route("/wake_up/<salt>", methods=["POST"])
 def wake_up(salt):
     return jsonify(**{"result": salt})
+
 
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
-db = DBHandler()
+db = HumanStorage()
 
 
 class User(object):
@@ -126,6 +129,7 @@ usersHandler = UsersHandler()
 log.info("users handler was initted")
 usersHandler.add_user(User("3030", "89231950908zozo"))
 
+
 @app.before_request
 def load_user():
     if session.get("user_id"):
@@ -162,11 +166,13 @@ def login():
 
     return render_template("login.html")
 
+
 @app.route('/logout')
 @login_required
 def logout():
     logout_user()
     return redirect(url_for('login'))
+
 
 @app.route("/")
 @login_required
@@ -176,13 +182,12 @@ def main():
         wu.what = _url
 
     user = g.user
-    return render_template("main.html", **{"username": user.name, "url":wu.what})
+    return render_template("main.html", **{"username": user.name, "url": wu.what})
 
 
 REDIRECT_URI = "http://rr-alexeyp.rhcloud.com/authorize_callback"
 C_ID = None
 C_SECRET = None
-
 
 
 @app.route("/humans/add_credential", methods=["GET", "POST"])
@@ -213,7 +218,6 @@ def human_auth_start():
         return render_template("human_add_credentials.html", **{"url": url})
 
 
-
 @app.route("/authorize_callback")
 @login_required
 def human_auth_end():
@@ -230,7 +234,6 @@ def human_auth_end():
 
 
 human_orchestra = HumanOrchestra()
-
 
 
 @app.route("/humans", methods=["POST", "GET"])
@@ -259,7 +262,6 @@ def humans():
                               "worked_humans": worked_humans})
 
 
-
 @app.route("/humans/<name>", methods=["POST", "GET"])
 @login_required
 def humans_info(name):
@@ -285,15 +287,68 @@ def humans_info(name):
     human_cfg = db.get_human_config(name)
 
     return render_template("humans_info.html", **{"human_name": name,
-                                               "human_stat": stat,
-                                               "human_log": human_log,
-                                               "human_live_state": human_cfg.get("live_state"),
-                                               "subs": human_cfg.get("subs", []),
-                                               "config": human_cfg.get("live_config") or HumanConfiguration().data,
-                                               "ss": human_cfg.get("ss", []),
-                                               "friends": human_cfg.get("frds", []),
-                                                "want_coefficient":want_coefficient_max
-                                               })
+                                                  "human_stat": stat,
+                                                  "human_log": human_log,
+                                                  "human_live_state": human_cfg.get("live_state"),
+                                                  "subs": human_cfg.get("subs", []),
+                                                  "config": human_cfg.get("live_config") or HumanConfiguration().data,
+                                                  "ss": human_cfg.get("ss", []),
+                                                  "friends": human_cfg.get("frds", []),
+                                                  "want_coefficient": want_coefficient_max
+                                                  })
+
+
+comment_searcher = CommentSearcher(db)
+
+
+@app.route("/comment_search/start/<sub>", methods=["POST"])
+@login_required
+def start_comment_search(sub):
+    comment_searcher.start_retrieve_comments(sub)
+    return redirect(url_for('comment_search_info', sub=sub))
+
+
+@app.route("/posts")
+def posts():
+    subs = comment_searcher.comment_queue.get_sbrdts_states()
+    qc_s = {}
+    for sub in subs.keys():
+        queued_comments = comment_searcher.comment_queue.show_all(sub)
+        qc_s[sub] = queued_comments
+
+    return render_template("posts_and_comments.html", **{"subs":subs, "qc_s":qc_s})
+
+@app.route("/comment_search/info/<sub>")
+def comment_search_info(sub):
+    posts = db.get_posts_found_comment_text()
+    comments = comment_searcher.comment_queue.show_all(sub)
+    comments = dict(map(lambda c: get_post_and_comment_text(c), comments))
+
+    if comments:
+        for i, post in enumerate(posts):
+            post['is_in_queue'] = post.get("fullname") in comments
+            if post["is_in_queue"]:
+                post['text'] = comments.get(post.get("fullname"), "")
+            posts[i] = post
+
+    posts_commented = db.get_posts_commented()
+    subs_ = db.human_config.aggregate([{"$group": {"_id": "$subs"}}])
+    subs = []
+    for sbs in subs_:
+        for sb in sbs["_id"]:
+            if sub != sb:
+                subs.append(sb)
+    subs_states = comment_searcher.comment_queue.get_sbrdts_states()
+    state = comment_searcher.comment_queue.get_state(sub)
+
+    result = {"posts_found_comment_text": posts,
+              "posts_commented": posts_commented,
+              "sub": sub,
+              "a_subs": subs,
+              "subs_states": subs_states,
+              "state":state}
+    return render_template("comment_search_info.html", **result)
+
 
 if __name__ == '__main__':
     print os.path.dirname(__file__)

@@ -51,8 +51,17 @@ SRC_OBSERV = "observation"
 mongo_uri = "mongodb://3030:sederfes100500@ds055525.mongolab.com:55525/reddit_people"
 db_name = "reddit_people"
 
+ae_mongo_uri = "mongodb://localhost:27017"
+ae_db_name = "ae"
+
+c_queue_mongo_uri = mongo_uri
+c_queue_db_name = db_name
+
+c_queue_redis_addres = "pub-redis-11997.us-east-1-3.7.ec2.redislabs.com"
+c_queue_redis_port = 11997
+
 DEFAULT_LIMIT = 100
-DEFAULT_SLEEP_TIME_AFTER_READ_SUBREDDIT = 60 * 60
+DEFAULT_SLEEP_TIME_AFTER_READ_SUBREDDIT = 60 * 60 * 4
 
 min_copy_count = 2
 min_comment_create_time_difference = 3600 * 24 * 10
