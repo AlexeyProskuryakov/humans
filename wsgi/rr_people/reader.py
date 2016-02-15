@@ -158,7 +158,7 @@ class CommentSearcher(Man):
                                     comment, post.fullname, subreddit))
                                 break
 
-                    if comment and self.db.set_post_found_comment_text(post.fullname, info_words_hash(comment.body)):
+                    if comment and self.db.set_post_found_comment_text(post.fullname, info_words_hash(comment.body), comment.body):
                         yield serialise(post.fullname, comment.body)
                     else:
                         log.info("Can not find any valid comments for [%s]" % (post.fullname))

@@ -382,7 +382,7 @@ class Consumer(Man):
                             self.db.can_comment_post(self.user_name, hash=hash(normalize_comment(comment_text))):
                         response = _post.add_comment(comment_text)
                         self.db.set_post_commented(_post.fullname, by=self.user_name,
-                                                   info=dict(info_words_hash(comment_text), **{"text": comment_text}))
+                                                   info=dict(info_words_hash(comment_text), text= comment_text))
                         self.register_step(A_COMMENT,
                                            info={"fullname": post_fullname, "text": comment_text,
                                                  "sub": subreddit_name})
@@ -474,6 +474,7 @@ class Kapellmeister(Process):
                     return
 
                 for sub in self.db.get_human_subs(self.human_name):
+                    #todo remove it
                     self.r_human.start_retrieve_comments(sub)
                     try:
                         to_comment_info = self.comment_queue.get(sub)

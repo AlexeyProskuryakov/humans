@@ -5,6 +5,7 @@ from uuid import uuid4
 
 import praw
 from datetime import datetime
+import time
 from flask import Flask, logging, request, render_template, session, url_for, g
 from flask.json import jsonify
 from flask_debugtoolbar import DebugToolbarExtension
@@ -305,7 +306,13 @@ comment_searcher = CommentSearcher(db)
 @login_required
 def start_comment_search(sub):
     comment_searcher.start_retrieve_comments(sub)
-    return redirect(url_for('comment_search_info', sub=sub))
+    while 1:
+        state = comment_searcher.comment_queue.get_state(sub)
+        if "work" in state:
+            return jsonify({"state":state})
+        time.sleep(1)
+
+
 
 
 @app.route("/posts")
@@ -316,14 +323,13 @@ def posts():
         queued_comments = comment_searcher.comment_queue.show_all(sub)
         qc_s[sub] = queued_comments
 
-    return render_template("posts_and_comments.html", **{"subs":subs, "qc_s":qc_s})
+    return render_template("posts_and_comments.html", **{"subs": subs, "qc_s": qc_s})
+
 
 @app.route("/comment_search/info/<sub>")
 def comment_search_info(sub):
     posts = db.get_posts_found_comment_text()
     comments = comment_searcher.comment_queue.show_all(sub)
-    comments = dict(map(lambda c: get_post_and_comment_text(c), comments))
-
     if comments:
         for i, post in enumerate(posts):
             post['is_in_queue'] = post.get("fullname") in comments
@@ -346,7 +352,7 @@ def comment_search_info(sub):
               "sub": sub,
               "a_subs": subs,
               "subs_states": subs_states,
-              "state":state}
+              "state": state}
     return render_template("comment_search_info.html", **result)
 
 

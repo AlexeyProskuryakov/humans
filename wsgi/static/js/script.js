@@ -170,3 +170,16 @@ $(function(){
     }
 
 });
+
+function start_find(sub){
+    console.log(sub);
+    $.ajax({
+        type:"POST",
+        url:"/comment_search/start/"+sub,
+        success:function(x){
+            console.log(x);
+             $("#"+sub+"_st").text(x.state);
+        }
+    })
+}
+

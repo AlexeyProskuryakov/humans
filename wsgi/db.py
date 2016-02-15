@@ -14,8 +14,6 @@ __author__ = 'alesha'
 log = logging.getLogger("DB")
 
 WORDS_HASH = "words_hash"
-INFO_WORDS_HASH = "info.words_hash"
-INFO_OWNER = "info.owner"
 
 
 class DBHandler(object):
@@ -81,8 +79,9 @@ class HumanStorage(DBHandler):
             self.human_posts.create_index([("low_copies", pymongo.ASCENDING), ("commented", pymongo.ASCENDING),
                                            ("found_text", pymongo.ASCENDING)])
             self.human_posts.create_index([("time", pymongo.ASCENDING)])
-            self.human_posts.create_index([(INFO_WORDS_HASH, pymongo.ASCENDING)])
-            self.human_posts.create_index([(INFO_OWNER, pymongo.ASCENDING)])
+            self.human_posts.create_index([("time", pymongo.ASCENDING)])
+
+            self.human_posts.create_index([(WORDS_HASH, pymongo.ASCENDING)])
             self.human_posts.create_index([("by", pymongo.ASCENDING)])
 
     def update_human_access_credentials_info(self, user, info):
@@ -180,14 +179,16 @@ class HumanStorage(DBHandler):
 
         ######POSTS###########################
 
-    def set_post_commented(self, post_fullname, info=None, by=None):
-        found = self.human_posts.find_one({"fullname": post_fullname})
+    def set_post_commented(self, post_fullname, info=None, by=None, text=None):
+        found = self.human_posts.find_one({"fullname": post_fullname, "commented": {"$exists": False}})
         if not found:
             to_add = {"fullname": post_fullname, "commented": True, "time": time.time()}
             if info:
                 to_add["info"] = info
             if by:
                 to_add['by'] = by
+            if text:
+                to_add["text"] = text
             self.human_posts.insert_one(to_add)
         else:
             to_set = {"commented": True}
@@ -199,7 +200,7 @@ class HumanStorage(DBHandler):
                                         {"$set": to_set})
 
     def can_comment_post(self, who, post_fullname=None, hash=None):
-        q = {"by": who, "commented":True}
+        q = {"by": who, "commented": True}
         if post_fullname:
             q["fullname"] = post_fullname
         if hash:
@@ -210,14 +211,15 @@ class HumanStorage(DBHandler):
         return found is None
 
     def set_post_found_comment_text(self, post_fullname, word_hash, text=None):
-        found = self.human_posts.find_one({"$or": [{"fullname": post_fullname}, {WORDS_HASH: word_hash}]})
-        if found and (found.get("commented") or found.get("found_text")):
+        found = self.human_posts.find_one(
+                {"fullname": post_fullname, "$or": [{WORDS_HASH: word_hash}, {WORDS_HASH: {"$exist": False}}]})
+        if found and found.get("commented"):
             return
         elif found:
             return self.human_posts.update_one(found, {"$set": {"found_text": True, WORDS_HASH: word_hash}})
         else:
             return self.human_posts.insert_one(
-                    {"fullname": post_fullname, "found_text": True, WORDS_HASH: word_hash, "text":text})
+                    {"fullname": post_fullname, "found_text": True, WORDS_HASH: word_hash, "text": text})
 
     def get_posts_found_comment_text(self):
         return list(self.human_posts.find({"found_text": True, "commented": {"$exists": False}}))
