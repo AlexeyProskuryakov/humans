@@ -381,8 +381,10 @@ class Consumer(Man):
                     if self.db.can_comment_post(self.user_name, post_fullname=_post.fullname) and \
                             self.db.can_comment_post(self.user_name, hash=hash(normalize_comment(comment_text))):
                         response = _post.add_comment(comment_text)
-                        self.db.set_post_commented(_post.fullname, by=self.user_name,
-                                                   info=dict(info_words_hash(comment_text), text= comment_text))
+                        self.db.set_post_commented(_post.fullname,
+                                                   by=self.user_name,
+                                                   words_hash=hash(normalize_comment(comment_text)),
+                                                   text=comment_text)
                         self.register_step(A_COMMENT,
                                            info={"fullname": post_fullname, "text": comment_text,
                                                  "sub": subreddit_name})
@@ -453,15 +455,15 @@ class Kapellmeister(Process):
     def human_check(self):
         ok = check_any_login(self.human_name)
         if not ok:
-            self.db.set_human_live_state(self.human_name, S_BAN, self.pid)
+            self.db.set_human_state(self.human_name, S_BAN)
         return ok
 
     def set_state(self, new_state):
-        state = self.db.get_human_live_state(self.human_name)
+        state = self.db.get_human_state(self.human_name)
         if state == S_SUSPEND:
             return False
         else:
-            self.db.set_human_live_state(self.human_name, new_state, self.pid)
+            self.db.set_human_state(self.human_name, new_state)
             return True
 
     def run(self):
@@ -474,17 +476,17 @@ class Kapellmeister(Process):
                     return
 
                 for sub in self.db.get_human_subs(self.human_name):
-                    #todo remove it
-                    self.r_human.start_retrieve_comments(sub)
                     try:
                         to_comment_info = self.comment_queue.get(sub)
                         if to_comment_info:
                             post, text = to_comment_info
                             self.w_human.do_comment_post(post, sub, text)
+                        else:
+                            log.error("get from queue none! for sub %s" % sub)
                     except Empty as e:
                         log.info(
                                 "%s can not comment at %s because they no found at this moment" % (
-                                self.human_name, sub))
+                                    self.human_name, sub))
 
                     except Exception as e:
                         log.info("%s can not comment at %s" % (self.human_name, sub))
@@ -520,7 +522,7 @@ class HumanOrchestra():
     def start_humans(self):
         log.info("Will auto start humans")
         for human in self.db.get_humans_available():
-            self.add_human(human.get("user"))
+            self.add_human(human.get("name"))
 
     @property
     def humans(self):
@@ -549,6 +551,7 @@ class HumanOrchestra():
 
 
 if __name__ == '__main__':
-    l, r = _get_random_near(["a", "b", "c", "d", "e", "f", "g", "h", "i"], 5, 4)
-    print l
-    print r
+    # l, r = _get_random_near(["a", "b", "c", "d", "e", "f", "g", "h", "i"], 5, 4)
+    # print l
+    # print r
+    print check_any_login("Shlak2k15")

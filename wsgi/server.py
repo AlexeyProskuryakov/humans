@@ -257,7 +257,8 @@ def humans():
         return redirect(url_for('humans_info', name=human_name))
 
     humans_info = db.get_humans_info()
-    worked_humans = human_orchestra.humans.keys()
+    worked_humans = map(lambda x: x.get("name"), db.get_humans_with_state(S_WORK))
+
     return render_template("humans_management.html",
                            **{"humans": humans_info,
                               "worked_humans": worked_humans})
@@ -270,11 +271,11 @@ def humans_info(name):
 
     if request.method == "POST":
         if request.form.get("stop"):
-            db.set_human_live_state(name, S_SUSPEND, "web")
+            db.set_human_state(name, S_SUSPEND)
             return redirect(url_for('humans_info', name=name))
 
         if request.form.get("start"):
-            db.set_human_live_state(name, S_WORK, "web")
+            db.set_human_state(name, S_WORK)
             human_orchestra.add_human(name)
             return redirect(url_for('humans_info', name=name))
 
@@ -286,11 +287,12 @@ def humans_info(name):
     stat = db.get_log_of_human_statistics(name)
 
     human_cfg = db.get_human_config(name)
+    state = db.get_human_state(name)
 
     return render_template("humans_info.html", **{"human_name": name,
                                                   "human_stat": stat,
                                                   "human_log": human_log,
-                                                  "human_live_state": human_cfg.get("live_state"),
+                                                  "human_live_state": state,
                                                   "subs": human_cfg.get("subs", []),
                                                   "config": human_cfg.get("live_config") or HumanConfiguration().data,
                                                   "ss": human_cfg.get("ss", []),
@@ -309,10 +311,8 @@ def start_comment_search(sub):
     while 1:
         state = comment_searcher.comment_queue.get_state(sub)
         if "work" in state:
-            return jsonify({"state":state})
+            return jsonify({"state": state})
         time.sleep(1)
-
-
 
 
 @app.route("/posts")

@@ -67,9 +67,6 @@
                     </td>
                     <td class="col-md-2 ">
                         {{human.live_state}}
-                        {%if human.live_state%}
-                        (At {{human.live_state_time | tst_to_dt}} by {{human.live_pid}})
-                        {%endif%}
                     </td>
                     <td>
                         {% if human.info %}

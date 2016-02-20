@@ -78,11 +78,16 @@ class HumanStorage(DBHandler):
             self.human_posts.create_index([("fullname", pymongo.ASCENDING)], unique=True)
             self.human_posts.create_index([("low_copies", pymongo.ASCENDING), ("commented", pymongo.ASCENDING),
                                            ("found_text", pymongo.ASCENDING)])
-            self.human_posts.create_index([("time", pymongo.ASCENDING)])
-            self.human_posts.create_index([("time", pymongo.ASCENDING)])
 
+            self.human_posts.create_index([("time", pymongo.ASCENDING)])
             self.human_posts.create_index([(WORDS_HASH, pymongo.ASCENDING)])
             self.human_posts.create_index([("by", pymongo.ASCENDING)])
+
+        self.humans_states = db.get_collection("human_states")
+        if not self.humans_states:
+            self.humans_states = db.create_collection("human_states")
+            self.human_posts.create_index([("name", pymongo.ASCENDING)])
+            self.human_posts.create_index([("state", pymongo.ASCENDING)])
 
     def update_human_access_credentials_info(self, user, info):
         if isinstance(info.get("scope"), set):
@@ -114,25 +119,6 @@ class HumanStorage(DBHandler):
 
     def set_human_channel_id(self, name, channel_id):
         self.human_config.update_one({"user": name}, {"$set": {"channel_id": channel_id}})
-
-    def get_humans_available(self):
-        return self.human_config.find({"info": {"$exists": True},
-                                       "subs": {"$exists": True},
-                                       "live_state": {"$in": ["work", "unknown", "sleep"]}})
-
-    def set_human_live_state(self, name, state, pid):
-        self.human_config.update_one({"user": name},
-                                     {"$set": {"live_state": state, "live_state_time": time.time(), "live_pid": pid}})
-
-    def get_human_live_state(self, name):
-        found = self.human_config.find_one({"user": name})
-        if found:
-            state_time = found.get("live_state_time")
-            if not state_time or (state_time and time.time() - state_time > 3600):
-                return "unknown"
-            else:
-                return found.get("live_state")
-        return None
 
     def get_humans_info(self):
         found = self.human_config.find({})
@@ -177,15 +163,40 @@ class HumanStorage(DBHandler):
     def get_human_config(self, name):
         return self.human_config.find_one({"user": name})
 
-        ######POSTS###########################
+    ############STATES################
+    def get_humans_available(self):
+        worked = self.humans_states.find({"state": {"$in": ["work", "sleep"]}})
+        return worked
 
+    def set_human_state(self, name, state):
+        if state == "ban":
+            self.humans_states.update_one({"name": name}, {"$inc": {"ban_count": 1}, "$set": {'state': state}},
+                                          upsert=True)
+        else:
+            self.humans_states.update_one({"name": name}, {"$set": {'state': state}}, upsert=True)
+
+    def get_human_state(self, name):
+        found = self.human_config.find_one({"name": name})
+        if found:
+            state = found.get("state")
+            if state == "ban" and found.get("ban_count") <= 3:
+                return "work"
+            return state
+        return None
+
+
+    def get_humans_with_state(self, state):
+        return self.humans_states.find({"state":state})
+
+    ######POSTS###########################
     def set_post_commented(self, post_fullname, by, text, words_hash):
         found = self.human_posts.find_one({"fullname": post_fullname, "commented": {"$exists": False}})
         if not found:
-            to_add = {"fullname": post_fullname, "commented": True, "time": time.time(), WORDS_HASH:words_hash, "text":text, "by":by}
+            to_add = {"fullname": post_fullname, "commented": True, "time": time.time(), WORDS_HASH: words_hash,
+                      "text": text, "by": by}
             self.human_posts.insert_one(to_add)
         else:
-            to_set = {"commented": True, WORDS_HASH:words_hash, "text":text, "by":by, "time": time.time()}
+            to_set = {"commented": True, WORDS_HASH: words_hash, "text": text, "by": by, "time": time.time()}
             self.human_posts.update_one({"fullname": post_fullname}, {"$set": to_set})
 
     def can_comment_post(self, who, post_fullname=None, hash=None):
@@ -205,7 +216,8 @@ class HumanStorage(DBHandler):
         if found and found.get("commented"):
             return
         elif found:
-            return self.human_posts.update_one(found, {"$set": {"found_text": True, WORDS_HASH: word_hash}})
+            return self.human_posts.update_one(found,
+                                               {"$set": {"found_text": True, WORDS_HASH: word_hash, "text": text}})
         else:
             return self.human_posts.insert_one(
                     {"fullname": post_fullname, "found_text": True, WORDS_HASH: word_hash, "text": text})
@@ -299,7 +311,7 @@ if __name__ == '__main__':
     h2 = hash(normalize_comment("one 12two,. three 112four"))
     h21 = hash(normalize_comment("one two three four"))
 
-    db.set_post_commented("1", info={WORDS_HASH: h1})
+    db.set_post_commented("1", "1",info={WORDS_HASH: h1})
     print db.is_post_commented("1")
     print db.is_posts_have_words_hash(h11)
     db.set_post_low_copies("1")

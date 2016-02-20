@@ -13,7 +13,7 @@ from wsgi import properties
 from wsgi.db import HumanStorage
 from wsgi.properties import c_queue_redis_addres, c_queue_redis_port
 from wsgi.rr_people import re_url, normalize_comment, info_words_hash, S_WORK, S_SLEEP, S_STOP
-from wsgi.rr_people.he import Man
+from wsgi.rr_people import Man
 
 log = logging.getLogger("reader")
 
@@ -107,7 +107,6 @@ class CommentSearcher(Man):
                 start = time.time()
                 log.info("Will start find comments for [%s]" % (sub))
                 for el in self.find_comment(sub):
-                    log.info("was found comment: %s" % el)
                     self.comment_queue.put(sub, el)
                 end = time.time()
                 sleep_time = random.randint(properties.DEFAULT_SLEEP_TIME_AFTER_READ_SUBREDDIT / 5,
@@ -115,7 +114,7 @@ class CommentSearcher(Man):
                 log.info(
                         "Was get all comments which found for [%s] at %s seconds... Will trying next after %s" % (
                             sub, end - start, sleep_time))
-                self.comment_queue.set_state(sub, S_SLEEP, ex=sleep_time)
+                self.comment_queue.set_state(sub, S_SLEEP, ex=sleep_time+1)
                 time.sleep(sleep_time)
 
         ps = Process(name="[%s] comment founder" % sub, target=f)
@@ -250,9 +249,10 @@ class CommentQueue():
 
 
 if __name__ == '__main__':
-    sbrdt = "video"
-    db = HumanStorage()
-
-    cs = CommentSearcher(db)
-    for comment in cs.find_comment(sbrdt):
-        print comment
+    # sbrdt = "video"
+    # db = HumanStorage()
+    #
+    # cs = CommentSearcher(db)
+    # for comment in cs.find_comment(sbrdt):
+    #     print comment
+    print is_good_text("   https://www.youtube.com/watch?v=cq751gquYQ8   ")
