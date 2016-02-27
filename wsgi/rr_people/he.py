@@ -132,6 +132,7 @@ class Consumer(Man):
             raise Exception("Can not have login credentials at %s", login)
         self.subscribed_subreddits = set(state.get("ss", [])) or set()
         self.friends = set(state.get("frds", [])) or set()
+        self.last_friend_add = state.get("last_friend_add") or time.time() - WEEK
 
         self.init_engine(login_credentials)
         self.init_work_cycle()
@@ -237,6 +238,8 @@ class Consumer(Man):
     def register_step(self, step_type, info=None):
         if step_type in self.counters:
             self.incr_counter(step_type)
+        if step_type == A_FRIEND:
+            self.last_friend_add = time.time()
 
         self.db.save_log_human_row(self.user_name, step_type, info or {})
         self.persist_state()
@@ -248,7 +251,12 @@ class Consumer(Man):
     @property
     def state(self):
         return {"ss": list(self.subscribed_subreddits),
-                "frds": list(self.friends)}
+                "frds": list(self.friends),
+                "last_friend_add": self.last_friend_add
+                }
+
+    def can_friendship_create(self, friend_name):
+        return friend_name not in self.friends and time.time() - self.last_friend_add > random.randint(WEEK / 5, WEEK)
 
     def persist_state(self):
         self.db.update_human_internal_state(self.user_name, state=self.state)
@@ -288,23 +296,24 @@ class Consumer(Man):
                     vote_count = random.choice([1, -1])
                     try:
                         comment.vote(vote_count)
+                        self.register_step(A_VOTE, info={"fullname": comment.fullname, "vote": vote_count})
+                        self.wait(self.configuration.max_wait_time / 10)
                     except Exception as e:
-                        log.error(e)
-                    self.register_step(A_VOTE, info={"fullname": comment.fullname, "vote": vote_count})
-                    self.wait(self.configuration.max_wait_time / 10)
-                    if self._is_want_to(
-                            self.configuration.comment_friend) and vote_count > 0 and comment.author.name not in self.friends:  # friend comment author
-                        c_author = comment.author
-                        if c_author.name not in self.friends:
-                            try:
-                                c_author.friend()
-                            except Exception as e:
-                                log.error(e)
+                        log.exception(e)
+
+                    if self._is_want_to(self.configuration.comment_friend) and \
+                                    vote_count > 0 and \
+                            self.can_friendship_create(comment.author.name):  # friend comment author
+                        try:
+                            c_author = comment.author
+                            c_author.friend()
                             self.friends.add(c_author.name)
                             self.register_step(A_FRIEND, info={"friend": c_author.name, "from": "comment"})
                             log.info("%s was add friend from comment %s because want coefficient is: %s",
                                      (self.user_name, comment.fullname, self.configuration.comment_friend))
                             self.wait(self.configuration.max_wait_time / 10)
+                        except Exception as e:
+                            log.exception(e)
 
                 if self._is_want_to(self.configuration.comment_url):  # go to url in comment
                     if isinstance(comment, MoreComments):
@@ -325,29 +334,27 @@ class Consumer(Man):
 
             self.wait(self.configuration.max_wait_time / 5)
 
-        if self._is_want_to(
-                self.configuration.subscribe) and post.subreddit.display_name not in self.subscribed_subreddits:  # subscribe sbrdt
+        if self._is_want_to(self.configuration.subscribe) and \
+                        post.subreddit.display_name not in self.subscribed_subreddits:  # subscribe sbrdt
             try:
                 self.reddit.subscribe(post.subreddit.display_name)
+                self.subscribed_subreddits.add(post.subreddit.display_name)
+                self.register_step(A_SUBSCRIBE, info={"sub": post.subreddit.display_name})
+                self.wait(self.configuration.max_wait_time / 5)
             except Exception as e:
-                log.error(e)
-            self.subscribed_subreddits.add(post.subreddit.display_name)
-            self.register_step(A_SUBSCRIBE, info={"sub": post.subreddit.display_name})
-            self.wait(self.configuration.max_wait_time / 5)
+                log.exception(e)
 
-        if self._is_want_to(
-                self.configuration.author_friend) and post.author.name not in self.friends:  # friend post author
+        if self._is_want_to(self.configuration.author_friend) and \
+                self.can_friendship_create(post.author.name):  # friend post author
             try:
                 post.author.friend()
+                self.friends.add(post.author.name)
+                self.register_step(A_FRIEND, info={"fullname": post.author.name, "from": "post"})
+                log.info("%s was add friend from post %s because want coefficient is: %s" % (
+                    self.user_name, post.fullname, self.configuration.author_friend))
+                self.wait(self.configuration.max_wait_time / 5)
             except Exception as e:
-                log.error(e)
-                log.error(self.reddit)
-
-            self.friends.add(post.author.name)
-            self.register_step(A_FRIEND, info={"fullname": post.author.name, "from": "post"})
-            log.info("%s was add friend from post %s because want coefficient is: %s" % (
-                self.user_name, post.fullname, self.configuration.author_friend))
-            self.wait(self.configuration.max_wait_time / 5)
+                log.exception(e)
 
     def set_configuration(self, configuration):
         self.configuration = configuration
@@ -433,7 +440,7 @@ class Consumer(Man):
         else:
             posts = self._sub_posts[random_sub]
 
-        w_k = random.randint(properties.want_coefficient_max/2, properties.want_coefficient_max)
+        w_k = random.randint(properties.want_coefficient_max / 2, properties.want_coefficient_max)
 
         start_from = self._last_post_ids.get(random_sub, 0)
         for i, post in enumerate(posts, start=start_from):
@@ -511,6 +518,8 @@ class Kapellmeister(Process):
             step += _diff
             if step > WEEK:
                 step = step - WEEK
+
+            log.info("[%s] step is end. Action was: [%s], time spent: %s, next step: %s"%(self.human_name, action, _diff, step))
 
 
 class HumanOrchestra():
