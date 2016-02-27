@@ -12,7 +12,7 @@ from redis.client import Pipeline
 from wsgi import properties
 from wsgi.db import HumanStorage
 from wsgi.properties import c_queue_redis_addres, c_queue_redis_port
-from wsgi.rr_people import re_url, normalize_comment, info_words_hash, S_WORK, S_SLEEP, S_STOP
+from wsgi.rr_people import re_url, normalize, S_WORK, S_SLEEP, S_STOP, re_crying_chars
 from wsgi.rr_people import Man
 
 log = logging.getLogger("reader")
@@ -73,16 +73,6 @@ __doc__ = """
     """
 
 
-class ActionModel():
-    """
-    """
-
-
-class AuthorHandler():
-    def __init__(self, db):
-        self.db = db
-
-
 class CommentSearcher(Man):
     def __init__(self, db, user_agent=None):
         """
@@ -103,7 +93,7 @@ class CommentSearcher(Man):
 
         def f():
             while 1:
-                self.comment_queue.set_state(sub, S_WORK)
+                self.comment_queue.set_reader_state(sub, S_WORK)
                 start = time.time()
                 log.info("Will start find comments for [%s]" % (sub))
                 for el in self.find_comment(sub):
@@ -114,7 +104,7 @@ class CommentSearcher(Man):
                 log.info(
                         "Was get all comments which found for [%s] at %s seconds... Will trying next after %s" % (
                             sub, end - start, sleep_time))
-                self.comment_queue.set_state(sub, S_SLEEP, ex=sleep_time+1)
+                self.comment_queue.set_reader_state(sub, S_SLEEP, ex=sleep_time + 1)
                 time.sleep(sleep_time)
 
         ps = Process(name="[%s] comment founder" % sub, target=f)
@@ -133,39 +123,33 @@ class CommentSearcher(Man):
 
         subreddit = at_subreddit
         all_posts = self.get_hot_and_new(subreddit, sort=cmp_by_created_utc)
-        self.comment_queue.set_state(subreddit, "%s found %s" % (S_WORK, len(all_posts)), ex=len(all_posts) * 2)
+        self.comment_queue.set_reader_state(subreddit, "%s found %s" % (S_WORK, len(all_posts)), ex=len(all_posts) * 2)
         for post in all_posts:
-            # log.info("Find comments in %s"%post.fullname)
-            if self.db.is_post_commented(post.fullname):
-                # log.info("But post %s have low copies or commented yet"%post.fullname)
-                continue
-            try:
-                copies = self._get_post_copies(post)
-                copies = filter(
-                        lambda copy: _so_long(copy.created_utc, properties.min_comment_create_time_difference) and \
-                                     copy.num_comments > properties.min_donor_num_comments,
-                        copies)
-                if len(copies) >= properties.min_copy_count:
-                    copies.sort(cmp=cmp_by_created_utc)
-                    comment = None
-                    for copy in copies:
-                        # log.info("Validating copy %s for post %s"%(copy.fullname, post.fullname))
-                        if copy.subreddit != post.subreddit and copy.fullname != post.fullname:
-                            comment = self._retrieve_interested_comment(copy, post)
-                            if comment and post.author != comment.author:
-                                log.info("Find comment: [%s] in post: [%s] at subreddit: [%s]" % (
-                                    comment, post.fullname, subreddit))
-                                break
+            if self.db.is_can_see_post(post.fullname):
+                try:
+                    copies = self._get_post_copies(post)
+                    copies = filter(
+                            lambda copy: _so_long(copy.created_utc, properties.min_comment_create_time_difference) and \
+                                         copy.num_comments > properties.min_donor_num_comments,
+                            copies)
+                    if len(copies) >= properties.min_copy_count:
+                        copies.sort(cmp=cmp_by_created_utc)
+                        comment = None
+                        for copy in copies:
+                            if copy.subreddit != post.subreddit and copy.fullname != post.fullname:
+                                comment = self._retrieve_interested_comment(copy, post)
+                                if comment:
+                                    log.info("Find comment: [%s] in post: [%s] at subreddit: [%s]" % (
+                                        comment, post.fullname, subreddit))
+                                    break
 
-                    if comment and self.db.set_post_found_comment_text(post.fullname, info_words_hash(comment.body), comment.body):
-                        yield serialise(post.fullname, comment.body)
+                        if comment and self.db.set_post_ready_for_comment(post.fullname,
+                                                                          hash(normalize(comment.body))):
+                            yield serialise(post.fullname, comment.body)
                     else:
-                        log.info("Can not find any valid comments for [%s]" % (post.fullname))
-                else:
-                    # log.info("But have low copies")
-                    self.db.set_post_low_copies(post.fullname)
-            except Exception as e:
-                log.error(e)
+                        self.db.set_post_low_copies(post.fullname)
+                except Exception as e:
+                    log.exception(e)
 
     def _get_post_copies(self, post):
         search_request = "url:\'%s\'" % post.url
@@ -180,6 +164,7 @@ class CommentSearcher(Man):
             comment = comments[i]
             if comment.ups >= properties.min_donor_comment_ups and \
                             comment.ups <= properties.max_donor_comment_ups and \
+                            post.author != comment.author and \
                     self.check_comment_text(comment.body, post):
                 return comment
 
@@ -187,7 +172,6 @@ class CommentSearcher(Man):
         result = self.retrieve_comments(post.comments, post.fullname)
         result = set(map(lambda x: x.body, result))
         return result
-
 
     def check_comment_text(self, text, post):
         """
@@ -198,61 +182,70 @@ class CommentSearcher(Man):
         :return:
         """
         if is_good_text(text):
-            normalized_text = normalize_comment(text)
-            info_words_hash(text)
+            normalized_text = normalize(text)
             tokens = set(normalized_text.split())
-            for comment in praw.helpers.flatten_tree(post.comments):
-                c_text = comment.body
-                if is_good_text(c_text):
-                    pc_tokens = set(normalize_comment(c_text).split())
-                    if len(tokens) == len(pc_tokens) and len(pc_tokens.intersection(tokens)) == len(pc_tokens):
-                        log.info("found similar text [%s] in post %s" % (tokens, post.fullname))
-                        return False
-        return True
+            if (float(len(tokens)) / 100) * 20 >= len(re_crying_chars.findall(text)):
+                for comment in praw.helpers.flatten_tree(post.comments):
+                    c_text = comment.body
+                    if is_good_text(c_text):
+                        pc_tokens = set(normalize(c_text).split())
+                        if len(tokens) == len(pc_tokens) and len(pc_tokens.intersection(tokens)) == len(pc_tokens):
+                            log.info("found similar text [%s] in post %s" % (tokens, post.fullname))
+                            return False
+                return True
 
-SUB_QUEUE = lambda x:"%s_cq"%x
+
+Q_SUB_QUEUE = lambda x: "%s_cq" % x
+Q_SUBS_STATES_H = "sbrdt_states"
+
 
 class CommentQueue():
-    def __init__(self):
+    def __init__(self, clear=False):
         self.redis = redis.StrictRedis(host=c_queue_redis_addres, port=c_queue_redis_port, db=0,
                                        password="sederfes100500")
 
+        log.info("Comment Queue inited!\n Entry subs is:")
+        for sub in self.redis.hgetall(Q_SUBS_STATES_H):
+            log.info("%s: \n%s\n" % (sub, "\n".join(["%s\t%s" % (k, v) for k, v in self.show_all(sub).iteritems()])))
+
     def put(self, sbrdt, key):
         log.debug("redis: push to %s \nthis:%s" % (sbrdt, key))
-        self.redis.rpush(SUB_QUEUE(sbrdt), key)
+        self.redis.rpush(Q_SUB_QUEUE(sbrdt), key)
 
     def get(self, sbrdt):
-        result = self.redis.lpop(SUB_QUEUE(sbrdt))
+        """
+        :param sbrdt: subreddit name in which post will comment
+        :return: post full name (which will comment), comment text
+        """
+        result = self.redis.lpop(Q_SUB_QUEUE(sbrdt))
         log.debug("redis: get by %s\nthis: %s" % (sbrdt, result))
         return get_post_and_comment_text(result)
 
-    def show_all(self,sbrdt):
-        result = self.redis.lrange(SUB_QUEUE(sbrdt),0,-1)
-        return dict(map(lambda x:get_post_and_comment_text(x), result))
+    def show_all(self, sbrdt):
+        result = self.redis.lrange(Q_SUB_QUEUE(sbrdt), 0, -1)
+        return dict(map(lambda x: get_post_and_comment_text(x), result))
 
-    def set_state(self, sbrdt, state, ex=None):
+    def set_reader_state(self, sbrdt, state, ex=None):
         pipe = self.redis.pipeline()
-        pipe.hset("sbrdt_states", sbrdt, state)
+        pipe.hset(Q_SUBS_STATES_H, sbrdt, state)
         pipe.set(sbrdt, state, ex=ex or 3600)
         pipe.execute()
 
-    def get_state(self, sbrdt):
+    def get_reader_state(self, sbrdt):
         return self.redis.get(sbrdt)
 
     def get_sbrdts_states(self):
         result = self.redis.hgetall("sbrdt_states")
         for k, v in result.iteritems():
-            ks = self.get_state(k)
+            ks = self.get_reader_state(k)
             if v is None or ks is None:
                 result[k] = S_STOP
         return result
 
 
 if __name__ == '__main__':
-    # sbrdt = "video"
-    # db = HumanStorage()
-    #
-    # cs = CommentSearcher(db)
-    # for comment in cs.find_comment(sbrdt):
-    #     print comment
-    print is_good_text("   https://www.youtube.com/watch?v=cq751gquYQ8   ")
+    queue = CommentQueue()
+    db = HumanStorage()
+    cs = CommentSearcher(db)
+    for res in cs.find_comment("videos"):
+        print res

@@ -16,7 +16,7 @@ from wsgi.properties import want_coefficient_max
 from wsgi.rr_people import S_STOP, S_WORK, S_SUSPEND
 from wsgi.rr_people.he import HumanConfiguration, HumanOrchestra
 from wsgi.db import HumanStorage
-from wsgi.rr_people.reader import CommentSearcher, get_post_and_comment_text, SUB_QUEUE
+from wsgi.rr_people.reader import CommentSearcher, get_post_and_comment_text, Q_SUB_QUEUE
 from wsgi.wake_up import WakeUp
 
 __author__ = '4ikist'
@@ -309,7 +309,7 @@ comment_searcher = CommentSearcher(db)
 def start_comment_search(sub):
     comment_searcher.start_retrieve_comments(sub)
     while 1:
-        state = comment_searcher.comment_queue.get_state(sub)
+        state = comment_searcher.comment_queue.get_reader_state(sub)
         if "work" in state:
             return jsonify({"state": state})
         time.sleep(1)
@@ -328,7 +328,7 @@ def posts():
 
 @app.route("/comment_search/info/<sub>")
 def comment_search_info(sub):
-    posts = db.get_posts_found_comment_text()
+    posts = db.get_posts_ready_for_comment()
     comments = comment_searcher.comment_queue.show_all(sub)
     if comments:
         for i, post in enumerate(posts):
@@ -345,7 +345,7 @@ def comment_search_info(sub):
             if sub != sb:
                 subs.append(sb)
     subs_states = comment_searcher.comment_queue.get_sbrdts_states()
-    state = comment_searcher.comment_queue.get_state(sub)
+    state = comment_searcher.comment_queue.get_reader_state(sub)
 
     result = {"posts_found_comment_text": posts,
               "posts_commented": posts_commented,

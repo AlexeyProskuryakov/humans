@@ -1,8 +1,6 @@
 import logging
-import numbers
 import random
-from collections import defaultdict
-from copy import copy
+from collections import defaultdict, Counter
 from datetime import datetime
 from random import choice
 
@@ -10,17 +8,11 @@ import praw
 import pymongo
 from pymongo.mongo_client import MongoClient
 
-from wsgi.db import DBHandler, HumanStorage
+from wsgi.db import DBHandler
 from wsgi.properties import ae_mongo_uri, ae_db_name
-from wsgi.rr_people import USER_AGENTS, A_SLEEP, A_CONSUME, A_COMMENT
+from wsgi.rr_people import USER_AGENTS, A_SLEEP, A_CONSUME, A_COMMENT, DAY, HOUR, MINUTE, SEC
 
 log = logging.getLogger("ae")
-
-SEC = 1
-MINUTE = 60
-HOUR = MINUTE * 60
-DAY = HOUR * 24
-WEEK = DAY * 7
 
 
 class AEPrepearer(object):
@@ -50,36 +42,21 @@ class AuthorsStorage(DBHandler):
         if not self.author_groups:
             self.author_groups = self.db.create_collection("ae_author_groups")
 
-
-    def get_interested_authors(self, count=1500):
+    def get_interested_authors(self, min_count_actions=1500):
         result = self.authors.aggregate([
             {"$group": {"_id": "$author", "count": {"$sum": "$count"}}},
-            {"$match": {"count": {"$gte": count}}}])
+            {"$match": {"count": {"$gte": min_count_actions}}}])
         return filter(lambda x: x is not None, map(lambda x: x.get("_id"), result))
 
-    def get_author_steps(self, author):
-        result = []
-        for step in self.authors.find({"end_time": {"$exists": True}, "action_type": A_SLEEP, "author": author}).sort(
-                "time"):
-            result.append(dict(step))
-        return result
-
-    def get_authors_steps(self, min_count=1500):
-        authors = defaultdict(list)
-        for author in self.get_interested_authors(min_count):
-            for step in self.authors.find(
-                    {"end_time": {"$exists": True}, "action_type": A_SLEEP, "author": author}).sort("time"):
-                authors[author].append(step)
-        return authors
-
-    def get_authors_groups(self, min_difference=2 * HOUR, difference_step=2 * HOUR, step_count=10, min_nights=5):
+    def get_authors_groups(self, min_difference=2 * HOUR, difference_step=2 * HOUR, step_count=10, min_nights=5,
+                           by=A_SLEEP):
         authors = defaultdict(list)
         groups = []
 
         for author in self.get_interested_authors():
             author_steps = []
             for step in self.authors.find(
-                    {"end_time": {"$exists": True}, "action_type": A_SLEEP, "author": author}).sort("time"):
+                    {"end_time": {"$exists": True}, "action_type": by, "author": author}).sort("time"):
                 author_steps.append(dict(step))
             if len(author_steps) >= min_nights:
                 authors[author] = author_steps[:]
@@ -176,19 +153,39 @@ WEEK_DAYS = {0: "MO", 1: "TU", 2: "WE", 3: "TH", 4: "FR", 5: "SA", 6: "SU"}
 
 
 class ActivityEngine(object):
-    def __init__(self, authors=None):
+    class ActionStack():
+        def __init__(self, size):
+            self.data = []
+            self.size = size
+
+        def push(self, action):
+            self.data.append(action)
+            if len(self.data) > self.size:
+                del self.data[0]
+
+        def get_prevailing_action(self):
+            if self.data:
+                cnt = Counter(self.data)
+                return cnt.most_common()[0]
+
+    def __init__(self, authors=None, size=5):
         self.authors = authors or []
         self._storage = AuthorsStorage()
         self._r = praw.Reddit(user_agent=choice(USER_AGENTS))
-
-        self._is_sleep = False
-        self._start_sleep = 0
-        self._end_sleep = 0
+        self._action_stack = ActivityEngine.ActionStack(size)
 
     def set_authors(self, authors, group_name=None):
         name = group_name or datetime.now().strftime("%A%B")
         self.authors = list(authors)
-        self._storage.author_groups.insert_one({"name":name, "authors":self.authors})
+        if not self._storage.authors.find_one(group_name):
+            self._storage.author_groups.insert_one({"name": name, "authors": self.authors})
+
+    def set_authors_by_group_name(self, group_name):
+        result = self._storage.author_groups.find_one({"name": group_name})
+        if result:
+            self.authors = result.get("authors")
+            return self.authors
+        return None
 
     def save_action(self, author, action_type, time, end_time=None):
         q = {"author": author, "action_type": action_type}
@@ -209,7 +206,7 @@ class ActivityEngine(object):
 
     def hash_string(self, time_hash):
         if not isinstance(time_hash, int):
-            return ""
+            return None
         else:
             d, r = divmod(time_hash, DAY)
             h, r = divmod(r, HOUR)
@@ -236,10 +233,7 @@ class ActivityEngine(object):
                 winner = i
         return winner
 
-    def get_actions(self, for_time, step=60):
-        if self._is_sleep and for_time - self._start_sleep < random.randint(6,8)*HOUR:
-            return A_SLEEP
-
+    def get_action(self, for_time, step=60):
         pipe = [
             {"$match": {"author": {"$in": self.authors},
                         "$or": [{"time": {"$gte": for_time, "$lte": for_time + step}},
@@ -253,19 +247,12 @@ class ActivityEngine(object):
         for r in result:
             action_weights[r.get("_id")] = r.get("count")
         getted_action = self.weighted_choice_king(action_weights)
-
-        if getted_action == A_SLEEP and for_time - self._end_sleep > random.randint(7,12)*HOUR and not self._is_sleep:
-            self._is_sleep = True
-            self._start_sleep = for_time
-
-        if getted_action != A_SLEEP and self._is_sleep and for_time - self._start_sleep > 8*HOUR:
-            self._is_sleep = False
-            self._end_sleep = for_time
-
+        self._action_stack.push(getted_action)
+        if self._action_stack.get_prevailing_action() == A_SLEEP: return A_SLEEP
         return getted_action
 
-    def fill_consume_and_sleep(self):
-        for author in self._storage.get_interested_authors():
+    def fill_consume_and_sleep(self, authors_min_actions_count=1500):
+        for author in self._storage.get_interested_authors(authors_min_actions_count):
             start_time, end_time = 0, 0
             actions = self._storage.authors.find({"author": author}).sort("time", 1)
             for i, action in enumerate(actions):
@@ -307,57 +294,57 @@ class ActivityEngine(object):
         self._storage.authors.delete_many({})
 
 
-def visualise_steps(groups, authors_steps):
-    import matplotlib.pyplot as plt
+# def visualise_steps(groups, authors_steps):
+#     import matplotlib.pyplot as plt
+#
+#     counter = 1
+#     clrs = ["b", "g", "r", "c", "m", "y", "k"]
+#     for i, group in enumerate(groups):
+#         c = random.choice(clrs)
+#         fstp = None
+#         for author in group:
+#             counter += 1
+#             for step in authors_steps[author]:
+#                 if not fstp:
+#                     fstp = step
+#                 plt.plot([step.get("time"), step.get("end_time")], [counter, counter], "k-", lw=1, label=author,
+#                          color=c)
+#
+#         plt.text(fstp["time"], counter, "%s" % i)
+#
+#     plt.axis([0, WEEK, 0, len(authors_steps) + 5])
+#     plt.xlabel("time")
+#     plt.ylabel("authors")
+#     plt.show()
 
-    counter = 1
-    clrs = ["b", "g", "r", "c", "m", "y", "k"]
-    for i, group in enumerate(groups):
-        c = random.choice(clrs)
-        fstp = None
-        for author in group:
-            counter += 1
-            for step in authors_steps[author]:
-                if not fstp:
-                    fstp = step
-                plt.plot([step.get("time"), step.get("end_time")], [counter, counter], "k-", lw=1, label=author,
-                         color=c)
 
-        plt.text(fstp["time"], counter, "%s" % i)
-
-    plt.axis([0, WEEK, 0, len(authors_steps) + 5])
-    plt.xlabel("time")
-    plt.ylabel("authors")
-    plt.show()
-
-
-def visualise_group_life(group, ae, step=HOUR):
-    ae.set_authors(group)
-    sleep = []
-    consume = []
-    comment = []
-    for t in range(0, WEEK, step):
-        result = ae.get_actions(t)
-        for action in result:
-            if action["_id"] == A_SLEEP:
-                sleep.append((action.get("count"), t))
-            if action["_id"] == A_CONSUME:
-                consume.append((action.get("count"), t))
-            if action["_id"] == A_COMMENT:
-                comment.append((action.get("count"), t))
-
-    get_y = lambda arr: map(lambda x: x[0], arr)
-    get_x = lambda arr: map(lambda x: x[1], arr)
-
-    import matplotlib.pyplot as plt
-
-    plt.plot(get_x(sleep), get_y(sleep), "o", color="r")
-    plt.plot(get_x(consume), get_y(consume), "o", color="g")
-    plt.plot(get_x(comment), get_y(comment), "o", color="b")
-    plt.axis([0, WEEK, 0, 20])
-    plt.xlabel("time")
-    plt.ylabel("actions")
-    plt.show()
+# def visualise_group_life(group, ae, step=HOUR):
+#     ae.set_authors(group)
+#     sleep = []
+#     consume = []
+#     comment = []
+#     for t in range(0, WEEK, step):
+#         result = ae.get_action(t)
+#         for action in result:
+#             if action["_id"] == A_SLEEP:
+#                 sleep.append((action.get("count"), t))
+#             if action["_id"] == A_CONSUME:
+#                 consume.append((action.get("count"), t))
+#             if action["_id"] == A_COMMENT:
+#                 comment.append((action.get("count"), t))
+#
+#     get_y = lambda arr: map(lambda x: x[0], arr)
+#     get_x = lambda arr: map(lambda x: x[1], arr)
+#
+#     import matplotlib.pyplot as plt
+#
+#     plt.plot(get_x(sleep), get_y(sleep), "o", color="r")
+#     plt.plot(get_x(consume), get_y(consume), "o", color="g")
+#     plt.plot(get_x(comment), get_y(comment), "o", color="b")
+#     plt.axis([0, WEEK, 0, 20])
+#     plt.xlabel("time")
+#     plt.ylabel("actions")
+#     plt.show()
 
 
 if __name__ == '__main__':
@@ -365,22 +352,37 @@ if __name__ == '__main__':
     a_s = AuthorsStorage()
     groups_result, authors = a_s.get_authors_groups()
     group = a_s.get_best_group(groups_result[-1], authors)
-    ae.set_authors(group)
+    ae.set_authors(group, "Shlak2k15")
+    ae.set_authors(group, "Shlak2k16")
+    ae.set_authors_by_group_name("Shlak2k15")
 
     import matplotlib.pyplot as plt
+    from wsgi.rr_people import WEEK
+    from wsgi.rr_people.he import Consumer
 
-    for t in range(0, WEEK, HOUR/12):
-        result = ae.get_actions(t, HOUR/12)
+    count = defaultdict(int)
+    for t in range(0, WEEK, HOUR / 2):
+        result = ae.get_action(t, HOUR / 2)
         if result == A_SLEEP:
             plt.plot([t], [2], "o", color="r")
+            count[A_SLEEP] += 1
         if result == A_CONSUME:
             plt.plot([t], [4], "o", color="g")
+            count[A_CONSUME] += 1
         if result == A_COMMENT:
             plt.plot([t], [6], "o", color="b")
+            count[A_COMMENT] += 1
+
+    print count
 
     plt.axis([0, WEEK, 0, 8])
     plt.xlabel("time")
     plt.ylabel("actions")
     plt.show()
-    # # visualise_steps([group], authors)
-    # visualise_group_life(group, ae, HOUR/12)
+
+    # for author in a_s.get_interested_authors(min_count_actions=0):
+    #     result = a_s.authors.aggregate([{"$match":{"author":author, "action_type":A_COMMENT}}, {"$group":{"_id":"$action_type", "count":{"$sum":"$count"}}}])
+    #     print author,"\t", ";\t".join(["%s: %s"%(el.get("_id"), el.get("count")) for el in  result])
+
+# # visualise_steps([group], authors)
+# visualise_group_life(group, ae, HOUR/12)

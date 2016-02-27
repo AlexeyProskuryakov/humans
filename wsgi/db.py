@@ -1,3 +1,4 @@
+# coding=utf-8
 import hashlib
 import logging
 import time
@@ -6,14 +7,11 @@ from datetime import datetime
 import pymongo
 from pymongo import MongoClient
 
-from wsgi.properties import mongo_uri, db_name
-from wsgi.rr_people import info_words_hash
+from wsgi.properties import mongo_uri, db_name, TIME_TO_WAIT_NEW_COPIES
 
 __author__ = 'alesha'
 
 log = logging.getLogger("DB")
-
-WORDS_HASH = "words_hash"
 
 
 class DBHandler(object):
@@ -80,7 +78,7 @@ class HumanStorage(DBHandler):
                                            ("found_text", pymongo.ASCENDING)])
 
             self.human_posts.create_index([("time", pymongo.ASCENDING)])
-            self.human_posts.create_index([(WORDS_HASH, pymongo.ASCENDING)])
+            self.human_posts.create_index([("text_hash", pymongo.ASCENDING)])
             self.human_posts.create_index([("by", pymongo.ASCENDING)])
 
         self.humans_states = db.get_collection("human_states")
@@ -184,55 +182,62 @@ class HumanStorage(DBHandler):
             return state
         return None
 
-
     def get_humans_with_state(self, state):
-        return self.humans_states.find({"state":state})
+        return self.humans_states.find({"state": state})
 
     ######POSTS###########################
-    def set_post_commented(self, post_fullname, by, text, words_hash):
+    def set_post_commented(self, post_fullname, by, text, text_hash):
         found = self.human_posts.find_one({"fullname": post_fullname, "commented": {"$exists": False}})
         if not found:
-            to_add = {"fullname": post_fullname, "commented": True, "time": time.time(), WORDS_HASH: words_hash,
-                      "text": text, "by": by}
+            to_add = {"fullname": post_fullname, "commented": True, "time": time.time(), "text_hash": text_hash,
+                      "commented_text": text, "by": by}
             self.human_posts.insert_one(to_add)
         else:
-            to_set = {"commented": True, WORDS_HASH: words_hash, "text": text, "by": by, "time": time.time()}
+            to_set = {"commented": True, "text_hash": text_hash, "commented_text": text, "by": by, "time": time.time(), "low_copies":False}
             self.human_posts.update_one({"fullname": post_fullname}, {"$set": to_set})
 
-    def can_comment_post(self, who, post_fullname=None, hash=None):
-        q = {"by": who, "commented": True}
-        if post_fullname:
-            q["fullname"] = post_fullname
-        if hash:
-            q['info'] = {WORDS_HASH: hash}
-        if not hash and not post_fullname:
-            return False
+    def can_comment_post(self, who, post_fullname, hash):
+        q = {"by": who, "commented": True, "$or": [{"fullname": post_fullname}, {"text_hash": hash}]}
         found = self.human_posts.find_one(q)
         return found is None
 
-    def set_post_found_comment_text(self, post_fullname, word_hash, text=None):
+    def set_post_ready_for_comment(self, post_fullname, text_hash):
         found = self.human_posts.find_one(
-                {"fullname": post_fullname, "$or": [{WORDS_HASH: word_hash}, {WORDS_HASH: {"$exist": False}}]})
+                {"fullname": post_fullname, "$or": [{"text_hash": text_hash}, {"text_hash": {"$exists": False}}]})
         if found and found.get("commented"):
             return
         elif found:
             return self.human_posts.update_one(found,
-                                               {"$set": {"found_text": True, WORDS_HASH: word_hash, "text": text}})
+                                               {"$set": {"ready_for_comment": True, "text_hash": text_hash, "low_copies":False}})
         else:
             return self.human_posts.insert_one(
-                    {"fullname": post_fullname, "found_text": True, WORDS_HASH: word_hash, "text": text})
+                    {"fullname": post_fullname, "ready_for_comment": True, "text_hash": text_hash})
 
-    def get_posts_found_comment_text(self):
-        return list(self.human_posts.find({"found_text": True, "commented": {"$exists": False}}))
+    def get_posts_ready_for_comment(self):
+        return list(self.human_posts.find({"ready_for_comment": True, "commented": {"$exists": False}}))
 
-    def is_post_used(self, post_fullname):
+    def get_post(self, post_fullname):
         found = self.human_posts.find_one({"fullname": post_fullname})
         return found
+
+    def is_can_see_post(self, fullname):
+        """
+        Можем посмотреть пост только если у него было мало копий давно.
+        Или же поста нет в бд.
+        :param fullname:
+        :return:
+        """
+        found = self.human_posts.find_one({"fullname": fullname})
+        if found:
+            if found.get("low_copies") and time.time() - found.get("time") > TIME_TO_WAIT_NEW_COPIES:
+                return True
+            return False
+        return True
 
     def is_post_commented(self, post_fullname):
         found = self.human_posts.find_one({"fullname": post_fullname})
         if found:
-            return found.get("commented")
+            return found.get("commented") or False
         return False
 
     def get_posts_commented(self, by=None):
@@ -249,9 +254,7 @@ class HumanStorage(DBHandler):
             self.human_posts.update_one({"fullname": post_fullname},
                                         {'$set': {"low_copies": True, "time": time.time()}})
 
-
-            #################HUMAN LOG
-
+    #################HUMAN LOG
     def save_log_human_row(self, human_name, action_name, info):
         self.human_log.insert_one(
                 {"human_name": human_name,
@@ -301,33 +304,39 @@ class HumanStorage(DBHandler):
 
 #
 if __name__ == '__main__':
-    from rr_people import normalize_comment
+    from rr_people import normalize
 
     db = HumanStorage()
     db.human_posts.delete_many({})
-    h1 = hash(normalize_comment(".,./one 1 two 2 three 3"))
-    h11 = hash(normalize_comment("one two three"))
+    t1 = ".,./one 1 two 2 three 3"
+    h1 = hash(normalize(t1))
 
-    h2 = hash(normalize_comment("one 12two,. three 112four"))
-    h21 = hash(normalize_comment("one two three four"))
+    t11 = "one two three"
+    h11 = hash(normalize(t11))
 
-    db.set_post_commented("1", "1",info={WORDS_HASH: h1})
-    print db.is_post_commented("1")
-    print db.is_posts_have_words_hash(h11)
-    db.set_post_low_copies("1")
-    cb = "one, two , three, four, five,s555ix"
-    cb2 = "one, two , three, four, five,s555ix, seven"
-    cb3 = "one, two , three, four, five,s555ix, eight"
-    db.set_post_found_comment_text("2", hash(normalize_comment(cb)))
-    db.set_post_found_comment_text("2", hash(normalize_comment(cb)))
-    db.set_post_found_comment_text("3", hash(normalize_comment(cb)))
-    db.set_post_found_comment_text("4", hash(normalize_comment(cb)))
-    db.set_post_found_comment_text("5", hash(normalize_comment(cb2)))
-    db.set_post_found_comment_text("5", hash(normalize_comment(cb3)))
+    t2 = "one 12two,. three 112four"
+    h2 = hash(normalize(t2))
 
-    print db.get_posts_found_comment_text()
-    print db.get_posts_commented()
-    db.set_post_commented("1", info=dict(info_words_hash(cb), **{"by": "u1", "text": cb}))
-    print db.get_posts_found_comment_text()
-    print db.get_posts_commented()
-    db.human_posts.delete_many({})
+    t21 = "one two three four"
+    h21 = hash(normalize(t21))
+
+    db.set_post_low_copies("p1")
+    p1 = db.get_post("p1")
+    print "low copies:", p1
+    print "can see", db.is_can_see_post("p1")
+
+    db.set_post_ready_for_comment("p2", h1)
+    print "not commented?: ", db.is_post_commented("p2")
+    print "ready for comment: ", db.get_post("p2")
+    print "can see", db.is_can_see_post("p2")
+
+    db.set_post_commented("p3", "u1", t2, h2)
+    print "commented?: ", db.is_post_commented("p3")
+    print "commented:", db.get_post("p3")
+    print "can not comment u1 p3 h2", db.can_comment_post("u1", "p3", h2)
+    print "can comment u2?", db.can_comment_post("u2", "p3", h2)
+    print "can comment u1 p3 h21?", db.can_comment_post("u1", "p3", h21)
+    print "can comment u1? p4", db.can_comment_post("u1", "p4", h2)
+    print "can see", db.is_can_see_post("p3")
+
+    print "can see", db.is_can_see_post("p4")

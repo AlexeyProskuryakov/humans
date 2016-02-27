@@ -54,7 +54,14 @@ S_UNKNOWN = "unknown"
 S_STOP = "stop"
 S_SUSPEND = "suspend"
 
+SEC = 1
+MINUTE = 60
+HOUR = MINUTE * 60
+DAY = HOUR * 24
+WEEK = DAY * 7
+
 re_url = re.compile("((https?|ftp)://|www\.)[^\s/$.?#].[^\s]*")
+re_crying_chars = re.compile("[A-Z!]{2,}")
 
 log = logging.getLogger("man")
 
@@ -65,11 +72,11 @@ class Man(object):
     def __init__(self, user_agent=None):
         self.reddit = praw.Reddit(user_agent=user_agent or random.choice(USER_AGENTS))
 
-    def get_hot_and_new(self, subreddit_name, sort=None):
+    def get_hot_and_new(self, subreddit_name, sort=None, limit=properties.DEFAULT_LIMIT):
         try:
             subreddit = self.reddit.get_subreddit(subreddit_name)
-            hot = list(subreddit.get_hot(limit=random.randint(properties.DEFAULT_LIMIT / 10, properties.DEFAULT_LIMIT)))
-            new = list(subreddit.get_new(limit=random.randint(properties.DEFAULT_LIMIT / 10, properties.DEFAULT_LIMIT)))
+            hot = list(subreddit.get_hot(limit=limit))
+            new = list(subreddit.get_new(limit=limit))
             result_dict = dict(map(lambda x: (x.fullname, x), hot), **dict(map(lambda x: (x.fullname, x), new)))
 
             log.info("Will search for dest posts candidates at %s posts in %s" % (len(result_dict), subreddit_name))
@@ -106,22 +113,19 @@ class Singleton(type):
         return cls._instances[cls]
 
 
-reg = re.compile("[\\W\\d]+")
+token_reg = re.compile("[\\W\\d]+")
 
 
-def normalize_comment(comment_body):
+def normalize(comment_body):
     res = []
     if isinstance(comment_body, (str, unicode)):
-        tokens = reg.split(comment_body.lower().strip())
+        tokens = token_reg.split(comment_body.lower().strip())
         for token in tokens:
             if len(token) > 2:
                 res.append(stem(token))
     return " ".join(res)
 
 
-def info_words_hash(comment_body):
-    return {WORDS_HASH: hash(normalize_comment(comment_body))}
-
 
 if __name__ == '__main__':
-    print hash(normalize_comment(u"the thing."))
+    print hash(normalize(u"the thing."))

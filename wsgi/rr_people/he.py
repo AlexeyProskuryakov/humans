@@ -4,6 +4,7 @@ import random
 import time
 import traceback
 from Queue import Empty
+from datetime import datetime
 from multiprocessing.process import Process
 from multiprocessing.synchronize import Lock
 from threading import Thread
@@ -17,8 +18,9 @@ from wsgi import properties
 from wsgi.db import HumanStorage
 from wsgi.rr_people import USER_AGENTS, \
     A_CONSUME, A_VOTE, A_COMMENT, A_POST, A_SUBSCRIBE, A_FRIEND, \
-    S_UNKNOWN, S_SLEEP, S_WORK, S_BAN, Man, re_url, S_SUSPEND, Singleton, info_words_hash, normalize_comment
-from wsgi.rr_people.reader import CommentSearcher, CommentQueue
+    S_SLEEP, S_WORK, S_BAN, Man, re_url, S_SUSPEND, Singleton, normalize, WEEK, \
+    MINUTE, HOUR, A_SLEEP
+from wsgi.rr_people.reader import CommentQueue
 
 log = logging.getLogger("he")
 
@@ -378,15 +380,17 @@ class Consumer(Man):
                     log.error(e)
 
                 try:
-                    if self.db.can_comment_post(self.user_name, post_fullname=_post.fullname) and \
-                            self.db.can_comment_post(self.user_name, hash=hash(normalize_comment(comment_text))):
+                    text_hash = hash(normalize(comment_text))
+                    if self.db.can_comment_post(self.user_name,
+                                                post_fullname=_post.fullname,
+                                                hash=text_hash):
                         response = _post.add_comment(comment_text)
                         self.db.set_post_commented(_post.fullname,
                                                    by=self.user_name,
-                                                   words_hash=hash(normalize_comment(comment_text)),
+                                                   text_hash=text_hash,
                                                    text=comment_text)
                         self.register_step(A_COMMENT,
-                                           info={"fullname": post_fullname, "text": comment_text,
+                                           info={"fullname": post_fullname,
                                                  "sub": subreddit_name})
                         log.info("[%s] Was comment post [%s] by: [%s] with response: %s" % (
                             self.user_name, _post.fullname, comment_text, response))
@@ -425,7 +429,7 @@ class Consumer(Man):
                 hot_posts = sub_posts[random_sub]
 
             post = random.choice(hot_posts)
-            if post.fullname not in self.used and self._is_want_to(7):
+            if post.fullname not in self.used and self._is_want_to(5):
                 self.do_see_post(post)
                 counter += 1
             if random.randint(0, max_actions) < counter:
@@ -433,24 +437,21 @@ class Consumer(Man):
 
 
 class Kapellmeister(Process):
-    def __init__(self, name, db, read_human):
+    def __init__(self, name, db, ae):
         super(Kapellmeister, self).__init__()
         self.db = db
         self.human_name = name
-        self.name = name
-
-        self.w_human = Consumer(db, login=name)
-        self.r_human = read_human
-        self.state = S_UNKNOWN
+        self.human = Consumer(db, login=name)
+        self.ae = ae
+        self.comment_queue = CommentQueue()
 
         self.lock = Lock()
-        self.comment_queue = CommentQueue()
-        log.info("human kapellmeister inited.")
+        log.info("Human kapellmeister inited.")
 
     def set_config(self, data):
         with self.lock:
             human_config = HumanConfiguration(data)
-            self.w_human.set_configuration(human_config)
+            self.human.set_configuration(human_config)
 
     def human_check(self):
         ok = check_any_login(self.human_name)
@@ -467,46 +468,40 @@ class Kapellmeister(Process):
             return True
 
     def run(self):
+        t_start = self.ae.time_hash(datetime.utcnow())
+        step = t_start
+        last_token_refresh_time = t_start
+        subs = self.db.get_human_subs(self.human_name)
         while 1:
-            try:
-                if not self.human_check():
-                    return
+            _start = time.time()
 
-                if not self.set_state(S_WORK):
-                    return
+            if not self.human_check():
+                return
 
-                for sub in self.db.get_human_subs(self.human_name):
-                    try:
-                        to_comment_info = self.comment_queue.get(sub)
-                        if to_comment_info:
-                            post, text = to_comment_info
-                            self.w_human.do_comment_post(post, sub, text)
-                        else:
-                            log.error("get from queue none! for sub %s" % sub)
-                    except Empty as e:
-                        log.info(
-                                "%s can not comment at %s because they no found at this moment" % (
-                                    self.human_name, sub))
+            if not self.set_state(S_WORK):
+                return
 
-                    except Exception as e:
-                        log.info("%s can not comment at %s" % (self.human_name, sub))
-                        log.exception(e)
+            if step - last_token_refresh_time > HOUR - 100:
+                self.human.refresh_token()
+                last_token_refresh_time = step
 
-                    if not self.set_state(S_WORK):
-                        return
+            action = self.ae.get_action(step)
+            if action == A_SLEEP:
+                self.set_state(S_SLEEP)
+                time.sleep(MINUTE)
+            elif action == A_CONSUME:
+                self.human.live_random(max_actions=10)
+            elif action == A_COMMENT:
+                sub_name = random.choice(subs)
+                comment = self.comment_queue.get(sub_name)
+                if comment and self.human.can_do(A_COMMENT):
+                    pfn, ct = comment
+                    self.human.do_comment_post(pfn, sub_name, ct)
 
-                    self.w_human.live_random(posts_limit=150)
-
-                sleep_time = random.randint(1, self.r_human.configuration.max_wait_time * 100)
-                log.info("human [%s] will sleep %s seconds" % (self.human_name, sleep_time))
-
-                if not self.set_state(S_SLEEP):
-                    return
-
-                time.sleep(sleep_time)
-                self.w_human.refresh_token()
-            except Exception as e:
-                log.exception(e)
+            _diff = time.time() - _start
+            step += _diff
+            if step > WEEK:
+                step = step - WEEK
 
 
 class HumanOrchestra():
@@ -551,7 +546,24 @@ class HumanOrchestra():
 
 
 if __name__ == '__main__':
-    # l, r = _get_random_near(["a", "b", "c", "d", "e", "f", "g", "h", "i"], 5, 4)
-    # print l
-    # print r
-    print check_any_login("Shlak2k15")
+    name = "Shlak2k15"
+
+    db = HumanStorage()
+
+    from wsgi.rr_people.reader import CommentSearcher
+
+    rdr = CommentSearcher(db)
+
+    rdr.start_retrieve_comments("videos")
+    rdr.start_retrieve_comments("funny")
+
+    from wsgi.rr_people.ae import ActivityEngine
+
+    ae = ActivityEngine()
+
+    ae.set_authors_by_group_name(name)
+
+    kplmstr = Kapellmeister(name, db, ae)
+    kplmstr.start()
+
+    kplmstr.join()
