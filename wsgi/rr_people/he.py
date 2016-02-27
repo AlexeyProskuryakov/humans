@@ -4,6 +4,7 @@ import random
 import time
 import traceback
 from Queue import Empty
+from collections import defaultdict
 from datetime import datetime
 from multiprocessing.process import Process
 from multiprocessing.synchronize import Lock
@@ -135,13 +136,17 @@ class Consumer(Man):
         self.init_engine(login_credentials)
         self.init_work_cycle()
 
-        self.used = set()
         live_config = state.get("live_config")
         if not live_config:
             self.configuration = HumanConfiguration()
             self.db.set_human_live_configuration(login, self.configuration)
         else:
             self.configuration = HumanConfiguration(live_config)
+
+        self._used = set()
+        self._last_loads = {}
+        self._sub_posts = {}
+        self._last_post_ids = defaultdict(int)
 
         log.info("Write human [%s] inited with credentials \n%s"
                  "\nConfiguration: \n%s"
@@ -219,9 +224,6 @@ class Consumer(Man):
         return current_perc <= granted_perc
 
     def must_do(self, action):
-        # result = reduce(lambda r, a: r and not self.can_do(a),
-        #                 [a for a in self.action_function_params.keys() if a != action],
-        #                 True)
         result = True
         for another_action in self.action_function_params.keys():
             if another_action == action:
@@ -241,7 +243,7 @@ class Consumer(Man):
         log.info("step by [%s] |%s|: %s", self.user_name, step_type, info)
 
         if info and info.get("fullname"):
-            self.used.add(info.get("fullname"))
+            self._used.add(info.get("fullname"))
 
     @property
     def state(self):
@@ -256,7 +258,7 @@ class Consumer(Man):
         1) go to his url with yours useragent, wait random
         2) random check comments and random check more comments
         3) random go to link in comments
-        #todo refactor action want to normal function
+        #todo friend five in week
         :param post:
         :return:
         """
@@ -274,9 +276,10 @@ class Consumer(Man):
             post_vote_count = random.choice([1, -1])
             try:
                 post.vote(post_vote_count)
+                self.register_step(A_VOTE, info={"fullname": post.fullname, "vote": post_vote_count})
             except Exception as e:
-                log.error(e)
-            self.register_step(A_VOTE, info={"fullname": post.fullname, "vote": post_vote_count})
+                log.exception(e)
+
             self.wait(self.configuration.max_wait_time / 2)
 
         if self._is_want_to(self.configuration.comments) and wt > self.configuration.comment_mwt:  # go to post comments
@@ -358,9 +361,6 @@ class Consumer(Man):
         return max_wait_time
 
     def do_comment_post(self, post_fullname, subreddit_name, comment_text):
-        log.info("[%s] will do comment post [%s] (%s) by this text:\n%s" % (
-            self.user_name, post_fullname, subreddit_name, comment_text))
-
         near_posts = self.get_hot_and_new(subreddit_name)
         for i, _post in enumerate(near_posts):
             if _post.fullname == post_fullname:
@@ -392,8 +392,6 @@ class Consumer(Man):
                         self.register_step(A_COMMENT,
                                            info={"fullname": post_fullname,
                                                  "sub": subreddit_name})
-                        log.info("[%s] Was comment post [%s] by: [%s] with response: %s" % (
-                            self.user_name, _post.fullname, comment_text, response))
                 except Exception as e:
                     log.error(e)
 
@@ -411,29 +409,40 @@ class Consumer(Man):
         except Exception as e:
             log.error(e)
 
-    def live_random(self, max_iters=2000, max_actions=100, posts_limit=500, **kwargs):
-        sub_posts = {}
+    def live_random(self, max_actions=100, posts_limit=500):
+
+        def get_hot_or_new(sbrdt):
+            funcs = [lambda: sbrdt.get_hot(limit=posts_limit), lambda: sbrdt.get_new(limit=posts_limit)]
+            f = random.choice(funcs)
+            return list(f())
+
         counter = 0
         subs = self.db.get_human_subs(self.user_name)
         if not subs:
             log.error("For %s not any subs at config :(", self.user_name)
             return
 
-        for x in xrange(max_iters):
-            random_sub = random.choice(subs)
-            if random_sub not in sub_posts:
-                sbrdt = self.reddit.get_subreddit(random_sub)
-                hot_posts = list(sbrdt.get_hot(limit=posts_limit))
-                sub_posts[random_sub] = hot_posts
-            else:
-                hot_posts = sub_posts[random_sub]
+        random_sub = random.choice(subs)
+        if random_sub not in self._sub_posts or \
+                                time.time() - self._last_loads.get(random_sub,
+                                                                   time.time()) > properties.TIME_TO_RELOAD_SUB_POSTS:
+            sbrdt = self.reddit.get_subreddit(random_sub)
+            posts = get_hot_or_new(sbrdt)
+            self._sub_posts[random_sub] = posts
+            self._last_loads[random_sub] = time.time()
+        else:
+            posts = self._sub_posts[random_sub]
 
-            post = random.choice(hot_posts)
-            if post.fullname not in self.used and self._is_want_to(5):
+        w_k = random.randint(properties.want_coefficient_max/2, properties.want_coefficient_max)
+
+        start_from = self._last_post_ids.get(random_sub, 0)
+        for i, post in enumerate(posts, start=start_from):
+            if post.fullname not in self._used and self._is_want_to(w_k):
                 self.do_see_post(post)
                 counter += 1
             if random.randint(0, max_actions) < counter:
-                break
+                self._last_post_ids[random_sub] = i
+                return
 
 
 class Kapellmeister(Process):

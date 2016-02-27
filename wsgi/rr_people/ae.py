@@ -173,6 +173,7 @@ class ActivityEngine(object):
         self._storage = AuthorsStorage()
         self._r = praw.Reddit(user_agent=choice(USER_AGENTS))
         self._action_stack = ActivityEngine.ActionStack(size)
+        log.info("Activity engine inited!")
 
     def set_authors(self, authors, group_name=None):
         name = group_name or datetime.now().strftime("%A%B")

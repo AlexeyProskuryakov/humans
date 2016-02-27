@@ -48,6 +48,7 @@ logging.getLogger("werkzeug").setLevel(logging.WARNING)
 SRC_SEARCH = "search"
 SRC_OBSERV = "observation"
 TIME_TO_WAIT_NEW_COPIES = 3600 * 24
+TIME_TO_RELOAD_SUB_POSTS = 3600 * 2 # at live random in consumer
 
 mongo_uri = "mongodb://3030:sederfes100500@ds055525.mongolab.com:55525/reddit_people"
 db_name = "reddit_people"
@@ -88,5 +89,5 @@ want_coefficient_max = 100
 test_mode = os.environ.get("RR_TEST", "false").strip().lower() in ("true","1","yes")
 print "TEST? ", test_mode
 
-logger.info(
-    "Reddit People MANAGEMENT SYSTEM STARTED... \nEnv:%s" % "\n".join(["%s:\t%s" % (k, v) for k, v in os.environ.iteritems()]))
+# logger.info(
+#     "Reddit People MANAGEMENT SYSTEM STARTED... \nEnv:%s" % "\n".join(["%s:\t%s" % (k, v) for k, v in os.environ.iteritems()]))

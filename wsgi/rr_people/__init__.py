@@ -96,7 +96,7 @@ class Man(object):
                 try:
                     self.retrieve_comments(comment.comments(), parent_id, acc)
                 except Exception as e:
-                    log.debug("Exception in unwind more comments: %s" % e)
+                    log.exception("Exception in unwind more comments: %s" % e)
                     continue
             else:
                 if comment.author and comment.parent_id == parent_id:

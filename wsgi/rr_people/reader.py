@@ -7,6 +7,7 @@ from multiprocessing import Process
 
 import praw
 import redis
+from praw.objects import MoreComments
 from redis.client import Pipeline
 
 from wsgi import properties
@@ -186,6 +187,8 @@ class CommentSearcher(Man):
             tokens = set(normalized_text.split())
             if (float(len(tokens)) / 100) * 20 >= len(re_crying_chars.findall(text)):
                 for comment in praw.helpers.flatten_tree(post.comments):
+                    if isinstance(comment, MoreComments):
+                        continue
                     c_text = comment.body
                     if is_good_text(c_text):
                         pc_tokens = set(normalize(c_text).split())
