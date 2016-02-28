@@ -3,7 +3,7 @@ import logging
 import random
 import time
 import traceback
-from Queue import Empty
+
 from collections import defaultdict
 from datetime import datetime
 from multiprocessing.process import Process
@@ -21,6 +21,7 @@ from wsgi.rr_people import USER_AGENTS, \
     A_CONSUME, A_VOTE, A_COMMENT, A_POST, A_SUBSCRIBE, A_FRIEND, \
     S_SLEEP, S_WORK, S_BAN, Man, re_url, S_SUSPEND, Singleton, normalize, WEEK, \
     MINUTE, HOUR, A_SLEEP
+from wsgi.rr_people.ae import ActivityEngine
 from wsgi.rr_people.reader import CommentQueue
 
 log = logging.getLogger("he")
@@ -399,6 +400,7 @@ class Consumer(Man):
                         self.register_step(A_COMMENT,
                                            info={"fullname": post_fullname,
                                                  "sub": subreddit_name})
+                        log.info("Comment text: %s"%(comment_text))
                 except Exception as e:
                     log.error(e)
 
@@ -407,14 +409,6 @@ class Consumer(Man):
                         self.do_see_post(p_ind)
                 except Exception as e:
                     log.error(e)
-
-        try:
-            if self._is_want_to(
-                    self.configuration.subscribe) and subreddit_name not in self.subscribed_subreddits:
-                self.reddit.subscribe(subreddit_name)
-                self.register_step(A_SUBSCRIBE, info={"sub": subreddit_name})
-        except Exception as e:
-            log.error(e)
 
     def live_random(self, max_actions=100, posts_limit=500):
 
@@ -527,7 +521,6 @@ class HumanOrchestra():
 
     def __init__(self):
         self.__humans = {}
-        self.read_human = CommentSearcher(HumanStorage())
         self.lock = Lock()
         self.db = HumanStorage()
         Thread(target=self.start_humans, name="Orchestra Human Starter").start()
@@ -545,7 +538,9 @@ class HumanOrchestra():
     def add_human(self, human_name):
         with self.lock:
             try:
-                human = Kapellmeister(human_name, HumanStorage(), self.read_human)
+                ae = ActivityEngine()
+                ae.set_authors_by_group_name(human_name)
+                human = Kapellmeister(human_name, HumanStorage(),ae)
                 self.__humans[human_name] = human
                 human.start()
             except Exception as e:
@@ -565,23 +560,28 @@ class HumanOrchestra():
 
 if __name__ == '__main__':
     name = "Shlak2k15"
-
     db = HumanStorage()
 
     from wsgi.rr_people.reader import CommentSearcher
-
     rdr = CommentSearcher(db)
-
     rdr.start_retrieve_comments("videos")
     rdr.start_retrieve_comments("funny")
 
-    from wsgi.rr_people.ae import ActivityEngine
+    #
+    # from wsgi.rr_people.ae import ActivityEngine
+    #
+    # ae = ActivityEngine()
+    #
+    # ae.set_authors_by_group_name(name)
+    #
+    # kplmstr = Kapellmeister(name, db, ae)
+    # kplmstr.start()
+    #
+    # kplmstr.join()
 
-    ae = ActivityEngine()
-
-    ae.set_authors_by_group_name(name)
-
-    kplmstr = Kapellmeister(name, db, ae)
-    kplmstr.start()
-
-    kplmstr.join()
+    c = Consumer(db, name)
+    queue = CommentQueue()
+    comment = queue.get("videos")
+    if comment:
+        fn, txt = comment
+        c.do_comment_post(fn, "videos", txt)

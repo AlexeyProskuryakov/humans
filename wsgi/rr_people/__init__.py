@@ -124,8 +124,3 @@ def normalize(comment_body):
             if len(token) > 2:
                 res.append(stem(token))
     return " ".join(res)
-
-
-
-if __name__ == '__main__':
-    print hash(normalize(u"the thing."))
