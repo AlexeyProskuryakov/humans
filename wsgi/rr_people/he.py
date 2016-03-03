@@ -21,7 +21,7 @@ from wsgi.rr_people import USER_AGENTS, \
     A_CONSUME, A_VOTE, A_COMMENT, A_POST, A_SUBSCRIBE, A_FRIEND, \
     S_SLEEP, S_WORK, S_BAN, Man, re_url, S_SUSPEND, Singleton, normalize, WEEK, \
     MINUTE, HOUR, A_SLEEP
-from wsgi.rr_people.ae import ActivityEngine
+from wsgi.rr_people.ae import ActionGenerator
 from wsgi.rr_people.reader import CommentQueue
 
 log = logging.getLogger("he")
@@ -540,7 +540,7 @@ class HumanOrchestra():
     def add_human(self, human_name):
         with self.lock:
             try:
-                ae = ActivityEngine()
+                ae = ActionGenerator()
                 ae.set_authors_by_group_name(human_name)
                 human = Kapellmeister(human_name, HumanStorage(), ae)
                 self.__humans[human_name] = human

@@ -54,12 +54,6 @@ S_UNKNOWN = "unknown"
 S_STOP = "stop"
 S_SUSPEND = "suspend"
 
-SEC = 1
-MINUTE = 60
-HOUR = MINUTE * 60
-DAY = HOUR * 24
-WEEK = DAY * 7
-
 re_url = re.compile("((https?|ftp)://|www\.)[^\s/$.?#].[^\s]*")
 re_crying_chars = re.compile("[A-Z!]{2,}")
 

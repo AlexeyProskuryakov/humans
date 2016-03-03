@@ -2,17 +2,25 @@ import logging
 import random
 from collections import defaultdict, Counter
 from datetime import datetime
+from multiprocessing import Process
 from multiprocessing.queues import Queue
 from random import choice
 
 import praw
 import pymongo
-from multiprocessing import Process
 from pymongo.mongo_client import MongoClient
 
 from wsgi.db import DBHandler
-from wsgi.properties import ae_mongo_uri, ae_db_name, AE_MIN_COMMENT_KARMA, AE_MIN_LINK_KARMA
-from wsgi.rr_people import USER_AGENTS, A_SLEEP, A_CONSUME, A_COMMENT, DAY, HOUR, MINUTE, SEC, A_POST
+from wsgi.properties import \
+    ae_mongo_uri, \
+    ae_db_name, \
+    DAY, HOUR, MINUTE, SEC, WEEK_DAYS, \
+    AE_MIN_COMMENT_KARMA, \
+    AE_MIN_LINK_KARMA, \
+    AE_MIN_SLEEP_TIME, \
+    AE_MAX_SLEEP_TIME, \
+    AE_AUTHOR_MIN_ACTIONS
+from wsgi.rr_people import USER_AGENTS, A_SLEEP, A_CONSUME, A_COMMENT, A_POST
 
 log = logging.getLogger("ae")
 
@@ -71,7 +79,7 @@ class AuthorsStorage(DBHandler):
         if not self.author_groups:
             self.author_groups = self.db.create_collection("ae_author_groups")
 
-    def get_interested_authors(self, min_count_actions=1500):
+    def get_interested_authors(self, min_count_actions=AE_AUTHOR_MIN_ACTIONS):
         result = self.authors.aggregate([
             {"$group": {"_id": "$author", "count": {"$sum": "$count"}}},
             {"$match": {"count": {"$gte": min_count_actions}}}])
@@ -178,32 +186,33 @@ class AuthorsStorage(DBHandler):
         return best_group
 
 
-WEEK_DAYS = {0: "MO", 1: "TU", 2: "WE", 3: "TH", 4: "FR", 5: "SA", 6: "SU"}
-
-
-class ActionEngineDataFormer(object):
+class ActionGeneratorDataFormer(object):
     class AuthorAdder(Process):
         def __init__(self, queue, outer):
-            super(ActionEngineDataFormer.AuthorAdder, self).__init__(name="author_adder")
+            super(ActionGeneratorDataFormer.AuthorAdder, self).__init__(name="author_adder")
             self.q = queue
             self.outer = outer
 
         def run(self):
+            log.info("author adder started")
             while 1:
-                author = self.q.get()
-                r_author = self.outer._get_author_object(author)
-                c_karma = r_author.__dict__.get("comment_karma", 0)
-                l_karma = r_author.__dict__.get("link_karma", 0)
-                if c_karma > AE_MIN_COMMENT_KARMA and l_karma > AE_MIN_LINK_KARMA:
-                    log.info("will add [%s] for action engine" % (author))
-                    self.outer._add_author_data(r_author)
+                try:
+                    author = self.q.get()
+                    r_author = self.outer._get_author_object(author)
+                    c_karma = r_author.__dict__.get("comment_karma", 0)
+                    l_karma = r_author.__dict__.get("link_karma", 0)
+                    if c_karma > AE_MIN_COMMENT_KARMA and l_karma > AE_MIN_LINK_KARMA:
+                        log.info("will add [%s] for action engine" % (author))
+                        self.outer._add_author_data(r_author)
+                except Exception as e:
+                    log.exception(e)
 
     def __init__(self):
         self._storage = AuthorsStorage()
         self._r = praw.Reddit(user_agent=choice(USER_AGENTS))
         self._queue = Queue()
 
-        adder = ActionEngineDataFormer.AuthorAdder(self._queue, self)
+        adder = ActionGeneratorDataFormer.AuthorAdder(self._queue, self)
         adder.start()
 
     def is_author_added(self, author):
@@ -227,11 +236,7 @@ class ActionEngineDataFormer(object):
             q["count"] = 1
             self._storage.authors.insert_one(q)
 
-    def fill_consume_and_sleep(self,
-                               authors_min_actions_count=1500,
-                               sleep_min=6 * HOUR,
-                               sleep_max=18 * HOUR,
-                               consume_shift=10 * MINUTE):
+    def fill_consume_and_sleep(self, authors_min_actions_count=1500):
         for author in self._storage.get_interested_authors(authors_min_actions_count):
             start_time, end_time = 0, 0
             actions = self._storage.authors.find({"author": author}).sort("time", 1)
@@ -242,10 +247,10 @@ class ActionEngineDataFormer(object):
 
                 end_time = action.get("time")
                 delta = (end_time - start_time)
-                if delta > sleep_min and delta < sleep_max:
+                if delta > AE_MIN_SLEEP_TIME and delta < AE_MAX_SLEEP_TIME:
                     self.save_action(author, A_SLEEP, start_time, end_time)
-                else:
-                    self.save_action(author, A_CONSUME, start_time - consume_shift, end_time + consume_shift)
+                # else:
+                #     self.save_action(author, A_CONSUME, start_time - AE_CONSUME_SHIFT_TIME, end_time + AE_CONSUME_SHIFT_TIME)
                 start_time = end_time
 
             log.info("Was update consume and sleep steps for %s" % author)
@@ -279,7 +284,7 @@ class ActionEngineDataFormer(object):
             self._queue.put(author)
 
 
-class ActivityEngine(object):
+class ActionGenerator(object):
     class ActionStack():
         def __init__(self, size):
             self.data = []
@@ -293,13 +298,16 @@ class ActivityEngine(object):
         def get_prevailing_action(self):
             if self.data:
                 cnt = Counter(self.data)
-                return cnt.most_common()[0]
+                return cnt.most_common()[0][0]
+
+        def __contains__(self, item):
+            return item in self.data
 
     def __init__(self, authors=None, size=5):
         self.authors = authors or []
         self._storage = AuthorsStorage()
         self._r = praw.Reddit(user_agent=choice(USER_AGENTS))
-        self._action_stack = ActivityEngine.ActionStack(size)
+        self._action_stack = ActionGenerator.ActionStack(size)
         log.info("Activity engine inited!")
 
     def set_authors(self, authors, group_name=None):
@@ -315,7 +323,7 @@ class ActivityEngine(object):
             return self.authors
         return None
 
-    def get_action(self, for_time, step=60):
+    def get_action(self, for_time, step=MINUTE):
         pipe = [
             {"$match": {"author": {"$in": self.authors},
                         "$or": [{"time": {"$gte": for_time, "$lte": for_time + step}},
@@ -326,12 +334,21 @@ class ActivityEngine(object):
         ]
         result = self._storage.authors.aggregate(pipe)
         action_weights = {}
+        non_consumed_authors = []
         for r in result:
             action_weights[r.get("_id")] = r.get("count")
+            non_consumed_authors.extend(r.get("authors"))
+
+        if A_CONSUME not in action_weights:
+            action_weights[A_CONSUME] = len(set(non_consumed_authors).difference(set(self.authors)))
+
         getted_action = weighted_choice_king(action_weights)
         self._action_stack.push(getted_action)
-        if self._action_stack.get_prevailing_action() == A_SLEEP: return A_SLEEP
-        return getted_action
+        if A_SLEEP in  self._action_stack:
+            return self._action_stack.get_prevailing_action()
+        else:
+            return getted_action
+
 
 
 # def visualise_steps(groups, authors_steps):
@@ -386,42 +403,58 @@ class ActivityEngine(object):
 #     plt.ylabel("actions")
 #     plt.show()
 
+def visualise():
+    ae = ActionGenerator()
+    a_s = AuthorsStorage()
+
+    groups_result, authors = a_s.get_authors_groups()
+    group = a_s.get_best_group(groups_result[-1], authors)
+    ae.set_authors(group, "Shlak2k15")
+    ae.set_authors(group, "Shlak2k16")
+    ae.set_authors_by_group_name("Shlak2k15")
+
+    import matplotlib.pyplot as plt
+
+
+    count = defaultdict(int)
+    for t in range(0, DAY*2, HOUR / 2):
+        result = ae.get_action(t, HOUR / 2)
+        if result == A_SLEEP:
+            plt.plot([t], [2], "o", color="r")
+            count[A_SLEEP] += 1
+        if result == A_CONSUME:
+            plt.plot([t], [4], "o", color="g")
+            count[A_CONSUME] += 1
+        if result == A_COMMENT:
+            plt.plot([t], [6], "o", color="b")
+            count[A_COMMENT] += 1
+
+    print count
+
+    plt.axis([0, DAY*2, 0, 8])
+    plt.xlabel("time")
+    plt.ylabel("actions")
+    plt.show()
 
 if __name__ == '__main__':
-    ae = ActivityEngine()
+    ae = ActionGenerator()
     a_s = AuthorsStorage()
-    builder = ActionEngineDataFormer()
+    a_s.authors.delete_many({})
 
-    builder.add_author_data("ajquick")
-    # groups_result, authors = a_s.get_authors_groups()
-    # group = a_s.get_best_group(groups_result[-1], authors)
-    # ae.set_authors(group, "Shlak2k15")
-    # ae.set_authors(group, "Shlak2k16")
-    # ae.set_authors_by_group_name("Shlak2k15")
-    #
-    # import matplotlib.pyplot as plt
-    # from wsgi.rr_people import WEEK
-    # from wsgi.rr_people.he import Consumer
-    #
-    # count = defaultdict(int)
-    # for t in range(0, WEEK, HOUR / 2):
-    #     result = ae.get_action(t, HOUR / 2)
-    #     if result == A_SLEEP:
-    #         plt.plot([t], [2], "o", color="r")
-    #         count[A_SLEEP] += 1
-    #     if result == A_CONSUME:
-    #         plt.plot([t], [4], "o", color="g")
-    #         count[A_CONSUME] += 1
-    #     if result == A_COMMENT:
-    #         plt.plot([t], [6], "o", color="b")
-    #         count[A_COMMENT] += 1
-    #
-    # print count
-    #
-    # plt.axis([0, WEEK, 0, 8])
-    # plt.xlabel("time")
-    # plt.ylabel("actions")
-    # plt.show()
+    from wsgi.rr_people.reader import CommentSearcher, CommentQueue
+    from wsgi.db import HumanStorage
+
+    db = HumanStorage()
+    cs = CommentSearcher(db)
+    cq = CommentQueue()
+
+    sbrdt = "videos"
+    for comment in cs.find_comment(sbrdt):
+        cq.put(sbrdt, comment)
+
+
+    visualise()
+
 
     # for author in a_s.get_interested_authors(min_count_actions=0):
     #     result = a_s.authors.aggregate([{"$match":{"author":author, "action_type":A_COMMENT}}, {"$group":{"_id":"$action_type", "count":{"$sum":"$count"}}}])

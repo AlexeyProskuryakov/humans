@@ -8,13 +8,13 @@ from multiprocessing import Process
 import praw
 import redis
 from praw.objects import MoreComments
-from redis.client import Pipeline
 
-from wsgi import properties
 from wsgi.db import HumanStorage
-from wsgi.properties import c_queue_redis_addres, c_queue_redis_port
-from wsgi.rr_people import re_url, normalize, S_WORK, S_SLEEP, S_STOP, re_crying_chars
+from wsgi.properties import c_queue_redis_addres, c_queue_redis_port, AE_ADD_AUTHORS, \
+    DEFAULT_SLEEP_TIME_AFTER_READ_SUBREDDIT, min_donor_num_comments, min_comment_create_time_difference, min_copy_count, \
+    shift_copy_comments_part, min_donor_comment_ups, max_donor_comment_ups
 from wsgi.rr_people import Man
+from wsgi.rr_people import re_url, normalize, S_WORK, S_SLEEP, S_STOP, re_crying_chars
 
 log = logging.getLogger("reader")
 
@@ -86,6 +86,11 @@ class CommentSearcher(Man):
         self.db = db
         self.comment_queue = CommentQueue()
         self.subs = {}
+
+        if AE_ADD_AUTHORS:
+            from wsgi.rr_people.ae import ActionGeneratorDataFormer
+            self.agdf = ActionGeneratorDataFormer()
+
         log.info("Read human inited!")
 
     def start_retrieve_comments(self, sub):
@@ -100,8 +105,8 @@ class CommentSearcher(Man):
                 for el in self.find_comment(sub):
                     self.comment_queue.put(sub, el)
                 end = time.time()
-                sleep_time = random.randint(properties.DEFAULT_SLEEP_TIME_AFTER_READ_SUBREDDIT / 5,
-                                            properties.DEFAULT_SLEEP_TIME_AFTER_READ_SUBREDDIT)
+                sleep_time = random.randint(DEFAULT_SLEEP_TIME_AFTER_READ_SUBREDDIT / 5,
+                                            DEFAULT_SLEEP_TIME_AFTER_READ_SUBREDDIT)
                 log.info(
                         "Was get all comments which found for [%s] at %s seconds... Will trying next after %s" % (
                             sub, end - start, sleep_time))
@@ -130,10 +135,10 @@ class CommentSearcher(Man):
                 try:
                     copies = self._get_post_copies(post)
                     copies = filter(
-                            lambda copy: _so_long(copy.created_utc, properties.min_comment_create_time_difference) and \
-                                         copy.num_comments > properties.min_donor_num_comments,
+                            lambda copy: _so_long(copy.created_utc, min_comment_create_time_difference) and \
+                                         copy.num_comments > min_donor_num_comments,
                             copies)
-                    if len(copies) >= properties.min_copy_count:
+                    if len(copies) >= min_copy_count:
                         copies.sort(cmp=cmp_by_created_utc)
                         comment = None
                         for copy in copies:
@@ -152,7 +157,8 @@ class CommentSearcher(Man):
                 except Exception as e:
                     log.exception(e)
 
-                post.author
+            if AE_ADD_AUTHORS:
+                self.agdf.add_author_data(post.author.name)
 
     def _get_post_copies(self, post):
         search_request = "url:\'%s\'" % post.url
@@ -162,11 +168,11 @@ class CommentSearcher(Man):
     def _retrieve_interested_comment(self, copy, post):
         # prepare comments from donor to selection
         comments = self.retrieve_comments(copy.comments, copy.fullname)
-        after = len(comments) / properties.shift_copy_comments_part
+        after = len(comments) / shift_copy_comments_part
         for i in range(after, len(comments)):
             comment = comments[i]
-            if comment.ups >= properties.min_donor_comment_ups and \
-                            comment.ups <= properties.max_donor_comment_ups and \
+            if comment.ups >= min_donor_comment_ups and \
+                            comment.ups <= max_donor_comment_ups and \
                             post.author != comment.author and \
                     self.check_comment_text(comment.body, post):
                 return comment
