@@ -45,10 +45,6 @@ logging.getLogger("urllib3").setLevel(logging.WARNING)
 logging.getLogger("requests").setLevel(logging.WARNING)
 logging.getLogger("werkzeug").setLevel(logging.WARNING)
 
-SRC_SEARCH = "search"
-SRC_OBSERV = "observation"
-TIME_TO_WAIT_NEW_COPIES = 3600 * 24
-TIME_TO_RELOAD_SUB_POSTS = 3600 * 2 # at live random in consumer
 
 mongo_uri = "mongodb://3030:sederfes100500@ds055525.mongolab.com:55525/reddit_people"
 db_name = "reddit_people"
@@ -61,6 +57,14 @@ ae_db_name = "ae"
 
 c_queue_redis_addres = "pub-redis-11997.us-east-1-3.7.ec2.redislabs.com"
 c_queue_redis_port = 11997
+
+SRC_SEARCH = "search"
+SRC_OBSERV = "observation"
+TIME_TO_WAIT_NEW_COPIES = 3600 * 24
+TIME_TO_RELOAD_SUB_POSTS = 3600 * 2 # at live random in consumer
+
+AE_MIN_COMMENT_KARMA = 10000
+AE_MIN_LINK_KARMA = 10000
 
 DEFAULT_LIMIT = 1000
 DEFAULT_SLEEP_TIME_AFTER_READ_SUBREDDIT = 60 * 60 * 4

@@ -400,7 +400,7 @@ class Consumer(Man):
                         self.register_step(A_COMMENT,
                                            info={"fullname": post_fullname,
                                                  "sub": subreddit_name})
-                        log.info("Comment text: %s"%(comment_text))
+                        log.info("Comment text: %s" % (comment_text))
                 except Exception as e:
                     log.error(e)
 
@@ -478,6 +478,7 @@ class Kapellmeister(Process):
             return True
 
     def run(self):
+        log.info("start kappellmeister for [%s]" % self.human_name)
         t_start = self.ae.time_hash(datetime.utcnow())
         step = t_start
         last_token_refresh_time = t_start
@@ -513,7 +514,8 @@ class Kapellmeister(Process):
             if step > WEEK:
                 step = step - WEEK
 
-            log.info("[%s] step is end. Action was: [%s], time spent: %s, next step: %s"%(self.human_name, action, _diff, step))
+            log.info("[%s] step is end. Action was: [%s], time spent: %s, next step: %s" % (
+                self.human_name, action, _diff, step))
 
 
 class HumanOrchestra():
@@ -540,7 +542,7 @@ class HumanOrchestra():
             try:
                 ae = ActivityEngine()
                 ae.set_authors_by_group_name(human_name)
-                human = Kapellmeister(human_name, HumanStorage(),ae)
+                human = Kapellmeister(human_name, HumanStorage(), ae)
                 self.__humans[human_name] = human
                 human.start()
             except Exception as e:
@@ -563,6 +565,7 @@ if __name__ == '__main__':
     db = HumanStorage()
 
     from wsgi.rr_people.reader import CommentSearcher
+
     rdr = CommentSearcher(db)
     rdr.start_retrieve_comments("videos")
     rdr.start_retrieve_comments("funny")

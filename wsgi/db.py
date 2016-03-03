@@ -166,15 +166,15 @@ class HumanStorage(DBHandler):
         worked = self.humans_states.find({"state": {"$in": ["work", "sleep"]}})
         return worked
 
-    def set_human_state(self, name, state):
+    def set_human_state(self, name, state, last_action):
         if state == "ban":
-            self.humans_states.update_one({"name": name}, {"$inc": {"ban_count": 1}, "$set": {'state': state}},
+            self.humans_states.update_one({"name": name}, {"$inc": {"ban_count": 1}, "$set": {'state': state, "last_action":last_action}},
                                           upsert=True)
         else:
-            self.humans_states.update_one({"name": name}, {"$set": {'state': state}}, upsert=True)
+            self.humans_states.update_one({"name": name}, {"$set": {'state': state, "last_action":last_action}}, upsert=True)
 
     def get_human_state(self, name):
-        found = self.human_config.find_one({"name": name})
+        found = self.humans_states.find_one({"name": name})
         if found:
             state = found.get("state")
             if state == "ban" and found.get("ban_count") <= 3:

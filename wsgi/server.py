@@ -310,7 +310,7 @@ def start_comment_search(sub):
     comment_searcher.start_retrieve_comments(sub)
     while 1:
         state = comment_searcher.comment_queue.get_reader_state(sub)
-        if "work" in state:
+        if state and "work" in state:
             return jsonify({"state": state})
         time.sleep(1)
 
@@ -354,6 +354,11 @@ def comment_search_info(sub):
               "subs_states": subs_states,
               "state": state}
     return render_template("comment_search_info.html", **result)
+
+
+@app.route("/actions")
+def actions():
+   pass
 
 
 if __name__ == '__main__':

@@ -152,6 +152,8 @@ class CommentSearcher(Man):
                 except Exception as e:
                     log.exception(e)
 
+                post.author
+
     def _get_post_copies(self, post):
         search_request = "url:\'%s\'" % post.url
         copies = list(self.reddit.search(search_request))
