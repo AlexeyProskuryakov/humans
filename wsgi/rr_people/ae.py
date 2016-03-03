@@ -1,3 +1,4 @@
+# coding=utf-8
 import logging
 import random
 from collections import defaultdict, Counter
@@ -437,6 +438,12 @@ def visualise():
     plt.show()
 
 if __name__ == '__main__':
+
+    # //todo:
+    # 1) доделать тест с сохранением без консьюмов.
+    # 2) сделать привязку данных генератора к чуваку
+    # 3) сделать манаж этой привязки: отображать, изменять, добавлять.
+
     ae = ActionGenerator()
     a_s = AuthorsStorage()
     a_s.authors.delete_many({})
