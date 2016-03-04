@@ -85,19 +85,22 @@ class AuthorsStorage(DBHandler):
             self.authors.create_index([("action_type", pymongo.ASCENDING)])
             self.authors.create_index([("time", pymongo.ASCENDING)])
             self.authors.create_index([("end_time", pymongo.ASCENDING)])
+            self.authors.create_index([("used", pymongo.ASCENDING)], sparse=True)
 
         self.author_groups = self.db.get_collection("ae_author_groups")
 
         if not self.author_groups:
             self.author_groups = self.db.create_collection("ae_author_groups")
+            self.author_groups.create_index([("name", pymongo.ASCENDING)])
 
     def get_interested_authors(self, min_count_actions=AE_AUTHOR_MIN_ACTIONS):
         result = self.authors.aggregate([
+            {"$match": {"used": {"$exists": False}}},
             {"$group": {"_id": "$author", "count": {"$sum": "$count"}}},
             {"$match": {"count": {"$gte": min_count_actions}}}])
         return filter(lambda x: x is not None, map(lambda x: x.get("_id"), result))
 
-    def get_authors_groups(self, min_difference=2 * HOUR, difference_step=2 * HOUR, step_count=10, min_nights=5,
+    def get_authors_groups(self, min_difference=2 * HOUR, difference_step=2 * HOUR, step_count=100, min_nights=5,
                            by=A_SLEEP, min_groups=2):
         authors = defaultdict(list)
         groups = []
@@ -111,6 +114,9 @@ class AuthorsStorage(DBHandler):
                 authors[author] = author_steps[:]
                 groups.append({author})
 
+        if not authors:
+            return None
+
         log.info("Preparing authors for groups: %s" % authors.keys())
 
         def create_new_groups(nearest_groups, groups):
@@ -123,12 +129,12 @@ class AuthorsStorage(DBHandler):
                     result.append(group)
             return result
 
-        result = []
+        group_result = []
         step = 0
 
         while len(groups) > min_groups or len(groups) == 0:
             log.info("adding to group. Group len is:%s" % len(groups))
-            max_nearest_weight = 0
+            max_nearest_weight = -WEEK
             nearest_groups = (None, None)
 
             for i, authors_group in enumerate(groups):
@@ -140,12 +146,16 @@ class AuthorsStorage(DBHandler):
                             nearest += self.get_authors_nearest(authors[author], authors[a_author])
 
                     nearest = nearest / (len(authors_group) * len(authors_a_group))
-                    if max_nearest_weight < nearest:
+                    if max_nearest_weight <= nearest:
                         max_nearest_weight = nearest
                         nearest_groups = (i, j)
 
+            if nearest_groups == (None, None):
+                break
+
             groups = create_new_groups(nearest_groups, groups)
-            result.append(groups[:])
+
+            group_result.append(groups[:])
             log.info("filtered groups count: %s" % len(groups))
 
             step += 1
@@ -153,10 +163,24 @@ class AuthorsStorage(DBHandler):
             if step > step_count:
                 break
 
-        return result, authors
+        best_group = self.get_best_group(group_result[-1], authors)
+
+        result = {'best': best_group}
+        max_subst = WEEK
+        for i, _ in enumerate(group_result):
+            dg1, dg2, g_subst = self.get_max_difference_groups(group_result[i], authors)
+            if g_subst < max_subst:
+                max_subst = g_subst
+                result['difference_1'] = dg1
+                result['difference_2'] = dg2
+
+        result['authors'] = authors
+        result['all_groups'] = group_result
+        return result
 
     def get_authors_nearest(self, author1_steps, author2_steps):
         """
+        #todo go for each day and create result.
         :param author1_steps:
         :param author2_steps:
         :return: more is than authors more equals
@@ -165,17 +189,19 @@ class AuthorsStorage(DBHandler):
         s = lambda x: x['time']
         e = lambda x: x["end_time"]
 
-        if len(author1_steps) != len(author2_steps):
-            return 0
+        steps_diff = abs(len(author1_steps) - len(author2_steps))
+        if steps_diff != 0:
+            return -((DAY / 4) * steps_diff)
         for one in author1_steps:
             for two in author2_steps:
                 if e(one) < s(two) or e(two) < s(one):
-                    result -= 1
+                    result -= float(abs(min(s(two) - e(one), s(one) - e(two))))/len(author1_steps)
                     continue
 
                 k = abs(e(one) - e(two)) + abs(s(one) - s(two))
                 if k > (e(one) - s(one)) or k > (e(two) - s(two)):
-                    continue
+                    result -= float(abs(min(k - (e(one) - s(one)), k - (e(two) - s(two)))))/len(author1_steps)
+
 
                 result += max(e(one), e(two)) - min(s(one), s(two)) - k
 
@@ -196,6 +222,30 @@ class AuthorsStorage(DBHandler):
                 best_group = group
 
         return best_group
+
+    def get_max_difference_groups(self, groups, authors):
+        def subst_groups(group1, group2):
+            nearest = 0
+            for g1a in group1:
+                for g2a in group2:
+                    nearest += self.get_authors_nearest(authors[g1a], authors[g2a])
+            return nearest
+
+        min_nearest_groups = WEEK * 1000
+        result = None
+        for i, group in enumerate(groups):
+            for j, a_group in enumerate(groups):
+                if i == j: continue
+                nearest = subst_groups(group, a_group)
+                if nearest < min_nearest_groups:
+                    min_nearest_groups = nearest
+                    result = group, a_group, min_nearest_groups
+        return result
+
+    def set_group(self, authors, group_name):
+        if not self.author_groups.find_one(group_name):
+            self.author_groups.insert_one({"name": group_name, "authors": self.authors})
+            self.authors.update_many({"author": {"$in": authors}}, {"$set": {"used": group_name}})
 
 
 class ActionGeneratorDataFormer(object):
@@ -248,8 +298,11 @@ class ActionGeneratorDataFormer(object):
             q["count"] = 1
             self._storage.authors.insert_one(q)
 
-    def revert_sleep_actions(self):
-        self._storage.authors.delete_many({'end_time': {'$exists': True}})
+    def revert_sleep_actions(self, group_id=None):
+        q = {'end_time': {'$exists': True}}
+        if group_id:
+            q["used"] = group_id
+        self._storage.authors.delete_many(q)
 
     def fill_consume_and_sleep(self, authors_min_actions_count=AE_AUTHOR_MIN_ACTIONS, min_sleep=AE_MIN_SLEEP_TIME,
                                max_sleep=AE_MAX_SLEEP_TIME):
@@ -265,8 +318,6 @@ class ActionGeneratorDataFormer(object):
                 delta = (end_time - start_time)
                 if delta > min_sleep and delta < max_sleep:
                     self.save_action(author, A_SLEEP, start_time, end_time)
-                # else:
-                #     log.info("[%s] delta: %s" % (author, delta_info(delta)))
                 start_time = end_time
 
             log.info("Was update consume and sleep steps for %s" % author)
@@ -319,29 +370,22 @@ class ActionGenerator(object):
         def __contains__(self, item):
             return item in self.data
 
-    def __init__(self, authors=None, size=5):
-        self.authors = authors or []
+    def __init__(self, group_name=None, size=5):
+        self.group_name = group_name
         self._storage = AuthorsStorage()
         self._r = praw.Reddit(user_agent=choice(USER_AGENTS))
         self._action_stack = ActionGenerator.ActionStack(size)
         log.info("Activity engine inited!")
 
-    def set_authors(self, authors, group_name=None):
-        name = group_name or datetime.now().strftime("%A%B")
-        self.authors = list(authors)
-        if not self._storage.authors.find_one(group_name):
-            self._storage.author_groups.insert_one({"name": name, "authors": self.authors})
-
-    def set_authors_by_group_name(self, group_name):
-        result = self._storage.author_groups.find_one({"name": group_name})
-        if result:
-            self.authors = result.get("authors")
-            return self.authors
-        return None
+    def set_group_name(self, group_name):
+        self.group_name = group_name
 
     def get_action(self, for_time, step=MINUTE):
+        if not self.group_name:
+            log.error("For action generator group name is not exists")
+            return None
         pipe = [
-            {"$match": {"author": {"$in": self.authors},
+            {"$match": {"used": self.group_name,
                         "$or": [{"time": {"$gte": for_time, "$lte": for_time + step}},
                                 {"end_time": {"$gte": for_time + step}, "time": {"$lte": for_time}}
                                 ]}
@@ -369,6 +413,7 @@ def visualise_steps(groups, authors_steps):
     counter = 1
     clrs = ["b", "g", "r", "c", "m", "y", "k"]
     for i, group in enumerate(groups):
+        if not group:continue
         c = random.choice(clrs)
         fstp = None
         for author in group:
@@ -387,44 +432,24 @@ def visualise_steps(groups, authors_steps):
     plt.show()
 
 
-def visualise_group_life(group, ae, step=HOUR):
-    ae.set_authors(group)
-    sleep = []
-    consume = []
-    comment = []
-    for t in range(0, WEEK, step):
-        result = ae.get_action(t)
-        for action in result:
-            if action["_id"] == A_SLEEP:
-                sleep.append((action.get("count"), t))
-            if action["_id"] == A_CONSUME:
-                consume.append((action.get("count"), t))
-            if action["_id"] == A_COMMENT:
-                comment.append((action.get("count"), t))
+def renew_sleep_actions():
+    agdf = ActionGeneratorDataFormer()
+    agdf.revert_sleep_actions()
+    agdf.fill_consume_and_sleep(min_sleep=4 * HOUR, max_sleep=24 * HOUR, authors_min_actions_count=0)
 
-    get_y = lambda arr: map(lambda x: x[0], arr)
-    get_x = lambda arr: map(lambda x: x[1], arr)
-
-    import matplotlib.pyplot as plt
-
-    plt.plot(get_x(sleep), get_y(sleep), "o", color="r")
-    plt.plot(get_x(consume), get_y(consume), "o", color="g")
-    plt.plot(get_x(comment), get_y(comment), "o", color="b")
-    plt.axis([0, WEEK, 0, 20])
-    plt.xlabel("time")
-    plt.ylabel("actions")
-    plt.show()
-
-
-def group_and_visualise(for_time=DAY * 2):
+def group_and_visualise_gen(for_time=DAY * 2):
     ae = ActionGenerator()
     a_s = AuthorsStorage()
 
-    groups_result, authors = a_s.get_authors_groups()
-    group = a_s.get_best_group(groups_result[-1], authors)
-    ae.set_authors(group, "Shlak2k15")
-    ae.set_authors(group, "Shlak2k16")
-    ae.set_authors_by_group_name("Shlak2k15")
+    g_res = a_s.get_authors_groups()
+
+    visualise_steps([g_res.get("best"), g_res.get('difference_1'), g_res.get('difference_2')], g_res.get("authors"))
+    for group in g_res.get("all_groups"):
+        visualise_steps(group, g_res.get("authors"))
+
+    a_s.set_group(g_res.get('difference_1'), "Shlak2k15")
+    a_s.set_group(g_res.get('difference_2'), "Shlak2k16")
+    a_s.set_group(g_res.get("best"), "best")
 
     import matplotlib.pyplot as plt
 
@@ -473,7 +498,7 @@ def create():
 
 if __name__ == '__main__':
     # //todo:
-    # 1) доделать тест с сохранением без консьюмов.
+
     # 2) сделать привязку данных генератора к чуваку
     # 3) сделать манаж этой привязки: отображать, изменять, добавлять.
 
@@ -481,7 +506,7 @@ if __name__ == '__main__':
     # agdf.revert_sleep_actions()
     # agdf.fill_consume_and_sleep(min_sleep=4 * HOUR, max_sleep=18 * HOUR)
 
-    group_and_visualise()
+    group_and_visualise_gen(for_time=WEEK)
 
 
     # for author in a_s.get_interested_authors(min_count_actions=0):
