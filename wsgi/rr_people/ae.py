@@ -15,7 +15,7 @@ from wsgi.db import DBHandler
 from wsgi.properties import \
     ae_mongo_uri, \
     ae_db_name, \
-    DAY, HOUR, MINUTE, SEC, WEEK_DAYS, \
+    DAY, HOUR, MINUTE, SEC, WEEK_DAYS, WEEK, \
     AE_MIN_COMMENT_KARMA, \
     AE_MIN_LINK_KARMA, \
     AE_MIN_SLEEP_TIME, \
@@ -35,6 +35,17 @@ def hash_string(time_hash):
         m, r = divmod(r, MINUTE)
         s = r
         return "%s %s:%s:%s" % (WEEK_DAYS[d], h, m, s)
+
+
+def delta_info(delta):
+    if not isinstance(delta, int):
+        return None
+    else:
+        d, r = divmod(delta, DAY)
+        h, r = divmod(r, HOUR)
+        m, r = divmod(r, MINUTE)
+        s = r
+        return "days: %s, hours: %s, minutes: %s, secs: %s" % (d, h, m, s)
 
 
 def time_hash(time):
@@ -87,7 +98,7 @@ class AuthorsStorage(DBHandler):
         return filter(lambda x: x is not None, map(lambda x: x.get("_id"), result))
 
     def get_authors_groups(self, min_difference=2 * HOUR, difference_step=2 * HOUR, step_count=10, min_nights=5,
-                           by=A_SLEEP):
+                           by=A_SLEEP, min_groups=2):
         authors = defaultdict(list)
         groups = []
 
@@ -115,7 +126,7 @@ class AuthorsStorage(DBHandler):
         result = []
         step = 0
 
-        while len(groups) > 4 or len(groups) == 0:
+        while len(groups) > min_groups or len(groups) == 0:
             log.info("adding to group. Group len is:%s" % len(groups))
             max_nearest_weight = 0
             nearest_groups = (None, None)
@@ -237,7 +248,11 @@ class ActionGeneratorDataFormer(object):
             q["count"] = 1
             self._storage.authors.insert_one(q)
 
-    def fill_consume_and_sleep(self, authors_min_actions_count=1500):
+    def revert_sleep_actions(self):
+        self._storage.authors.delete_many({'end_time': {'$exists': True}})
+
+    def fill_consume_and_sleep(self, authors_min_actions_count=AE_AUTHOR_MIN_ACTIONS, min_sleep=AE_MIN_SLEEP_TIME,
+                               max_sleep=AE_MAX_SLEEP_TIME):
         for author in self._storage.get_interested_authors(authors_min_actions_count):
             start_time, end_time = 0, 0
             actions = self._storage.authors.find({"author": author}).sort("time", 1)
@@ -248,10 +263,10 @@ class ActionGeneratorDataFormer(object):
 
                 end_time = action.get("time")
                 delta = (end_time - start_time)
-                if delta > AE_MIN_SLEEP_TIME and delta < AE_MAX_SLEEP_TIME:
+                if delta > min_sleep and delta < max_sleep:
                     self.save_action(author, A_SLEEP, start_time, end_time)
                 # else:
-                #     self.save_action(author, A_CONSUME, start_time - AE_CONSUME_SHIFT_TIME, end_time + AE_CONSUME_SHIFT_TIME)
+                #     log.info("[%s] delta: %s" % (author, delta_info(delta)))
                 start_time = end_time
 
             log.info("Was update consume and sleep steps for %s" % author)
@@ -340,71 +355,68 @@ class ActionGenerator(object):
             action_weights[r.get("_id")] = r.get("count")
             non_consumed_authors.extend(r.get("authors"))
 
-        if A_CONSUME not in action_weights:
-            action_weights[A_CONSUME] = len(set(non_consumed_authors).difference(set(self.authors)))
-
         getted_action = weighted_choice_king(action_weights)
         self._action_stack.push(getted_action)
-        if A_SLEEP in  self._action_stack:
+        if A_SLEEP in self._action_stack:
             return self._action_stack.get_prevailing_action()
         else:
             return getted_action
 
 
+def visualise_steps(groups, authors_steps):
+    import matplotlib.pyplot as plt
 
-# def visualise_steps(groups, authors_steps):
-#     import matplotlib.pyplot as plt
-#
-#     counter = 1
-#     clrs = ["b", "g", "r", "c", "m", "y", "k"]
-#     for i, group in enumerate(groups):
-#         c = random.choice(clrs)
-#         fstp = None
-#         for author in group:
-#             counter += 1
-#             for step in authors_steps[author]:
-#                 if not fstp:
-#                     fstp = step
-#                 plt.plot([step.get("time"), step.get("end_time")], [counter, counter], "k-", lw=1, label=author,
-#                          color=c)
-#
-#         plt.text(fstp["time"], counter, "%s" % i)
-#
-#     plt.axis([0, WEEK, 0, len(authors_steps) + 5])
-#     plt.xlabel("time")
-#     plt.ylabel("authors")
-#     plt.show()
+    counter = 1
+    clrs = ["b", "g", "r", "c", "m", "y", "k"]
+    for i, group in enumerate(groups):
+        c = random.choice(clrs)
+        fstp = None
+        for author in group:
+            counter += 1
+            for step in authors_steps[author]:
+                if not fstp:
+                    fstp = step
+                plt.plot([step.get("time"), step.get("end_time")], [counter, counter], "k-", lw=1, label=author,
+                         color=c)
+
+        plt.text(fstp["time"], counter, "%s" % i)
+
+    plt.axis([0, WEEK, 0, len(authors_steps) + 5])
+    plt.xlabel("time")
+    plt.ylabel("authors")
+    plt.show()
 
 
-# def visualise_group_life(group, ae, step=HOUR):
-#     ae.set_authors(group)
-#     sleep = []
-#     consume = []
-#     comment = []
-#     for t in range(0, WEEK, step):
-#         result = ae.get_action(t)
-#         for action in result:
-#             if action["_id"] == A_SLEEP:
-#                 sleep.append((action.get("count"), t))
-#             if action["_id"] == A_CONSUME:
-#                 consume.append((action.get("count"), t))
-#             if action["_id"] == A_COMMENT:
-#                 comment.append((action.get("count"), t))
-#
-#     get_y = lambda arr: map(lambda x: x[0], arr)
-#     get_x = lambda arr: map(lambda x: x[1], arr)
-#
-#     import matplotlib.pyplot as plt
-#
-#     plt.plot(get_x(sleep), get_y(sleep), "o", color="r")
-#     plt.plot(get_x(consume), get_y(consume), "o", color="g")
-#     plt.plot(get_x(comment), get_y(comment), "o", color="b")
-#     plt.axis([0, WEEK, 0, 20])
-#     plt.xlabel("time")
-#     plt.ylabel("actions")
-#     plt.show()
+def visualise_group_life(group, ae, step=HOUR):
+    ae.set_authors(group)
+    sleep = []
+    consume = []
+    comment = []
+    for t in range(0, WEEK, step):
+        result = ae.get_action(t)
+        for action in result:
+            if action["_id"] == A_SLEEP:
+                sleep.append((action.get("count"), t))
+            if action["_id"] == A_CONSUME:
+                consume.append((action.get("count"), t))
+            if action["_id"] == A_COMMENT:
+                comment.append((action.get("count"), t))
 
-def visualise():
+    get_y = lambda arr: map(lambda x: x[0], arr)
+    get_x = lambda arr: map(lambda x: x[1], arr)
+
+    import matplotlib.pyplot as plt
+
+    plt.plot(get_x(sleep), get_y(sleep), "o", color="r")
+    plt.plot(get_x(consume), get_y(consume), "o", color="g")
+    plt.plot(get_x(comment), get_y(comment), "o", color="b")
+    plt.axis([0, WEEK, 0, 20])
+    plt.xlabel("time")
+    plt.ylabel("actions")
+    plt.show()
+
+
+def group_and_visualise(for_time=DAY * 2):
     ae = ActionGenerator()
     a_s = AuthorsStorage()
 
@@ -416,9 +428,8 @@ def visualise():
 
     import matplotlib.pyplot as plt
 
-
     count = defaultdict(int)
-    for t in range(0, DAY*2, HOUR / 2):
+    for t in range(0, for_time, HOUR / 2):
         result = ae.get_action(t, HOUR / 2)
         if result == A_SLEEP:
             plt.plot([t], [2], "o", color="r")
@@ -426,25 +437,22 @@ def visualise():
         if result == A_CONSUME:
             plt.plot([t], [4], "o", color="g")
             count[A_CONSUME] += 1
+        if result == A_POST:
+            plt.plot([t], [5], "o", color="m")
+            count[A_POST] += 1
         if result == A_COMMENT:
             plt.plot([t], [6], "o", color="b")
             count[A_COMMENT] += 1
 
     print count
 
-    plt.axis([0, DAY*2, 0, 8])
+    plt.axis([0, for_time, 0, 8])
     plt.xlabel("time")
     plt.ylabel("actions")
     plt.show()
 
-if __name__ == '__main__':
 
-    # //todo:
-    # 1) доделать тест с сохранением без консьюмов.
-    # 2) сделать привязку данных генератора к чуваку
-    # 3) сделать манаж этой привязки: отображать, изменять, добавлять.
-
-    ae = ActionGenerator()
+def create():
     a_s = AuthorsStorage()
     a_s.authors.delete_many({})
 
@@ -452,15 +460,28 @@ if __name__ == '__main__':
     from wsgi.db import HumanStorage
 
     db = HumanStorage()
-    cs = CommentSearcher(db)
+    cs = CommentSearcher(db, add_authors=True)
     cq = CommentQueue()
 
     sbrdt = "videos"
     for comment in cs.find_comment(sbrdt):
         cq.put(sbrdt, comment)
 
+    agdf = ActionGeneratorDataFormer()
+    agdf.fill_consume_and_sleep()
 
-    visualise()
+
+if __name__ == '__main__':
+    # //todo:
+    # 1) доделать тест с сохранением без консьюмов.
+    # 2) сделать привязку данных генератора к чуваку
+    # 3) сделать манаж этой привязки: отображать, изменять, добавлять.
+
+    # agdf = ActionGeneratorDataFormer()
+    # agdf.revert_sleep_actions()
+    # agdf.fill_consume_and_sleep(min_sleep=4 * HOUR, max_sleep=18 * HOUR)
+
+    group_and_visualise()
 
 
     # for author in a_s.get_interested_authors(min_count_actions=0):

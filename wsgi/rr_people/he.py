@@ -441,7 +441,7 @@ class Consumer(Man):
             if post.fullname not in self._used and self._is_want_to(w_k):
                 self.do_see_post(post)
                 counter += 1
-            if random.randint(0, max_actions) < counter:
+            if random.randint(int(max_actions/1.5), max_actions) < counter:
                 self._last_post_ids[random_sub] = i
                 return
 
@@ -500,14 +500,18 @@ class Kapellmeister(Process):
             if action == A_SLEEP:
                 self.set_state(S_SLEEP)
                 time.sleep(MINUTE)
-            elif action == A_CONSUME:
-                self.human.live_random(max_actions=10)
+
             elif action == A_COMMENT:
-                sub_name = random.choice(subs)
-                comment = self.comment_queue.get(sub_name)
-                if comment and self.human.can_do(A_COMMENT):
-                    pfn, ct = comment
-                    self.human.do_comment_post(pfn, sub_name, ct)
+                if self.human.can_do(A_COMMENT):
+                    sub_name = random.choice(subs)
+                    comment = self.comment_queue.get(sub_name)
+                    if comment:
+                        pfn, ct = comment
+                        self.human.do_comment_post(pfn, sub_name, ct)
+                else:
+                    self.human.live_random(max_actions=random.randint(10,20))
+            else:
+                self.human.live_random(max_actions=random.randint(10,60))
 
             _diff = time.time() - _start
             step += _diff

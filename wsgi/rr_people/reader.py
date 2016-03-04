@@ -75,7 +75,7 @@ __doc__ = """
 
 
 class CommentSearcher(Man):
-    def __init__(self, db, user_agent=None):
+    def __init__(self, db, user_agent=None, add_authors=False):
         """
         :param user_agent: for reddit non auth and non oauth client
         :param lcp: low copies posts if persisted
@@ -87,7 +87,8 @@ class CommentSearcher(Man):
         self.comment_queue = CommentQueue()
         self.subs = {}
 
-        if AE_ADD_AUTHORS:
+        self.add_authors = add_authors
+        if self.add_authors:
             from wsgi.rr_people.ae import ActionGeneratorDataFormer
             self.agdf = ActionGeneratorDataFormer()
 
@@ -117,7 +118,7 @@ class CommentSearcher(Man):
         ps.start()
         self.subs[sub] = ps
 
-    def find_comment(self, at_subreddit, serialise=set_post_and_comment_text):
+    def find_comment(self, at_subreddit, serialise=set_post_and_comment_text, add_authors=False):
         def cmp_by_created_utc(x, y):
             result = x.created_utc - y.created_utc
             if result > 0.5:
@@ -157,7 +158,7 @@ class CommentSearcher(Man):
                 except Exception as e:
                     log.exception(e)
 
-            if AE_ADD_AUTHORS:
+            if add_authors or self.add_authors:
                 self.agdf.add_author_data(post.author.name)
 
     def _get_post_copies(self, post):
