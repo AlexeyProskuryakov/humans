@@ -263,12 +263,18 @@ class AuthorsStorage(DBHandler):
 
         found = self.author_groups.find_one(group_name)
         if not found:
-            self.author_groups.insert_one({"name": group_name, "authors": self.authors})
+            self.author_groups.insert_one({"name": group_name, "authors": authors})
         else:
-            self.author_groups.update_one({"name": group_name, "authors": self.authors})
+            self.author_groups.update_one({"name": group_name}, {'$set': {"authors": authors}})
             self.authors.update_many({"author": {"$in": found.get("authors")}}, {"$unset": {"used", ""}})
 
         self.authors.update_many({"author": {"$in": authors}}, {"$set": {"used": group_name}})
+
+    def get_sleep_steps(self, group):
+        return list(self.authors.find({"used":group, "action_type":A_SLEEP}))
+
+    def get_all_groups(self):
+        return list(self.author_groups.find({}))
 
 
 class ActionGeneratorDataFormer(object):
@@ -429,22 +435,6 @@ class ActionGenerator(object):
         else:
             return getted_action
 
-    def get_steps_data(self):
-        steps = []
-        for t in range(0, WEEK, HOUR / 2):
-            action = self.get_action(t, HOUR / 2)
-            if action == A_SLEEP:
-                steps.append([10, t])
-            elif action == A_COMMENT:
-                steps.append([20, t])
-            elif action == A_POST:
-                steps.append([30, t])
-
-        result = {"series": {
-            'label': self.group_name, 'data': steps
-        }}
-
-        return result
 
 
 def visualise_steps(groups, authors_steps):
@@ -488,8 +478,8 @@ def group_and_visualise_gen(for_time=DAY * 2):
     # for group in g_res.get("all_groups"):
     #     visualise_steps(group, g_res.get("authors"))
 
-    a_s.set_group(g_res.get('difference_1'), "Shlak2k15")
-    a_s.set_group(g_res.get('difference_2'), "Shlak2k16")
+    a_s.set_group(list(g_res.get('difference_1')), "Shlak2k15")
+    a_s.set_group(list(g_res.get('difference_2')), "Shlak2k16")
     # a_s.set_group(g_res.get("best"), "best")
 
     import matplotlib.pyplot as plt

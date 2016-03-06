@@ -1,10 +1,11 @@
 # coding=utf-8
-
+import calendar
 import os
+from collections import defaultdict
 from uuid import uuid4
 
 import praw
-from datetime import datetime
+from datetime import datetime, timedelta
 import time
 from flask import Flask, logging, request, render_template, session, url_for, g
 from flask.json import jsonify
@@ -12,9 +13,9 @@ from flask_debugtoolbar import DebugToolbarExtension
 from flask_login import LoginManager, login_user, login_required, logout_user
 from werkzeug.utils import redirect
 
-from wsgi.properties import want_coefficient_max
+from wsgi.properties import want_coefficient_max, DAY, WEEK_DAYS
 from wsgi.rr_people import S_WORK, S_SUSPEND
-from wsgi.rr_people.ae import ActionGenerator
+from wsgi.rr_people.ae import ActionGenerator, AuthorsStorage
 from wsgi.rr_people.he import HumanConfiguration, HumanOrchestra
 from wsgi.db import HumanStorage
 from wsgi.rr_people.reader import CommentSearcher
@@ -365,12 +366,42 @@ def comment_search_info(sub):
 def actions():
     return render_template("actions.html")
 
+
+author_storage = AuthorsStorage()
+
+
 @app.route("/ae-represent/<name>", methods=["GET"])
 @login_required
 def ae_represent(name):
-    ae = ActionGenerator(name)
-    result = ae.get_steps_data()
-    return jsonify(**result)
+    def get_point_x(x):
+        dt = datetime.utcnow() + timedelta(seconds=x)
+        return calendar.timegm(dt.timetuple())*1000
+    y = 3
+    ssteps = author_storage.get_sleep_steps(name)
+    sleep_days = defaultdict(list)
+    for step in ssteps:
+        sleep_days[divmod(step.get("time"), DAY)[0]].append([step['time'], step['end_time']])
+
+    data = []
+    for _, v in sleep_days.iteritems():
+        avg_start = sum(map(lambda x: x[0], v)) / len(v)
+        avg_end = sum(map(lambda x: x[1], v)) / len(v)
+
+        step = (avg_end - avg_start) / 2
+        x = avg_start + step
+        data.append([get_point_x(x), y, step*1000, step*1000])
+
+    result = {"color": "blue",
+              "data": data,
+              "points": {
+                  "show": True,
+                  "radius": 2,
+                  "fillColor": "red",
+                  "errorbars": "x",
+                  "xerr": {"show": True, "asymmetric": True, "upperCap": "-", "lowerCap": "-"},
+              }
+              }
+    return jsonify(**{"data": result, "ok": True})
 
 
 if __name__ == '__main__':

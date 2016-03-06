@@ -6,24 +6,31 @@
 <div class="container">
     <div class="row">
         <div class="col-md-6 col-md-offset-3">
+            <h2>
+                Просмотр времени сна чувака
+            </h2>
             <form id="ae-form" class="form-inline">
+                <label for="ae-name">
+                    Имя чувака:
+                </label>
                 <input type="text" id="ae-name">
-                <input type="submit">
+                <input type="submit" value="send">
             </form>
         </div>
     </div>
 
     <div class="row">
         <div class="col-md-6 col-md-offset-3">
-            <div id="loader-wrapper">
-                <img id='loader-gif' src="{{url_for('static', filename='img/giphy.gif')}}">
-            </div>
+            <img id='loader-gif' src="{{url_for('static', filename='img/giphy.gif')}}">
         </div>
     </div>
 
 </div>
 
-<div id="ae-represent">
+<div id="ae-represent-container">
+    <div id="ae-represent-placeholder">
+
+    </div>
 </div>
 
 <script src="{{ url_for('static', filename='js/ae-script.js') }}"></script>

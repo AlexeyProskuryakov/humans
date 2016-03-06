@@ -18,26 +18,31 @@ table.sortable thead {
     width: 25px;
 }
 
-#ae-represent{
-	width: 1750px;
-	height: 250px;
-	}
-
 .legend{
 	font-size: 7pt; /* Размер шрифта в пунктах */
 }
 
 
-.green{
-    background-color:#eee;!important;
-    color:#666666;!important;
-}
-
-
-#loader-wrapper{
-    width: 1750px;
-	height: 250px;
-}
 #loader-gif{
     display:none;
 }
+
+#ae-represent-container {
+	box-sizing: border-box;
+	width: 1750px;
+	height: 250px;
+	padding: 20px 15px 15px 15px;
+	margin: 15px auto 30px auto;
+}
+
+#ae-represent-placeholder {
+	width: 100%;
+	height: 100%;
+	font-size: 14px;
+	line-height: 1.2em;
+}
+
+.legend table {
+	border-spacing: 5px;
+}
+
