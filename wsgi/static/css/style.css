@@ -18,7 +18,7 @@ table.sortable thead {
     width: 25px;
 }
 
-#posts-chart{
+#ae-represent{
 	width: 1750px;
 	height: 250px;
 	}
@@ -31,4 +31,13 @@ table.sortable thead {
 .green{
     background-color:#eee;!important;
     color:#666666;!important;
+}
+
+
+#loader-wrapper{
+    width: 1750px;
+	height: 250px;
+}
+#loader-gif{
+    display:none;
 }

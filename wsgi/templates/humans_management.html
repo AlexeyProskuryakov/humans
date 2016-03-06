@@ -34,10 +34,7 @@
         </div>
     </div>
     <div class="row">
-        <h3> Worked humans: {{worked_humans}}</h3>
-    </div>
-    <div class="row">
-        <h3> humans states: </h3>
+        <h3> Humans info: </h3>
     </div>
     <div class="row">
         <div class="col-md-8 col-md-offset-2">
@@ -66,7 +63,7 @@
                         <a href="{{ url_for('humans_info', name=human.user) }}"> {{human.user}}</a>
                     </td>
                     <td class="col-md-2 ">
-                        {{human.live_state}}
+                        {{human['state']}}
                     </td>
                     <td>
                         {% if human.info %}

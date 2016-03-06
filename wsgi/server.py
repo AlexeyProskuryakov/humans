@@ -13,10 +13,11 @@ from flask_login import LoginManager, login_user, login_required, logout_user
 from werkzeug.utils import redirect
 
 from wsgi.properties import want_coefficient_max
-from wsgi.rr_people import S_STOP, S_WORK, S_SUSPEND
+from wsgi.rr_people import S_WORK, S_SUSPEND
+from wsgi.rr_people.ae import ActionGenerator
 from wsgi.rr_people.he import HumanConfiguration, HumanOrchestra
 from wsgi.db import HumanStorage
-from wsgi.rr_people.reader import CommentSearcher, get_post_and_comment_text, Q_SUB_QUEUE
+from wsgi.rr_people.reader import CommentSearcher
 from wsgi.wake_up import WakeUp
 
 __author__ = '4ikist'
@@ -257,11 +258,12 @@ def humans():
         return redirect(url_for('humans_info', name=human_name))
 
     humans_info = db.get_humans_info()
-    worked_humans = map(lambda x: x.get("name"), db.get_humans_with_state(S_WORK))
+    for human in humans_info:
+        human['state'] = db.get_human_state(human['user'])
+    # worked_humans = map(lambda x: x.get("name"), db.get_humans_with_state(S_WORK))
 
     return render_template("humans_management.html",
-                           **{"humans": humans_info,
-                              "worked_humans": worked_humans})
+                           **{"humans": humans_info})
 
 
 @app.route("/humans/<name>", methods=["POST", "GET"])
@@ -316,6 +318,7 @@ def start_comment_search(sub):
 
 
 @app.route("/posts")
+@login_required
 def posts():
     subs = comment_searcher.comment_queue.get_sbrdts_states()
     qc_s = {}
@@ -327,6 +330,7 @@ def posts():
 
 
 @app.route("/comment_search/info/<sub>")
+@login_required
 def comment_search_info(sub):
     posts = db.get_posts_ready_for_comment()
     comments = comment_searcher.comment_queue.show_all(sub)
@@ -357,8 +361,16 @@ def comment_search_info(sub):
 
 
 @app.route("/actions")
+@login_required
 def actions():
-   pass
+    return render_template("actions.html")
+
+@app.route("/ae-represent/<name>", methods=["GET"])
+@login_required
+def ae_represent(name):
+    ae = ActionGenerator(name)
+    result = ae.get_steps_data()
+    return jsonify(**result)
 
 
 if __name__ == '__main__':

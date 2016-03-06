@@ -1,0 +1,32 @@
+{% extends "layout.html" %}
+
+{% block body %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-md-6 col-md-offset-3">
+            <form id="ae-form" class="form-inline">
+                <input type="text" id="ae-name">
+                <input type="submit">
+            </form>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6 col-md-offset-3">
+            <div id="loader-wrapper">
+                <img id='loader-gif' src="{{url_for('static', filename='img/giphy.gif')}}">
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<div id="ae-represent">
+</div>
+
+<script src="{{ url_for('static', filename='js/ae-script.js') }}"></script>
+
+{% endblock %}
+{% endblock%}

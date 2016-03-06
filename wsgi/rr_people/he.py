@@ -18,11 +18,12 @@ from praw.objects import MoreComments
 from wsgi import properties
 from wsgi.db import HumanStorage
 from wsgi.rr_people import USER_AGENTS, \
-    A_CONSUME, A_VOTE, A_COMMENT, A_POST, A_SUBSCRIBE, A_FRIEND, \
-    S_SLEEP, S_WORK, S_BAN, Man, re_url, S_SUSPEND, Singleton, normalize, WEEK, \
-    MINUTE, HOUR, A_SLEEP
-from wsgi.rr_people.ae import ActionGenerator
+    A_CONSUME, A_VOTE, A_COMMENT, A_POST, A_SUBSCRIBE, A_FRIEND, A_SLEEP, \
+    S_WORK, S_BAN, S_SLEEP, S_SUSPEND, \
+    Man, re_url, Singleton, normalize
+from wsgi.rr_people.ae import ActionGenerator, time_hash
 from wsgi.rr_people.reader import CommentQueue
+from wsgi.properties import WEEK, HOUR, MINUTE
 
 log = logging.getLogger("he")
 
@@ -441,7 +442,7 @@ class Consumer(Man):
             if post.fullname not in self._used and self._is_want_to(w_k):
                 self.do_see_post(post)
                 counter += 1
-            if random.randint(int(max_actions/1.5), max_actions) < counter:
+            if random.randint(int(max_actions / 1.5), max_actions) < counter:
                 self._last_post_ids[random_sub] = i
                 return
 
@@ -472,6 +473,7 @@ class Kapellmeister(Process):
     def set_state(self, new_state):
         state = self.db.get_human_state(self.human_name)
         if state == S_SUSPEND:
+            log.info("%s is suspended will stop" % self.human_name)
             return False
         else:
             self.db.set_human_state(self.human_name, new_state)
@@ -479,7 +481,7 @@ class Kapellmeister(Process):
 
     def run(self):
         log.info("start kappellmeister for [%s]" % self.human_name)
-        t_start = self.ae.time_hash(datetime.utcnow())
+        t_start = time_hash(datetime.utcnow())
         step = t_start
         last_token_refresh_time = t_start
         subs = self.db.get_human_subs(self.human_name)
@@ -487,6 +489,7 @@ class Kapellmeister(Process):
             _start = time.time()
 
             if not self.human_check():
+                log.info("%s is not checked..." % self.human_name)
                 return
 
             if not self.set_state(S_WORK):
@@ -498,7 +501,8 @@ class Kapellmeister(Process):
 
             action = self.ae.get_action(step)
             if action == A_SLEEP:
-                self.set_state(S_SLEEP)
+                if not self.set_state(S_SLEEP):
+                    return
                 time.sleep(MINUTE)
 
             elif action == A_COMMENT:
@@ -509,9 +513,9 @@ class Kapellmeister(Process):
                         pfn, ct = comment
                         self.human.do_comment_post(pfn, sub_name, ct)
                 else:
-                    self.human.live_random(max_actions=random.randint(10,20))
+                    self.human.live_random(max_actions=random.randint(10, 20))
             else:
-                self.human.live_random(max_actions=random.randint(10,60))
+                self.human.live_random(max_actions=random.randint(10, 60))
 
             _diff = time.time() - _start
             step += _diff
@@ -544,8 +548,7 @@ class HumanOrchestra():
     def add_human(self, human_name):
         with self.lock:
             try:
-                ae = ActionGenerator()
-                ae.set_authors_by_group_name(human_name)
+                ae = ActionGenerator(group_name=human_name)
                 human = Kapellmeister(human_name, HumanStorage(), ae)
                 self.__humans[human_name] = human
                 human.start()

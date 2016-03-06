@@ -17,6 +17,7 @@ class WakeUp(Process):
     def set_what(self, what):
         with self.mutex:
             self.what = what
+
     def run(self):
         while 1:
             salt = ''.join(random.choice(string.lowercase) for _ in range(20))

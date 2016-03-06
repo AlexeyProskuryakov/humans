@@ -195,13 +195,12 @@ class AuthorsStorage(DBHandler):
         for one in author1_steps:
             for two in author2_steps:
                 if e(one) < s(two) or e(two) < s(one):
-                    result -= float(abs(min(s(two) - e(one), s(one) - e(two))))/len(author1_steps)
+                    result -= float(abs(min(s(two) - e(one), s(one) - e(two)))) / len(author1_steps)
                     continue
 
                 k = abs(e(one) - e(two)) + abs(s(one) - s(two))
                 if k > (e(one) - s(one)) or k > (e(two) - s(two)):
-                    result -= float(abs(min(k - (e(one) - s(one)), k - (e(two) - s(two)))))/len(author1_steps)
-
+                    result -= float(abs(min(k - (e(one) - s(one)), k - (e(two) - s(two))))) / len(author1_steps)
 
                 result += max(e(one), e(two)) - min(s(one), s(two)) - k
 
@@ -243,9 +242,17 @@ class AuthorsStorage(DBHandler):
         return result
 
     def set_group(self, authors, group_name):
-        if not self.author_groups.find_one(group_name):
+        if not authors:
+            return
+
+        found = self.author_groups.find_one(group_name)
+        if not found:
             self.author_groups.insert_one({"name": group_name, "authors": self.authors})
-            self.authors.update_many({"author": {"$in": authors}}, {"$set": {"used": group_name}})
+        else:
+            self.author_groups.update_one({"name": group_name, "authors": self.authors})
+            self.authors.update_many({"author": {"$in": found.get("authors")}}, {"$unset": {"used", ""}})
+
+        self.authors.update_many({"author": {"$in": authors}}, {"$set": {"used": group_name}})
 
 
 class ActionGeneratorDataFormer(object):
@@ -406,6 +413,23 @@ class ActionGenerator(object):
         else:
             return getted_action
 
+    def get_steps_data(self):
+        steps = []
+        for t in range(0, WEEK, HOUR / 2):
+            action = self.get_action(t, HOUR / 2)
+            if action == A_SLEEP:
+                steps.append([10, t])
+            elif action == A_COMMENT:
+                steps.append([20, t])
+            elif action == A_POST:
+                steps.append([30, t])
+
+        result = {"series": {
+            'label': self.group_name, 'data': steps
+        }}
+
+        return result
+
 
 def visualise_steps(groups, authors_steps):
     import matplotlib.pyplot as plt
@@ -413,7 +437,7 @@ def visualise_steps(groups, authors_steps):
     counter = 1
     clrs = ["b", "g", "r", "c", "m", "y", "k"]
     for i, group in enumerate(groups):
-        if not group:continue
+        if not group: continue
         c = random.choice(clrs)
         fstp = None
         for author in group:
@@ -436,6 +460,7 @@ def renew_sleep_actions():
     agdf = ActionGeneratorDataFormer()
     agdf.revert_sleep_actions()
     agdf.fill_consume_and_sleep(min_sleep=4 * HOUR, max_sleep=24 * HOUR, authors_min_actions_count=0)
+
 
 def group_and_visualise_gen(for_time=DAY * 2):
     ae = ActionGenerator()
