@@ -134,19 +134,22 @@ class AuthorsStorage(DBHandler):
 
         while len(groups) > min_groups or len(groups) == 0:
             log.info("adding to group. Group len is:%s" % len(groups))
-            max_nearest_weight = -WEEK
+            max_nearest_weight = 0
             nearest_groups = (None, None)
 
             for i, authors_group in enumerate(groups):
                 for j, authors_a_group in enumerate(groups):
                     if i == j: continue
-                    nearest = 0
+                    nearest = 0.0
                     for author in authors_group:
                         for a_author in authors_a_group:
                             nearest += self.get_authors_nearest(authors[author], authors[a_author])
 
-                    nearest = nearest / (len(authors_group) * len(authors_a_group))
-                    if max_nearest_weight <= nearest:
+                    if nearest < 0:
+                        continue
+
+                    nearest = nearest / (len(authors_group) + len(authors_a_group))
+                    if max_nearest_weight < nearest:
                         max_nearest_weight = nearest
                         nearest_groups = (i, j)
 
@@ -189,20 +192,33 @@ class AuthorsStorage(DBHandler):
         s = lambda x: x['time']
         e = lambda x: x["end_time"]
 
-        steps_diff = abs(len(author1_steps) - len(author2_steps))
-        if steps_diff != 0:
-            return -((DAY / 4) * steps_diff)
-        for one in author1_steps:
-            for two in author2_steps:
-                if e(one) < s(two) or e(two) < s(one):
-                    result -= float(abs(min(s(two) - e(one), s(one) - e(two)))) / len(author1_steps)
-                    continue
+        def get_author_steps(authors_steps, from_, to_):
+            result = []
+            for step in authors_steps:
+                if s(step) >= from_ and s(step) <= to_:
+                    result.append(step)
+            return result
 
-                k = abs(e(one) - e(two)) + abs(s(one) - s(two))
-                if k > (e(one) - s(one)) or k > (e(two) - s(two)):
-                    result -= float(abs(min(k - (e(one) - s(one)), k - (e(two) - s(two))))) / len(author1_steps)
+        for step in range(0, WEEK, DAY):
+            step_result = 0
+            a1stps = get_author_steps(author1_steps, step, step + DAY)
+            a2stps = get_author_steps(author2_steps, step, step + DAY)
 
-                result += max(e(one), e(two)) - min(s(one), s(two)) - k
+            for one in a1stps:
+                for two in a2stps:
+
+                    diff = abs(e(one) - e(two)) + abs(s(one) - s(two))
+                    inter = min((e(two) - s(one)), (e(one) - s(two)))
+                    union = max((e(two) - s(one)), (e(one) - s(two)))
+
+                    # steps have not intersection
+                    if inter <= 0:
+                        step_result -= union
+                        continue
+
+                    step_result += inter - diff
+
+            result += step_result
 
         return result
 
@@ -469,12 +485,12 @@ def group_and_visualise_gen(for_time=DAY * 2):
     g_res = a_s.get_authors_groups()
 
     visualise_steps([g_res.get("best"), g_res.get('difference_1'), g_res.get('difference_2')], g_res.get("authors"))
-    for group in g_res.get("all_groups"):
-        visualise_steps(group, g_res.get("authors"))
+    # for group in g_res.get("all_groups"):
+    #     visualise_steps(group, g_res.get("authors"))
 
     a_s.set_group(g_res.get('difference_1'), "Shlak2k15")
     a_s.set_group(g_res.get('difference_2'), "Shlak2k16")
-    a_s.set_group(g_res.get("best"), "best")
+    # a_s.set_group(g_res.get("best"), "best")
 
     import matplotlib.pyplot as plt
 
