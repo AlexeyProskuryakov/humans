@@ -4,15 +4,17 @@ from imgurpython import ImgurClient
 
 from wsgi import properties
 from wsgi.rr_people import RedditHandler, normalize
+from wsgi.rr_people.posting import Generator
 
 log = logging.getLogger("imgr")
 
+MAX_PAGES = 5
 
 def _get_post_id(url):
     return url
 
 
-class ImgurPostsProvider(RedditHandler):
+class ImgurPostsProvider(RedditHandler, Generator):
     def __init__(self):
         super(ImgurPostsProvider, self).__init__()
         self.client = ImgurClient(properties.ImgrClientID, properties.ImgrClientSecret)
@@ -26,12 +28,12 @@ class ImgurPostsProvider(RedditHandler):
         if not image.title or hash(normalize(image.title)) in self.toggled or image.height < 500 or image.width < 500:
             return False
 
-        id_copies = self.get_copies(image.id)
-        if len(id_copies) == 0:
+        copies = self.get_copies(image.id)
+        if len(copies) == 0:
             return True
 
-    def get_data(self, subreddit):
-        for page in xrange(0, 1000):
+    def generate_data(self, subreddit):
+        for page in xrange(MAX_PAGES):
             q = "tag:%s OR title:%s OR album:%s OR meme:%s"%(subreddit, subreddit, subreddit, subreddit)
             log.info("retrieve for %s at page %s" % (subreddit, page))
 
@@ -49,5 +51,5 @@ class ImgurPostsProvider(RedditHandler):
 
 if __name__ == '__main__':
     imgrpp = ImgurPostsProvider()
-    for data in imgrpp.get_data('cringe'):
-        print data.link, data.title
+    for url, title in imgrpp.generate_data('cringe'):
+        print url, title

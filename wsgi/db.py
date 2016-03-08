@@ -21,12 +21,6 @@ class DBHandler(object):
         self.db = self.client[db_name]
 
 
-class StatisticsCache(object):
-    def __init__(self):
-        self.last_update = time.time()
-        self.data = {}
-
-
 class HumanStorage(DBHandler):
     def __init__(self):
         super(HumanStorage, self).__init__()
@@ -37,27 +31,15 @@ class HumanStorage(DBHandler):
             self.users.create_index([("name", pymongo.ASCENDING)], unique=True)
             self.users.create_index([("user_id", pymongo.ASCENDING)], unique=True)
 
-        self.cache = {}
-        self.statistics = db.get_collection("statistics")
-        if not self.statistics:
-            self.statistics = db.create_collection(
-                    'statistics',
-                    capped=True,
-                    size=1024 * 1024 * 2,  # required
-            )
-            self.statistics.create_index([("time", pymongo.ASCENDING)])
-            self.statistics.create_index([("type", pymongo.ASCENDING)])
-
         self.human_log = db.get_collection("human_log")
         if not self.human_log:
             self.human_log = db.create_collection(
                     "human_log",
                     capped=True,
-                    size=1024 * 1024 * 256,
+                    size=1024 * 1024 * 50,
             )
-
             self.human_log.create_index([("human_name", pymongo.ASCENDING)])
-            self.human_log.create_index([("time", pymongo.ASCENDING)])
+            self.human_log.create_index([("time", pymongo.ASCENDING)], expireAfterSeconds=3600)
             self.human_log.create_index([("action", pymongo.ASCENDING)])
 
         self.human_config = db.get_collection("human_config")
@@ -302,7 +284,6 @@ class HumanStorage(DBHandler):
                 return found.get("user_id")
 
 
-#
 if __name__ == '__main__':
     from rr_people import normalize
 
