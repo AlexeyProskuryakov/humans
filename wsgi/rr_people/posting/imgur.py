@@ -4,19 +4,18 @@ from imgurpython import ImgurClient
 
 from wsgi import properties
 from wsgi.rr_people import RedditHandler, normalize
-from wsgi.rr_people.posting import Generator
+from wsgi.rr_people.posting import Generator, pp_objects, IMGUR
 
-log = logging.getLogger("imgr")
+log = logging.getLogger("imgur")
 
 MAX_PAGES = 5
 
 def _get_post_id(url):
     return url
 
-
 class ImgurPostsProvider(RedditHandler, Generator):
     def __init__(self):
-        super(ImgurPostsProvider, self).__init__()
+        super(ImgurPostsProvider, self).__init__("imgur")
         self.client = ImgurClient(properties.ImgrClientID, properties.ImgrClientSecret)
         self.toggled = set()
 
@@ -48,6 +47,8 @@ class ImgurPostsProvider(RedditHandler, Generator):
                         self.toggled.add(hash(normalize(image.title)))
                         yield image.link, image.title
 
+
+pp_objects[IMGUR] = ImgurPostsProvider
 
 if __name__ == '__main__':
     imgrpp = ImgurPostsProvider()

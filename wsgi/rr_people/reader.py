@@ -9,7 +9,7 @@ import praw
 from praw.objects import MoreComments
 
 from wsgi.db import HumanStorage
-from wsgi.properties import DEFAULT_SLEEP_TIME_AFTER_READ_SUBREDDIT, min_donor_num_comments, \
+from wsgi.properties import DEFAULT_SLEEP_TIME_AFTER_GENERATE_DATA, min_donor_num_comments, \
     min_comment_create_time_difference, min_copy_count, \
     shift_copy_comments_part, min_donor_comment_ups, max_donor_comment_ups
 from wsgi.rr_people import RedditHandler, serialize
@@ -93,8 +93,8 @@ class CommentSearcher(RedditHandler):
                 for pfn, ct in self.find_comment(sub):
                     self.comment_queue.put_comment(sub, pfn, ct)
                 end = time.time()
-                sleep_time = random.randint(DEFAULT_SLEEP_TIME_AFTER_READ_SUBREDDIT / 5,
-                                            DEFAULT_SLEEP_TIME_AFTER_READ_SUBREDDIT)
+                sleep_time = random.randint(DEFAULT_SLEEP_TIME_AFTER_GENERATE_DATA / 5,
+                                            DEFAULT_SLEEP_TIME_AFTER_GENERATE_DATA)
                 log.info(
                         "Was get all comments which found for [%s] at %s seconds... Will trying next after %s" % (
                             sub, end - start, sleep_time))
