@@ -271,7 +271,7 @@ class AuthorsStorage(DBHandler):
         self.authors.update_many({"author": {"$in": authors}}, {"$set": {"used": group_name}})
 
     def get_sleep_steps(self, group):
-        return list(self.authors.find({"used":group, "action_type":A_SLEEP}))
+        return list(self.authors.find({"used": group, "action_type": A_SLEEP}))
 
     def get_all_groups(self):
         return list(self.author_groups.find({}))
@@ -357,7 +357,7 @@ class ActionGeneratorDataFormer(object):
 
     def _get_data_of(self, r_author):
         try:
-            cb = list(r_author.get_comments(sort="new", limit=1000))
+            cb = list(r_author.gets(sort="new", limit=1000))
             sb = list(r_author.get_submitted(sort="new", limit=1000))
             return cb, sb
         except Exception as e:
@@ -436,7 +436,6 @@ class ActionGenerator(object):
             return getted_action
 
 
-
 def visualise_steps(groups, authors_steps):
     import matplotlib.pyplot as plt
 
@@ -451,7 +450,8 @@ def visualise_steps(groups, authors_steps):
             for step in authors_steps[author]:
                 if not fstp:
                     fstp = step
-                plt.plot([step.get("time"), step.get("end_time")], [counter, counter], "k-", lw=1, label=author,
+                plt.plot([step.get("time"), step.get("end_time")], [counter, counter], "k-", lw=1,
+                         label=author,
                          color=c)
 
         plt.text(fstp["time"], counter, "%s" % i)
@@ -512,16 +512,16 @@ def create():
     a_s = AuthorsStorage()
     a_s.authors.delete_many({})
 
-    from wsgi.rr_people.reader import CommentSearcher, CommentQueue
+    from wsgi.rr_people.reader import CommentSearcher, ProductionQueue
     from wsgi.db import HumanStorage
 
     db = HumanStorage()
     cs = CommentSearcher(db, add_authors=True)
-    cq = CommentQueue()
+    cq = ProductionQueue()
 
     sbrdt = "videos"
-    for comment in cs.find_comment(sbrdt):
-        cq.put(sbrdt, comment)
+    for post, comment in cs.find_comment(sbrdt):
+        cq.put_comment(sbrdt, post, comment)
 
     agdf = ActionGeneratorDataFormer()
     agdf.fill_consume_and_sleep()

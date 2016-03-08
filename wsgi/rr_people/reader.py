@@ -6,30 +6,17 @@ from datetime import datetime
 from multiprocessing import Process
 
 import praw
-import redis
 from praw.objects import MoreComments
 
 from wsgi.db import HumanStorage
-from wsgi.properties import c_queue_redis_addres, c_queue_redis_port, AE_ADD_AUTHORS, \
-    DEFAULT_SLEEP_TIME_AFTER_READ_SUBREDDIT, min_donor_num_comments, min_comment_create_time_difference, min_copy_count, \
+from wsgi.properties import DEFAULT_SLEEP_TIME_AFTER_READ_SUBREDDIT, min_donor_num_comments, \
+    min_comment_create_time_difference, min_copy_count, \
     shift_copy_comments_part, min_donor_comment_ups, max_donor_comment_ups
-from wsgi.rr_people import Man
-from wsgi.rr_people import re_url, normalize, S_WORK, S_SLEEP, S_STOP, re_crying_chars
+from wsgi.rr_people import RedditHandler, serialize
+from wsgi.rr_people import re_url, normalize, S_WORK, S_SLEEP, re_crying_chars
+from wsgi.rr_people.queue import ProductionQueue
 
 log = logging.getLogger("reader")
-
-CQ_SEP = "$:$"
-
-
-def get_post_and_comment_text(key):
-    if isinstance(key, (str, unicode)) and CQ_SEP in key:
-        splitted = key.split(CQ_SEP)
-        if len(splitted) == 2:
-            return tuple(splitted)
-    return None
-
-
-set_post_and_comment_text = lambda pfn, ct: "%s%s%s" % (pfn, CQ_SEP, ct)
 
 
 def _so_long(created, min_time):
@@ -74,7 +61,7 @@ __doc__ = """
     """
 
 
-class CommentSearcher(Man):
+class CommentSearcher(RedditHandler):
     def __init__(self, db, user_agent=None, add_authors=False):
         """
         :param user_agent: for reddit non auth and non oauth client
@@ -84,7 +71,7 @@ class CommentSearcher(Man):
         """
         super(CommentSearcher, self).__init__(user_agent)
         self.db = db
-        self.comment_queue = CommentQueue()
+        self.comment_queue = ProductionQueue()
         self.subs = {}
 
         self.add_authors = add_authors
@@ -94,31 +81,31 @@ class CommentSearcher(Man):
 
         log.info("Read human inited!")
 
-    def start_retrieve_comments(self, sub):
+    def start_find_comments(self, sub):
         if sub in self.subs and self.subs[sub].is_alive():
             return
 
         def f():
             while 1:
-                self.comment_queue.set_reader_state(sub, S_WORK)
+                self.comment_queue.set_comment_founder_state(sub, S_WORK)
                 start = time.time()
                 log.info("Will start find comments for [%s]" % (sub))
-                for el in self.find_comment(sub):
-                    self.comment_queue.put(sub, el)
+                for pfn, ct in self.find_comment(sub):
+                    self.comment_queue.put_comment(sub, pfn, ct)
                 end = time.time()
                 sleep_time = random.randint(DEFAULT_SLEEP_TIME_AFTER_READ_SUBREDDIT / 5,
                                             DEFAULT_SLEEP_TIME_AFTER_READ_SUBREDDIT)
                 log.info(
                         "Was get all comments which found for [%s] at %s seconds... Will trying next after %s" % (
                             sub, end - start, sleep_time))
-                self.comment_queue.set_reader_state(sub, S_SLEEP, ex=sleep_time + 1)
+                self.comment_queue.set_comment_founder_state(sub, S_SLEEP, ex=sleep_time + 1)
                 time.sleep(sleep_time)
 
         ps = Process(name="[%s] comment founder" % sub, target=f)
         ps.start()
         self.subs[sub] = ps
 
-    def find_comment(self, at_subreddit, serialise=set_post_and_comment_text, add_authors=False):
+    def find_comment(self, at_subreddit, add_authors=False):
         def cmp_by_created_utc(x, y):
             result = x.created_utc - y.created_utc
             if result > 0.5:
@@ -130,11 +117,11 @@ class CommentSearcher(Man):
 
         subreddit = at_subreddit
         all_posts = self.get_hot_and_new(subreddit, sort=cmp_by_created_utc)
-        self.comment_queue.set_reader_state(subreddit, "%s found %s" % (S_WORK, len(all_posts)), ex=len(all_posts) * 2)
+        self.comment_queue.set_comment_founder_state(subreddit, "%s found %s" % (S_WORK, len(all_posts)), ex=len(all_posts) * 2)
         for post in all_posts:
             if self.db.is_can_see_post(post.fullname):
                 try:
-                    copies = self._get_post_copies(post)
+                    copies = self.get_post_copies(post)
                     copies = filter(
                             lambda copy: _so_long(copy.created_utc, min_comment_create_time_difference) and \
                                          copy.num_comments > min_donor_num_comments,
@@ -152,7 +139,7 @@ class CommentSearcher(Man):
 
                         if comment and self.db.set_post_ready_for_comment(post.fullname,
                                                                           hash(normalize(comment.body))):
-                            yield serialise(post.fullname, comment.body)
+                            yield post.fullname, comment.body
                     else:
                         self.db.set_post_low_copies(post.fullname)
                 except Exception as e:
@@ -161,7 +148,7 @@ class CommentSearcher(Man):
             if add_authors or self.add_authors:
                 self.agdf.add_author_data(post.author.name)
 
-    def _get_post_copies(self, post):
+    def get_post_copies(self, post):
         search_request = "url:\'%s\'" % post.url
         copies = list(self.reddit.search(search_request))
         return list(copies)
@@ -207,56 +194,8 @@ class CommentSearcher(Man):
                 return True
 
 
-Q_SUB_QUEUE = lambda x: "%s_cq" % x
-Q_SUBS_STATES_H = "sbrdt_states"
-
-
-class CommentQueue():
-    def __init__(self, clear=False):
-        self.redis = redis.StrictRedis(host=c_queue_redis_addres, port=c_queue_redis_port, db=0,
-                                       password="sederfes100500")
-
-        log.info("Comment Queue inited!\n Entry subs is:")
-        for sub in self.redis.hgetall(Q_SUBS_STATES_H):
-            log.info("%s: \n%s\n" % (sub, "\n".join(["%s\t%s" % (k, v) for k, v in self.show_all(sub).iteritems()])))
-
-    def put(self, sbrdt, key):
-        log.debug("redis: push to %s \nthis:%s" % (sbrdt, key))
-        self.redis.rpush(Q_SUB_QUEUE(sbrdt), key)
-
-    def get(self, sbrdt):
-        """
-        :param sbrdt: subreddit name in which post will comment
-        :return: post full name (which will comment), comment text
-        """
-        result = self.redis.lpop(Q_SUB_QUEUE(sbrdt))
-        log.debug("redis: get by %s\nthis: %s" % (sbrdt, result))
-        return get_post_and_comment_text(result)
-
-    def show_all(self, sbrdt):
-        result = self.redis.lrange(Q_SUB_QUEUE(sbrdt), 0, -1)
-        return dict(map(lambda x: get_post_and_comment_text(x), result))
-
-    def set_reader_state(self, sbrdt, state, ex=None):
-        pipe = self.redis.pipeline()
-        pipe.hset(Q_SUBS_STATES_H, sbrdt, state)
-        pipe.set(sbrdt, state, ex=ex or 3600)
-        pipe.execute()
-
-    def get_reader_state(self, sbrdt):
-        return self.redis.get(sbrdt)
-
-    def get_sbrdts_states(self):
-        result = self.redis.hgetall("sbrdt_states")
-        for k, v in result.iteritems():
-            ks = self.get_reader_state(k)
-            if v is None or ks is None:
-                result[k] = S_STOP
-        return result
-
-
 if __name__ == '__main__':
-    queue = CommentQueue()
+    queue = ProductionQueue()
     db = HumanStorage()
     cs = CommentSearcher(db)
     for res in cs.find_comment("videos"):

@@ -62,13 +62,22 @@ log = logging.getLogger("man")
 WORDS_HASH = "words_hash"
 
 
-class Man(object):
+class RedditHandler(object):
     def __init__(self, user_agent=None):
         self.reddit = praw.Reddit(user_agent=user_agent or random.choice(USER_AGENTS))
+        self.subreddits_cache = {}
+
+    def get_subreddit(self, name):
+        if name not in self.subreddits_cache:
+            subreddit = self.reddit.get_subreddit(name)
+            self.subreddits_cache[name] = subreddit
+        else:
+            subreddit = self.subreddits_cache.get(name)
+        return subreddit
 
     def get_hot_and_new(self, subreddit_name, sort=None, limit=properties.DEFAULT_LIMIT):
         try:
-            subreddit = self.reddit.get_subreddit(subreddit_name)
+            subreddit = self.get_subreddit(subreddit_name)
             hot = list(subreddit.get_hot(limit=limit))
             new = list(subreddit.get_new(limit=limit))
             result_dict = dict(map(lambda x: (x.fullname, x), hot), **dict(map(lambda x: (x.fullname, x), new)))
@@ -97,6 +106,10 @@ class Man(object):
                     acc.append(comment)
         return acc
 
+    def search(self, query):
+        copies = list(self.reddit.search(query))
+        return list(copies)
+
 
 class Singleton(type):
     _instances = {}
@@ -109,7 +122,6 @@ class Singleton(type):
 
 token_reg = re.compile("[\\W\\d]+")
 
-
 def normalize(comment_body):
     res = []
     if isinstance(comment_body, (str, unicode)):
@@ -118,3 +130,16 @@ def normalize(comment_body):
             if len(token) > 2:
                 res.append(stem(token))
     return " ".join(res)
+
+
+CQ_SEP = "$:$"
+
+def deserialize(key):
+    if isinstance(key, (str, unicode)) and CQ_SEP in key:
+        splitted = key.split(CQ_SEP)
+        if len(splitted) == 2:
+            return tuple(splitted)
+    return None
+
+
+serialize = lambda pfn, ct: "%s%s%s" % (pfn, CQ_SEP, ct)

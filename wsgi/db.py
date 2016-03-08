@@ -88,7 +88,7 @@ class HumanStorage(DBHandler):
             self.human_posts.create_index([("state", pymongo.ASCENDING)])
 
     def update_human_access_credentials_info(self, user, info):
-        if isinstance(info.get("scope"), set):
+        if isinstance(info.get_comment("scope"), set):
             info['scope'] = list(info['scope'])
         self.human_config.update_one({"user": user}, {"$set": {"info": info, "time": time.time()}})
 

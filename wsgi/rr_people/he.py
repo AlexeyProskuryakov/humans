@@ -3,7 +3,6 @@ import logging
 import random
 import time
 import traceback
-
 from collections import defaultdict
 from datetime import datetime
 from multiprocessing.process import Process
@@ -17,13 +16,13 @@ from praw.objects import MoreComments
 
 from wsgi import properties
 from wsgi.db import HumanStorage
+from wsgi.properties import WEEK, HOUR, MINUTE
 from wsgi.rr_people import USER_AGENTS, \
     A_CONSUME, A_VOTE, A_COMMENT, A_POST, A_SUBSCRIBE, A_FRIEND, A_SLEEP, \
     S_WORK, S_BAN, S_SLEEP, S_SUSPEND, \
-    Man, re_url, Singleton, normalize
+    RedditHandler, re_url, Singleton, normalize
 from wsgi.rr_people.ae import ActionGenerator, time_hash
-from wsgi.rr_people.reader import CommentQueue
-from wsgi.properties import WEEK, HOUR, MINUTE
+from wsgi.rr_people.queue import ProductionQueue
 
 log = logging.getLogger("he")
 
@@ -115,19 +114,10 @@ class HumanConfiguration(object):
         return self.__dict__
 
 
-class Consumer(Man):
+class Consumer(RedditHandler):
     def __init__(self, db, login):
-        """
-        :param subreddits: subbreddits which this rr_people will comment
-        :param login_credentials:  dict object with this attributes: client_id, client_secret, redirect_url, access_token, refresh_token, login and password of user and user_agent 
-         user agent can not present it will use some default user agent
-        :return:
-        """
         super(Consumer, self).__init__()
-        self.lock = Lock()
-
         self.db = db
-
         state = db.get_human_config(login)
         login_credentials = db.get_human_access_credentials(login)
         if not login_credentials:
@@ -204,12 +194,18 @@ class Consumer(Man):
         prod_voting = random.randint(properties.min_voting, properties.max_voting)
         prod_commenting = 100 - prod_voting
 
-        production_voting = (prod_voting * production) / 100
-        production_commenting = (prod_commenting * production) / 100
+        prod_posting = prod_commenting / random.randint(2, 4)
+        prod_commenting -= prod_posting
+
+        voting = (prod_voting * production) / 100
+        commenting = (prod_commenting * production) / 100
+        posting = (prod_posting * production) / 100
 
         self.action_function_params = {A_CONSUME: consuming,
-                                       A_VOTE: production_voting,
-                                       A_COMMENT: production_commenting}
+                                       A_VOTE: voting,
+                                       A_COMMENT: commenting,
+                                       A_POST: posting
+                                       }
         log.info("MY [%s] WORK CYCLE: %s" % (self.user_name, self.action_function_params))
         return self.action_function_params
 
@@ -398,9 +394,7 @@ class Consumer(Man):
                                                    by=self.user_name,
                                                    text_hash=text_hash,
                                                    text=comment_text)
-                        self.register_step(A_COMMENT,
-                                           info={"fullname": post_fullname,
-                                                 "sub": subreddit_name})
+                        self.register_step(A_COMMENT, info={"fullname": post_fullname, "sub": subreddit_name})
                         log.info("Comment text: %s" % (comment_text))
                 except Exception as e:
                     log.error(e)
@@ -428,7 +422,7 @@ class Consumer(Man):
         if random_sub not in self._sub_posts or \
                                 time.time() - self._last_loads.get(random_sub,
                                                                    time.time()) > properties.TIME_TO_RELOAD_SUB_POSTS:
-            sbrdt = self.reddit.get_subreddit(random_sub)
+            sbrdt = self.get_subreddit(random_sub)
             posts = get_hot_or_new(sbrdt)
             self._sub_posts[random_sub] = posts
             self._last_loads[random_sub] = time.time()
@@ -446,6 +440,11 @@ class Consumer(Man):
                 self._last_post_ids[random_sub] = i
                 return
 
+    def post(self, sub_name, url, title):
+        subreddit = self.get_subreddit(sub_name)
+        result = subreddit.submit(save=True, title=title, url=url)
+        return result
+
 
 class Kapellmeister(Process):
     def __init__(self, name, db, ae):
@@ -454,7 +453,8 @@ class Kapellmeister(Process):
         self.human_name = name
         self.human = Consumer(db, login=name)
         self.ae = ae
-        self.comment_queue = CommentQueue()
+        self.comment_queue = ProductionQueue()
+
 
         self.lock = Lock()
         log.info("Human kapellmeister inited.")
@@ -508,12 +508,17 @@ class Kapellmeister(Process):
             elif action == A_COMMENT:
                 if self.human.can_do(A_COMMENT):
                     sub_name = random.choice(subs)
-                    comment = self.comment_queue.get(sub_name)
+                    comment = self.comment_queue.get_comment(sub_name)
                     if comment:
                         pfn, ct = comment
                         self.human.do_comment_post(pfn, sub_name, ct)
                 else:
                     self.human.live_random(max_actions=random.randint(10, 20))
+            elif action == A_POST:
+                if self.human.can_do(A_POST):
+                    sub_name = random.choice(subs)
+
+                    self.human.post()
             else:
                 self.human.live_random(max_actions=random.randint(10, 60))
 
@@ -570,28 +575,30 @@ class HumanOrchestra():
 if __name__ == '__main__':
     name = "Shlak2k15"
     db = HumanStorage()
-
-    from wsgi.rr_people.reader import CommentSearcher
-
-    rdr = CommentSearcher(db)
-    rdr.start_retrieve_comments("videos")
-    rdr.start_retrieve_comments("funny")
-
-    #
-    # from wsgi.rr_people.ae import ActivityEngine
-    #
-    # ae = ActivityEngine()
-    #
-    # ae.set_authors_by_group_name(name)
-    #
-    # kplmstr = Kapellmeister(name, db, ae)
-    # kplmstr.start()
-    #
-    # kplmstr.join()
-
     c = Consumer(db, name)
-    queue = CommentQueue()
-    comment = queue.get("videos")
-    if comment:
-        fn, txt = comment
-        c.do_comment_post(fn, "videos", txt)
+    c.post("test", "http://praw.readthedocs.org/en/stable/", "PRAW docs...")
+    #
+    # from wsgi.rr_people.reader import CommentSearcher
+    #
+    # rdr = CommentSearcher(db)
+    # rdr.start_retrieve_comments("videos")
+    # rdr.start_retrieve_comments("funny")
+    #
+    # #
+    # # from wsgi.rr_people.ae import ActivityEngine
+    # #
+    # # ae = ActivityEngine()
+    # #
+    # # ae.set_authors_by_group_name(name)
+    # #
+    # # kplmstr = Kapellmeister(name, db, ae)
+    # # kplmstr.start()
+    # #
+    # # kplmstr.join()
+    #
+    # c = Consumer(db, name)
+    # queue = CommentQueue()
+    # comment = queue.get("videos")
+    # if comment:
+    #     fn, txt = comment
+    #     c.do_comment_post(fn, "videos", txt)

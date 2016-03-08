@@ -310,9 +310,9 @@ comment_searcher = CommentSearcher(db)
 @app.route("/comment_search/start/<sub>", methods=["POST"])
 @login_required
 def start_comment_search(sub):
-    comment_searcher.start_retrieve_comments(sub)
+    comment_searcher.start_find_comments(sub)
     while 1:
-        state = comment_searcher.comment_queue.get_reader_state(sub)
+        state = comment_searcher.comment_queue.get_founder_state(sub)
         if state and "work" in state:
             return jsonify({"state": state})
         time.sleep(1)
@@ -321,10 +321,10 @@ def start_comment_search(sub):
 @app.route("/posts")
 @login_required
 def posts():
-    subs = comment_searcher.comment_queue.get_sbrdts_states()
+    subs = comment_searcher.comment_queue.get_founder_states()
     qc_s = {}
     for sub in subs.keys():
-        queued_comments = comment_searcher.comment_queue.show_all(sub)
+        queued_comments = comment_searcher.comment_queue.show_all_comments(sub)
         qc_s[sub] = queued_comments
 
     return render_template("posts_and_comments.html", **{"subs": subs, "qc_s": qc_s})
@@ -334,7 +334,7 @@ def posts():
 @login_required
 def comment_search_info(sub):
     posts = db.get_posts_ready_for_comment()
-    comments = comment_searcher.comment_queue.show_all(sub)
+    comments = comment_searcher.comment_queue.show_all_comments(sub)
     if comments:
         for i, post in enumerate(posts):
             post['is_in_queue'] = post.get("fullname") in comments
@@ -349,8 +349,8 @@ def comment_search_info(sub):
         for sb in sbs["_id"]:
             if sub != sb:
                 subs.append(sb)
-    subs_states = comment_searcher.comment_queue.get_sbrdts_states()
-    state = comment_searcher.comment_queue.get_reader_state(sub)
+    subs_states = comment_searcher.comment_queue.get_founder_states()
+    state = comment_searcher.comment_queue.get_founder_state(sub)
 
     result = {"posts_found_comment_text": posts,
               "posts_commented": posts_commented,
