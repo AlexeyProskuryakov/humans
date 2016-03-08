@@ -1,17 +1,22 @@
 import logging
+import random
 
 from imgurpython import ImgurClient
+from imgurpython.helpers.error import ImgurClientRateLimitError
 
 from wsgi import properties
 from wsgi.rr_people import RedditHandler, normalize
-from wsgi.rr_people.posting import Generator, pp_objects, IMGUR
+from wsgi.rr_people.posting.generator import Generator
 
 log = logging.getLogger("imgur")
 
 MAX_PAGES = 5
+IMGUR = "imgur"
+MIN_UPS = 10
 
 def _get_post_id(url):
     return url
+
 
 class ImgurPostsProvider(RedditHandler, Generator):
     def __init__(self):
@@ -24,33 +29,50 @@ class ImgurPostsProvider(RedditHandler, Generator):
         return list(self.reddit.search(search_request))
 
     def check(self, image):
-        if not image.title or hash(normalize(image.title)) in self.toggled or image.height < 500 or image.width < 500:
+        if not image.title or hash(normalize(image.title)) in self.toggled or \
+                        image.height < 500 or image.width < 500:
             return False
 
         copies = self.get_copies(image.id)
         if len(copies) == 0:
             return True
 
-    def generate_data(self, subreddit):
-        for page in xrange(MAX_PAGES):
-            q = "tag:%s OR title:%s OR album:%s OR meme:%s"%(subreddit, subreddit, subreddit, subreddit)
-            log.info("retrieve for %s at page %s" % (subreddit, page))
+    def process_title(self, title):
 
-            for entity in self.client.gallery_search(q=q, sort='time', page=page, window='week'):
-                if entity.is_album:
-                    images = self.client.get_album_images(entity.id)
-                else:
-                    images = [entity]
+        if isinstance(title,str):
+            title.replace("my", "")
+            title.replace("My", "")
+            title.replace("MY", "")
+            title.replace("me", "")
+            title.replace("Me", "")
+            title.replace("ME", "")
 
-                for image in images:
-                    if self.check(image):
-                        self.toggled.add(hash(normalize(image.title)))
-                        yield image.link, image.title
+        return title
 
+    def generate_data(self, subreddit, key_words):
+        try:#todo fix rate limit
+            for page in xrange(MAX_PAGES):
+                q = "tag:%s OR title:%s OR album:%s" % (subreddit, subreddit, subreddit)
+                log.info("retrieve for %s at page %s" % (subreddit, page))
 
-pp_objects[IMGUR] = ImgurPostsProvider
+                for entity in self.client.gallery_search(q=q, sort='time', page=page, window='week'):
+                    if entity.is_album:
+                        if entity.ups - entity.downs > 0 and entity.ups > MIN_UPS:
+                            images = [random.choice(self.client.get_album_images(entity.id))]
+                        else:
+                            images=[]
+                    else:
+                        images = [entity]
+
+                    for image in images:
+                        if self.check(image):
+                            self.toggled.add(hash(normalize(image.title)))
+                            yield {'url':image.link, "title":self.process_title(image.title)}
+        except Exception as e:
+            log.exception(e)
+            return
 
 if __name__ == '__main__':
     imgrpp = ImgurPostsProvider()
-    for url, title in imgrpp.generate_data('cringe'):
+    for url, title in imgrpp.generate_data('cringe', []):
         print url, title

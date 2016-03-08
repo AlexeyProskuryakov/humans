@@ -528,21 +528,4 @@ def create():
 
 
 if __name__ == '__main__':
-    # //todo:
-
-    # 2) сделать привязку данных генератора к чуваку
-    # 3) сделать манаж этой привязки: отображать, изменять, добавлять.
-
-    # agdf = ActionGeneratorDataFormer()
-    # agdf.revert_sleep_actions()
-    # agdf.fill_consume_and_sleep(min_sleep=4 * HOUR, max_sleep=18 * HOUR)
-
     group_and_visualise_gen(for_time=WEEK)
-
-
-    # for author in a_s.get_interested_authors(min_count_actions=0):
-    #     result = a_s.authors.aggregate([{"$match":{"author":author, "action_type":A_COMMENT}}, {"$group":{"_id":"$action_type", "count":{"$sum":"$count"}}}])
-    #     print author,"\t", ";\t".join(["%s: %s"%(el.get("_id"), el.get("count")) for el in  result])
-
-# # visualise_steps([group], authors)
-# visualise_group_life(group, ae, HOUR/12)

@@ -24,7 +24,7 @@ class ProductionQueue():
                                        db=0
                                        )
 
-        log.info("Comment Queue inited!\n Entry subs is:")
+        log.info("Production Queue inited!\n Entry subs is:")
         for sub in self.redis.hgetall(HASH_STATES_CF):
             log.info("%s comments: \n%s\n" % (sub, "\n".join(["%s\t%s" % (k, v) for k, v in self.show_all_comments(sub).iteritems()])))
             log.info("%s posts: \n%s\n" % (sub, "\n".join(["%s\t%s" % (k, v) for k, v in self.show_all_posts(sub).iteritems()])))

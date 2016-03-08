@@ -1,35 +1,20 @@
 import logging
 import random
-from threading import Thread
-
-from multiprocessing import Process
-
 import time
+from multiprocessing import Process
 
 import pymongo
 
 from wsgi.db import DBHandler
-from wsgi.rr_people import S_WORK, S_SLEEP
-from wsgi.rr_people.queue import ProductionQueue
 from wsgi.properties import default_post_generators, DEFAULT_SLEEP_TIME_AFTER_GENERATE_DATA
+from wsgi.rr_people import S_WORK, S_SLEEP
+from wsgi.rr_people.posting.imgur import ImgurPostsProvider, IMGUR
+from wsgi.rr_people.queue import ProductionQueue
 
 log = logging.getLogger("post_generator")
 
-IMGUR = "imgur"
-YOUTUBE = "youtube"
+POST_GENERATOR_OBJECTS = {IMGUR: ImgurPostsProvider}
 
-pp_objects = {}
-
-class Generator(object):
-    def __init__(self, name):
-        self.__name = name
-
-    @property
-    def name(self):
-        return self.__name
-
-    def generate_data(self, subreddit):
-        raise NotImplementedError
 
 class PostsGeneratorsStorage(DBHandler):
     def __init__(self):
@@ -39,28 +24,48 @@ class PostsGeneratorsStorage(DBHandler):
             self.generators = self.db.create_collection('generators')
             self.generators.create_index([("sub", pymongo.ASCENDING)], unque=True)
 
-    def set_subreddit_generator(self, sub, generator_name):
-        self.generators.update_one({"sub":sub}, {"$addToSet":{"gens":generator_name}}, upsert=True)
+    def set_subreddit_generator(self, sub, generators, key_words):
+        self.generators.update_one({"sub": sub}, {"$set": {"gens": generators, "key_words": key_words}}, upsert=True)
 
-    def get_subreddit_genearators(self, sub):
-        found = self.generators.find_one({"sub":sub})
+    def get_subreddit_generators(self, sub):
+        found = self.generators.find_one({"sub": sub})
         if found:
-            return found.get("gens")
-        return default_post_generators
+            return dict(found)
+        return {"gens": default_post_generators, "key_words": []}
+
 
 class PostsGenerator(object):
-    def __init__(self, posts_providers=None):
+    def __init__(self):
         self.queue = ProductionQueue()
         self.storage = PostsGeneratorsStorage()
-        self.subs = {}
+        self.gens = {}
 
     def generate_posts(self, subreddit):
-        gens = self.storage.get_subreddit_genearators(subreddit)
-        gens = map(lambda x:x(), filter(lambda x:x, map(lambda x: pp_objects.get(x), gens)))
+        if subreddit not in self.gens:
+            gen_config = self.storage.get_subreddit_generators(subreddit)
+
+            gens = map(lambda x: x().generate_data(subreddit, gen_config.get("key_words")),
+                       filter(lambda x: x,
+                              map(lambda x: POST_GENERATOR_OBJECTS.get(x),
+                                  gen_config.get('gens'))))
+            self.gens[subreddit] = gens
+        else:
+            gens = self.gens[subreddit]
+
+        stopped = set()
         while 1:
-            gen = random.choice(gens)
-            for url, title in gen.get_data(subreddit):
-                yield url, title
+            for gen in gens:
+                try:
+                    post = gen.next()
+                    yield post['url'], post['title']
+                except StopIteration:
+                    stopped.add(hash(gen))
+
+            if len(stopped) == len(gens):
+                break
+
+            random.shuffle(gens)
+
 
     def start_generate_posts(self, subrreddit):
         def f():
@@ -80,4 +85,9 @@ class PostsGenerator(object):
 
         ps = Process(name="[%s] posts generator" % subrreddit, target=f)
         ps.start()
-        self.subs[subrreddit] = ps
+
+
+if __name__ == '__main__':
+    pg = PostsGenerator()
+    for url, title in pg.generate_posts("cringe"):
+        print url, title
