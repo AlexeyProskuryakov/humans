@@ -122,17 +122,25 @@ class Singleton(type):
 
 token_reg = re.compile("[\\W\\d]+")
 
-def normalize(comment_body):
+
+def normalize(comment_body, serialise=lambda x: " ".join(x)):
     res = []
     if isinstance(comment_body, (str, unicode)):
         tokens = token_reg.split(comment_body.lower().strip())
         for token in tokens:
             if len(token) > 2:
                 res.append(stem(token))
-    return " ".join(res)
+    return serialise(res)
+
+def tokens_equals(tokens, another_tokens, more_than_perc=50):
+    o = set(tokens)
+    t = set(another_tokens)
+    intersection = o.intersection(t)
+    return float(len(intersection)) >= ((float(len(o) + len(t))/2) * more_than_perc) / 100
 
 
 CQ_SEP = "$:$"
+
 
 def deserialize(key):
     if isinstance(key, (str, unicode)) and CQ_SEP in key:
@@ -144,7 +152,16 @@ def deserialize(key):
 
 serialize = lambda pfn, ct: "%s%s%s" % (pfn, CQ_SEP, ct)
 
+
+def cmp_by_created_utc(x, y):
+    result = x.created_utc - y.created_utc
+    if result > 0.5:
+        return 1
+    elif result < 0.5:
+        return -1
+    else:
+        return 0
+
+
 if __name__ == '__main__':
-    r = RedditHandler()
-    sub = r.reddit.get_subreddit("pics")
-    print sub.__dict__
+   print tokens_equals([1,2,3,4,5,6,7], [4,5,6,7,8,9, 10], 50)

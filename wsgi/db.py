@@ -21,7 +21,7 @@ class DBHandler(object):
 
 
 class HumanStorage(DBHandler):
-    def __init__(self):
+    def __init__(self, delete_posts=False, expire_low_copies_posts=TIME_TO_WAIT_NEW_COPIES):
         super(HumanStorage, self).__init__()
         db = self.db
         self.users = db.get_collection("users")
@@ -38,7 +38,7 @@ class HumanStorage(DBHandler):
                     size=1024 * 1024 * 50,
             )
             self.human_log.create_index([("human_name", 1)])
-            self.human_log.create_index([("time", 1)], expireAfterSeconds=3600)
+            self.human_log.create_index([("time", 1)], expireAfterSeconds=3600*24)
             self.human_log.create_index([("action", 1)])
 
         self.human_config = db.get_collection("human_config")
@@ -47,20 +47,24 @@ class HumanStorage(DBHandler):
             self.human_config.create_index([("user", 1)], unique=True)
 
         self.human_posts = db.get_collection("human_posts")
-        if not self.human_posts:
+        if not self.human_posts or delete_posts:
+            db.drop_collection("human_posts")
+
             self.human_posts = db.create_collection(
                     "human_posts",
                     capped=True,
                     size=1024 * 1024 * 256,
             )
+            self.human_posts.drop_indexes()
 
             self.human_posts.create_index([("fullname", 1)], unique=True)
-            self.human_posts.create_index([("low_copies", 1), ("commented", 1),
-                                           ("found_text", 1)])
+            self.human_posts.create_index([("commented", 1)], sparse=True)
+            self.human_posts.create_index([("ready_for_comment", 1)], sparse=True)
+            self.human_posts.create_index([("ready_for_post", 1)], sparse=True)
 
-            self.human_posts.create_index([("time", 1)])
-            self.human_posts.create_index([("text_hash", 1)])
-            self.human_posts.create_index([("by", 1)])
+            self.human_log.create_index("low_copies", expireAfterSeconds=expire_low_copies_posts, sparse=True)
+
+            self.human_posts.create_index([("text_hash", 1)], sparse=True)
 
         self.humans_states = db.get_collection("human_states")
         if not self.humans_states:
@@ -167,14 +171,13 @@ class HumanStorage(DBHandler):
         return self.humans_states.find({"state": state})
 
     ######POSTS###########################
-    def set_post_commented(self, post_fullname, by, text, text_hash):
+    def set_post_commented(self, post_fullname, by, hash):
         found = self.human_posts.find_one({"fullname": post_fullname, "commented": {"$exists": False}})
         if not found:
-            to_add = {"fullname": post_fullname, "commented": True, "time": time.time(), "text_hash": text_hash,
-                      "commented_text": text, "by": by}
+            to_add = {"fullname": post_fullname, "commented": True, "time": time.time(), "text_hash": hash, "by": by}
             self.human_posts.insert_one(to_add)
         else:
-            to_set = {"commented": True, "text_hash": text_hash, "commented_text": text, "by": by, "time": time.time(), "low_copies":False}
+            to_set = {"commented": True, "text_hash": hash, "by": by, "time": time.time(), "low_copies": datetime.utcnow()}
             self.human_posts.update_one({"fullname": post_fullname}, {"$set": to_set})
 
     def can_comment_post(self, who, post_fullname, hash):
@@ -182,17 +185,15 @@ class HumanStorage(DBHandler):
         found = self.human_posts.find_one(q)
         return found is None
 
-    def set_post_ready_for_comment(self, post_fullname, text_hash):
-        found = self.human_posts.find_one(
-                {"fullname": post_fullname, "$or": [{"text_hash": text_hash}, {"text_hash": {"$exists": False}}]})
+    def set_post_ready_for_comment(self, post_fullname):
+        found = self.human_posts.find_one({"fullname": post_fullname})
         if found and found.get("commented"):
             return
         elif found:
             return self.human_posts.update_one(found,
-                                               {"$set": {"ready_for_comment": True, "text_hash": text_hash, "low_copies":False}})
+                                               {"$set": {"ready_for_comment": True}, "$unset": {"low_copies": datetime.utcnow()}})
         else:
-            return self.human_posts.insert_one(
-                    {"fullname": post_fullname, "ready_for_comment": True, "text_hash": text_hash})
+            return self.human_posts.insert_one({"fullname": post_fullname, "ready_for_comment": True})
 
     def get_posts_ready_for_comment(self):
         return list(self.human_posts.find({"ready_for_comment": True, "commented": {"$exists": False}}))
@@ -210,7 +211,8 @@ class HumanStorage(DBHandler):
         """
         found = self.human_posts.find_one({"fullname": fullname})
         if found:
-            if found.get("low_copies") and time.time() - found.get("time") > TIME_TO_WAIT_NEW_COPIES:
+            if (datetime.utcnow() - found.get("low_copies", datetime.utcnow())).total_seconds() > TIME_TO_WAIT_NEW_COPIES:
+                self.human_posts.remove(found)
                 return True
             return False
         return True
@@ -230,10 +232,10 @@ class HumanStorage(DBHandler):
     def set_post_low_copies(self, post_fullname):
         found = self.human_posts.find_one({"fullname": post_fullname})
         if not found:
-            self.human_posts.insert_one({"fullname": post_fullname, "low_copies": True, "time": time.time()})
+            self.human_posts.insert_one({"fullname": post_fullname, "low_copies": datetime.utcnow(), "time": time.time()})
         else:
             self.human_posts.update_one({"fullname": post_fullname},
-                                        {'$set': {"low_copies": True, "time": time.time()}})
+                                        {'$set': {"low_copies": datetime.utcnow(), "time": time.time()}})
 
     #################HUMAN LOG
     def save_log_human_row(self, human_name, action_name, info):
@@ -284,39 +286,9 @@ class HumanStorage(DBHandler):
 
 
 if __name__ == '__main__':
-    from rr_people import normalize
-
-    db = HumanStorage()
-    db.human_posts.delete_many({})
-    t1 = ".,./one 1 two 2 three 3"
-    h1 = hash(normalize(t1))
-
-    t11 = "one two three"
-    h11 = hash(normalize(t11))
-
-    t2 = "one 12two,. three 112four"
-    h2 = hash(normalize(t2))
-
-    t21 = "one two three four"
-    h21 = hash(normalize(t21))
-
-    db.set_post_low_copies("p1")
-    p1 = db.get_post("p1")
-    print "low copies:", p1
-    print "can see", db.is_can_see_post("p1")
-
-    db.set_post_ready_for_comment("p2", h1)
-    print "not commented?: ", db.is_post_commented("p2")
-    print "ready for comment: ", db.get_post("p2")
-    print "can see", db.is_can_see_post("p2")
-
-    db.set_post_commented("p3", "u1", t2, h2)
-    print "commented?: ", db.is_post_commented("p3")
-    print "commented:", db.get_post("p3")
-    print "can not comment u1 p3 h2", db.can_comment_post("u1", "p3", h2)
-    print "can comment u2?", db.can_comment_post("u2", "p3", h2)
-    print "can comment u1 p3 h21?", db.can_comment_post("u1", "p3", h21)
-    print "can comment u1? p4", db.can_comment_post("u1", "p4", h2)
-    print "can see", db.is_can_see_post("p3")
-
-    print "can see", db.is_can_see_post("p4")
+    hs = HumanStorage(delete_posts=False, expire_low_copies_posts=5)
+    # hs.set_post_low_copies("foo")
+    # time.sleep(5)
+    while 1:
+        print hs.is_can_see_post("foo")
+        time.sleep(5)

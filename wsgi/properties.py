@@ -47,13 +47,11 @@ logging.getLogger("requests").setLevel(logging.WARNING)
 logging.getLogger("werkzeug").setLevel(logging.WARNING)
 
 mongo_uri = "mongodb://3030:sederfes100500@ds055525.mongolab.com:55525/reddit_people"
+# mongo_uri = "mongodb://localhost:27017"
 db_name = "reddit_people"
 
 ae_mongo_uri = "mongodb://localhost:27017"
 ae_db_name = "ae"
-
-# c_queue_mongo_uri = mongo_uri
-# c_queue_db_name = db_name
 
 c_queue_redis_addres = "pub-redis-11997.us-east-1-3.7.ec2.redislabs.com"
 c_queue_redis_port = 11997

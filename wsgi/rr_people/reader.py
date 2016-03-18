@@ -12,7 +12,7 @@ from wsgi.db import HumanStorage
 from wsgi.properties import DEFAULT_SLEEP_TIME_AFTER_GENERATE_DATA, min_donor_num_comments, \
     min_comment_create_time_difference, min_copy_count, \
     shift_copy_comments_part, min_donor_comment_ups, max_donor_comment_ups
-from wsgi.rr_people import RedditHandler, serialize
+from wsgi.rr_people import RedditHandler, cmp_by_created_utc
 from wsgi.rr_people import re_url, normalize, S_WORK, S_SLEEP, re_crying_chars
 from wsgi.rr_people.queue import ProductionQueue
 
@@ -105,16 +105,7 @@ class CommentSearcher(RedditHandler):
         ps.start()
         self.subs[sub] = ps
 
-    def find_comment(self, at_subreddit, add_authors=False):
-        def cmp_by_created_utc(x, y):
-            result = x.created_utc - y.created_utc
-            if result > 0.5:
-                return 1
-            elif result < 0.5:
-                return -1
-            else:
-                return 0
-
+    def find_comment(self, at_subreddit, add_authors=False):#todo вынести загрузку всех постов в отдельную хуйню чтоб не делать это много раз
         subreddit = at_subreddit
         all_posts = self.get_hot_and_new(subreddit, sort=cmp_by_created_utc)
         self.comment_queue.set_comment_founder_state(subreddit, "%s found %s" % (S_WORK, len(all_posts)), ex=len(all_posts) * 2)
@@ -137,8 +128,7 @@ class CommentSearcher(RedditHandler):
                                         comment, post.fullname, subreddit))
                                     break
 
-                        if comment and self.db.set_post_ready_for_comment(post.fullname,
-                                                                          hash(normalize(comment.body))):
+                        if comment and self.db.set_post_ready_for_comment(post.fullname):
                             yield post.fullname, comment.body
                     else:
                         self.db.set_post_low_copies(post.fullname)

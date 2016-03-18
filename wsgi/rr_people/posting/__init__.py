@@ -6,8 +6,8 @@ from multiprocessing import Process
 from wsgi.db import DBHandler
 from wsgi.properties import default_post_generators, DEFAULT_SLEEP_TIME_AFTER_GENERATE_DATA
 from wsgi.rr_people import S_WORK, S_SLEEP
-from wsgi.rr_people.posting.copy import COPY, CopyPostGenerator
-from wsgi.rr_people.posting.imgur import ImgurPostsProvider, IMGUR
+from wsgi.rr_people.posting.copy_gen import COPY, CopyPostGenerator, SubredditsRelationsStore
+from wsgi.rr_people.posting.imgur_gen import ImgurPostsProvider, IMGUR
 from wsgi.rr_people.queue import ProductionQueue
 
 log = logging.getLogger("post_generator")
@@ -68,7 +68,7 @@ class PostsGenerator(object):
 
     def start_generate_posts(self, subrreddit):
         def f():
-            self.queue.set_comment_founder_state(subrreddit, S_WORK)
+            self.queue.set_posts_generator_state(subrreddit, S_WORK)
             start = time.time()
             log.info("Will start find posts for [%s] or another" % (subrreddit))
             for post in self.generate_posts(subrreddit):
@@ -79,7 +79,7 @@ class PostsGenerator(object):
             log.info(
                     "Was generate posts which found for [%s] at %s seconds... Will trying next after %s" % (
                         subrreddit, end - start, sleep_time))
-            self.queue.set_comment_founder_state(subrreddit, S_SLEEP, ex=sleep_time + 1)
+            self.queue.set_posts_generator_state(subrreddit, S_SLEEP, ex=sleep_time + 1)
             time.sleep(sleep_time)
 
         ps = Process(name="[%s] posts generator" % subrreddit, target=f)
@@ -87,6 +87,10 @@ class PostsGenerator(object):
 
 
 if __name__ == '__main__':
+    gs = PostsGeneratorsStorage()
+    gs.set_subreddit_generator("woahdude", [COPY], [])
+    rs = SubredditsRelationsStore()
+    rs.add_sub_relations("woahdude", ["cringe", "chopchop", "hui"])
     pg = PostsGenerator()
-    for url, title in pg.generate_posts("cringe"):
-        print url, title
+    for post in pg.generate_posts("woahdude"):
+        print post.url

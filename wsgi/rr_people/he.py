@@ -392,8 +392,7 @@ class Consumer(RedditHandler):
                         response = _post.add_comment(comment_text)
                         self.db.set_post_commented(_post.fullname,
                                                    by=self.user_name,
-                                                   text_hash=text_hash,
-                                                   text=comment_text)
+                                                   hash=text_hash)
                         self.register_step(A_COMMENT, info={"fullname": post_fullname, "sub": subreddit_name})
                         log.info("Comment text: %s" % (comment_text))
                 except Exception as e:

@@ -1,6 +1,7 @@
 # coding=utf-8
 import json
-import re
+
+from wsgi.db import DBHandler
 
 
 class Generator(object):
@@ -31,6 +32,36 @@ class PostSource(object):
 
     def serialize(self):
         return json.dumps(self.__dict__)
+
+    def __repr__(self):
+        result = "url: %s \ntitle: %s\n" % (self.url, self.title)
+        if self.for_sub:
+            result = "%sfor sub: %s\n" % (result, self.for_sub)
+        if self.at_time:
+            result = "%stime: %s" % (result, self.at_time)
+        return result
+
+PS_READY = "ready"
+PS_POSTED = "posted"
+
+class PostChecker(DBHandler):
+    def __init__(self):
+        super(PostChecker, self).__init__()
+        self.posts = self.db.get_collection("generated_posts")
+        if not self.posts:
+            self.posts = self.db.create_collection("generated_posts",
+                                                   capped=True,
+                                                   size=1024 * 1024 * 100)
+            self.posts.create_index("url_hash", unique=True)
+            self.posts.create_index("state")
+
+    def set_post_state(self, url_hash, state):
+        self.posts.update_one({"url_hash":url_hash}, {"$set":{"state":state}}, upsert=True)
+
+    def get_post_state(self, url_hash):
+        found = self.posts.find_one({"url_hash":url_hash})
+        if found:
+            return found.get("state")
 
 
 if __name__ == '__main__':
