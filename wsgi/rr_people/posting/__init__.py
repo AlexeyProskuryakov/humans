@@ -3,17 +3,16 @@ import random
 import time
 from multiprocessing import Process
 
-import pymongo
-
 from wsgi.db import DBHandler
 from wsgi.properties import default_post_generators, DEFAULT_SLEEP_TIME_AFTER_GENERATE_DATA
 from wsgi.rr_people import S_WORK, S_SLEEP
+from wsgi.rr_people.posting.copy import COPY, CopyPostGenerator
 from wsgi.rr_people.posting.imgur import ImgurPostsProvider, IMGUR
 from wsgi.rr_people.queue import ProductionQueue
 
 log = logging.getLogger("post_generator")
 
-POST_GENERATOR_OBJECTS = {IMGUR: ImgurPostsProvider}
+POST_GENERATOR_OBJECTS = {IMGUR: ImgurPostsProvider, COPY: CopyPostGenerator}
 
 
 class PostsGeneratorsStorage(DBHandler):
@@ -22,7 +21,7 @@ class PostsGeneratorsStorage(DBHandler):
         self.generators = self.db.get_collection("generators")
         if not self.generators:
             self.generators = self.db.create_collection('generators')
-            self.generators.create_index([("sub", pymongo.ASCENDING)], unque=True)
+            self.generators.create_index([("sub",1)], unque=True)
 
     def set_subreddit_generator(self, sub, generators, key_words):
         self.generators.update_one({"sub": sub}, {"$set": {"gens": generators, "key_words": key_words}}, upsert=True)
@@ -57,7 +56,7 @@ class PostsGenerator(object):
             for gen in gens:
                 try:
                     post = gen.next()
-                    yield post['url'], post['title']
+                    yield post
                 except StopIteration:
                     stopped.add(hash(gen))
 
@@ -71,9 +70,9 @@ class PostsGenerator(object):
         def f():
             self.queue.set_comment_founder_state(subrreddit, S_WORK)
             start = time.time()
-            log.info("Will start find comments for [%s]" % (subrreddit))
-            for url, title in self.generate_posts(subrreddit):
-                self.queue.put_post(subrreddit, url, title)
+            log.info("Will start find posts for [%s] or another" % (subrreddit))
+            for post in self.generate_posts(subrreddit):
+                self.queue.put_post(subrreddit, post)
             end = time.time()
             sleep_time = random.randint(DEFAULT_SLEEP_TIME_AFTER_GENERATE_DATA / 5,
                                         DEFAULT_SLEEP_TIME_AFTER_GENERATE_DATA)

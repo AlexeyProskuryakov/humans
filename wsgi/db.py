@@ -4,7 +4,6 @@ import logging
 import time
 from datetime import datetime
 
-import pymongo
 from pymongo import MongoClient
 
 from wsgi.properties import mongo_uri, db_name, TIME_TO_WAIT_NEW_COPIES
@@ -28,8 +27,8 @@ class HumanStorage(DBHandler):
         self.users = db.get_collection("users")
         if not self.users:
             self.users = db.create_collection()
-            self.users.create_index([("name", pymongo.ASCENDING)], unique=True)
-            self.users.create_index([("user_id", pymongo.ASCENDING)], unique=True)
+            self.users.create_index([("name", 1)], unique=True)
+            self.users.create_index([("user_id", 1)], unique=True)
 
         self.human_log = db.get_collection("human_log")
         if not self.human_log:
@@ -38,14 +37,14 @@ class HumanStorage(DBHandler):
                     capped=True,
                     size=1024 * 1024 * 50,
             )
-            self.human_log.create_index([("human_name", pymongo.ASCENDING)])
-            self.human_log.create_index([("time", pymongo.ASCENDING)], expireAfterSeconds=3600)
-            self.human_log.create_index([("action", pymongo.ASCENDING)])
+            self.human_log.create_index([("human_name", 1)])
+            self.human_log.create_index([("time", 1)], expireAfterSeconds=3600)
+            self.human_log.create_index([("action", 1)])
 
         self.human_config = db.get_collection("human_config")
         if not self.human_config:
             self.human_config = db.create_collection("human_config")
-            self.human_config.create_index([("user", pymongo.ASCENDING)], unique=True)
+            self.human_config.create_index([("user", 1)], unique=True)
 
         self.human_posts = db.get_collection("human_posts")
         if not self.human_posts:
@@ -55,19 +54,19 @@ class HumanStorage(DBHandler):
                     size=1024 * 1024 * 256,
             )
 
-            self.human_posts.create_index([("fullname", pymongo.ASCENDING)], unique=True)
-            self.human_posts.create_index([("low_copies", pymongo.ASCENDING), ("commented", pymongo.ASCENDING),
-                                           ("found_text", pymongo.ASCENDING)])
+            self.human_posts.create_index([("fullname", 1)], unique=True)
+            self.human_posts.create_index([("low_copies", 1), ("commented", 1),
+                                           ("found_text", 1)])
 
-            self.human_posts.create_index([("time", pymongo.ASCENDING)])
-            self.human_posts.create_index([("text_hash", pymongo.ASCENDING)])
-            self.human_posts.create_index([("by", pymongo.ASCENDING)])
+            self.human_posts.create_index([("time", 1)])
+            self.human_posts.create_index([("text_hash", 1)])
+            self.human_posts.create_index([("by", 1)])
 
         self.humans_states = db.get_collection("human_states")
         if not self.humans_states:
             self.humans_states = db.create_collection("human_states")
-            self.human_posts.create_index([("name", pymongo.ASCENDING)])
-            self.human_posts.create_index([("state", pymongo.ASCENDING)])
+            self.human_posts.create_index([("name", 1)])
+            self.human_posts.create_index([("state", 1)])
 
     def update_human_access_credentials_info(self, user, info):
         if isinstance(info.get_comment("scope"), set):
@@ -245,7 +244,7 @@ class HumanStorage(DBHandler):
                  "info": info})
 
     def get_log_of_human(self, human_name, limit=None):
-        res = self.human_log.find({"human_name": human_name}).sort("time", pymongo.DESCENDING)
+        res = self.human_log.find({"human_name": human_name}).sort("time", -1)
         if limit:
             res = res.limit(limit)
         return list(res)

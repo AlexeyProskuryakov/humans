@@ -6,7 +6,7 @@ from imgurpython.helpers.error import ImgurClientRateLimitError
 
 from wsgi import properties
 from wsgi.rr_people import RedditHandler, normalize
-from wsgi.rr_people.posting.generator import Generator
+from wsgi.rr_people.posting.generator import Generator, PostSource
 
 log = logging.getLogger("imgur")
 
@@ -38,7 +38,7 @@ class ImgurPostsProvider(RedditHandler, Generator):
             return True
 
     def process_title(self, title):
-
+        #todo fix by re
         if isinstance(title,str):
             title.replace("my", "")
             title.replace("My", "")
@@ -67,7 +67,7 @@ class ImgurPostsProvider(RedditHandler, Generator):
                     for image in images:
                         if self.check(image):
                             self.toggled.add(hash(normalize(image.title)))
-                            yield {'url':image.link, "title":self.process_title(image.title)}
+                            yield PostSource(image.link, self.process_title(image.title))
         except Exception as e:
             log.exception(e)
             return

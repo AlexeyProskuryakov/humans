@@ -3,6 +3,7 @@ import redis
 
 from wsgi.properties import c_queue_redis_addres, c_queue_redis_password, c_queue_redis_port
 from wsgi.rr_people import deserialize, S_STOP, serialize
+from wsgi.rr_people.posting.generator import PostSource
 
 log = logging.getLogger("pq")
 
@@ -43,13 +44,14 @@ class ProductionQueue():
         result = self.redis.lrange(QUEUE_CF(sbrdt), 0, -1)
         return dict(map(lambda x: deserialize(x), result))
 
-    def put_post(self, sbrdt, url, title):
-        key = serialize(url, title)
-        self.redis.rpush(QUEUE_PG(sbrdt), key)
+    def put_post(self, sbrdt, post):
+        post_raw = post.serialise()
+        self.redis.rpush(QUEUE_PG(sbrdt), post_raw)
 
     def get_post(self, sbrdt):
         result = self.redis.lpop(QUEUE_PG(sbrdt))
-        return deserialize(result)
+        post = PostSource.deserialize(result)
+        return post
 
     def show_all_posts(self, sbrdt):
         result = self.redis.lrange(QUEUE_PG(sbrdt), 0, -1)

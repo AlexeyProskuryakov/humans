@@ -143,3 +143,8 @@ def deserialize(key):
 
 
 serialize = lambda pfn, ct: "%s%s%s" % (pfn, CQ_SEP, ct)
+
+if __name__ == '__main__':
+    r = RedditHandler()
+    sub = r.reddit.get_subreddit("pics")
+    print sub.__dict__
