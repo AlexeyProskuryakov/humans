@@ -1,0 +1,58 @@
+{% extends "layout.html" %}
+{% block body %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-6 col-md-offset-3">
+            <h2>Сопоставление сабов да генераторовъ</h2>
+            <hr>
+            <form class="form-horizontal" id="sub-generators-form" action="{{url_for('gens_manage')}}" method="post">
+                <div class="form-group">
+                    <label class="col-md-3 control-label">Выбери сабъ:</label>
+                    <div class="col-md-5">
+                        <select class="form-control" name="sub" id="sub-choose">
+                            <option>Выберай сабъ</option>
+                            {%for sub in subs%}
+                            <option value="{{sub}}">{{sub}}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="col-md-3 control-label">Определи для него генераторы:</label>
+                    <div class="col-md-5">
+                        <select multiple class="form-control" name="gens[]">
+                            {%for gen in gens%}
+                            <option value="{{gen}}" id="choose-sub-{{gen}}" class="gen-name">{{gen}}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="col-md-3 control-label">Определи для него связные сабы:</label>
+                    <div class="col-md-5">
+                        <textarea name="related-subs" id="related-subs" rows="5" class="textarea"></textarea>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="col-md-3 control-label">Да ключевые слова подбери:</label>
+                    <div class="col-md-5">
+                        <textarea name="key-words" id="key-words" rows="5" class="textarea"></textarea>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <div class="col-md-5 col-md-offset-3">
+                        <button class="submit btn btn-info btn-lg disabled" type="submit" id="sub-generators-form-submit">Постановить</button>
+                    </div>
+                </div>
+
+            </form>
+        </div>
+    </div>
+
+</div>
+<script src="{{ url_for('static', filename='js/generators.js') }}"></script>
+{% endblock %}
+
+{%endblock%}

@@ -2,11 +2,11 @@ import logging
 import random
 
 from imgurpython import ImgurClient
-from imgurpython.helpers.error import ImgurClientRateLimitError
 
 from wsgi import properties
 from wsgi.rr_people import RedditHandler, normalize
-from wsgi.rr_people.posting.generator import Generator, PostSource
+from wsgi.rr_people.posting.generator import Generator
+from wsgi.rr_people.posting.posts import PostSource
 
 log = logging.getLogger("imgur")
 
@@ -20,7 +20,7 @@ def _get_post_id(url):
 
 class ImgurPostsProvider(RedditHandler, Generator):
     def __init__(self):
-        super(ImgurPostsProvider, self).__init__("imgur")
+        super(ImgurPostsProvider, self).__init__(IMGUR)
         self.client = ImgurClient(properties.ImgrClientID, properties.ImgrClientSecret)
         self.toggled = set()
 

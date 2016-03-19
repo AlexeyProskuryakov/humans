@@ -100,8 +100,6 @@ time_step_less_iteration_power = 0.85
 
 want_coefficient_max = 100
 
-default_post_generators = ['imgur']
-
 # imgur properties
 ImgrClientID = 'd7e9f9350ebe5a8'
 ImgrClientSecret = '945c124e48fd9ca208788c70028d7e8d8c7dc7c1'

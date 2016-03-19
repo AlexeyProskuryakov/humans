@@ -7,7 +7,8 @@ from praw.objects import MoreComments
 from requests import get
 
 from wsgi.rr_people import RedditHandler, cmp_by_created_utc, USER_AGENTS, normalize, tokens_equals
-from wsgi.rr_people.posting.generator import Generator, PostSource, PostChecker, PS_READY
+from wsgi.rr_people.posting.generator import Generator
+from wsgi.rr_people.posting.posts import PostSource, PostChecker, PS_READY
 from wsgi.db import DBHandler
 
 COPY = "copy"
@@ -27,12 +28,7 @@ class SubredditsRelationsStore(DBHandler):
             self.sub_col.create_index([("name", 1)], unique=True)
 
     def add_sub_relations(self, sub_name, related_subs):
-        found = self.sub_col.find_one({"name": sub_name})
-        if found:
-            result = self.sub_col.update_one(found, {"$addToSet": {"related": {"$each": related_subs}}})
-        else:
-            result = self.sub_col.insert_one({"name": sub_name, "related": related_subs})
-
+        result = self.sub_col.update_one({"name": sub_name}, {"$set": {"related":  related_subs}}, upsert=True)
         return result
 
     def get_related_subs(self, sub_name):
@@ -47,7 +43,6 @@ imgur_cb = lambda x: "http://%s" % x
 
 URLS_PROCESSORS = [
     {"re": imgur_url, "cb": imgur_cb}
-
 ]
 
 
@@ -64,7 +59,7 @@ def prepare_url(url):
 
 class CopyPostGenerator(RedditHandler, Generator):
     def __init__(self):
-        super(CopyPostGenerator, self).__init__()
+        super(CopyPostGenerator, self).__init__(name=COPY)
         self.sub_store = SubredditsRelationsStore()
         self.user_agent = random.choice(USER_AGENTS)
         self.checker = PostChecker()

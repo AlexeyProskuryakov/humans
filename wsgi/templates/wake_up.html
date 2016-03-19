@@ -1,0 +1,31 @@
+{% extends "layout.html" %}
+{% block body %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-8 col-md-offset-2">
+            <h2>Поднималка-с</h2>
+            <hr>
+            <form class="form-horizontal" id="urls-form" action="{{url_for('wake_up_manage')}}" method="post">
+                <div class="form-group">
+                    <div class="col-md-12">
+                        <textarea name="urls" rows="6" class="textarea">
+                            {%for url in urls%}
+                            {{url}}
+                            {%endfor%}
+                        </textarea>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <div class="col-md-12">
+                        <button class="submit btn btn-info btn-lg" type="submit">Постановить</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{%endblock%}

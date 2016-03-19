@@ -6,7 +6,8 @@
     <title>RR-People</title>
     <!-- Latest compiled and minified CSS -->
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.5.0/css/bootstrap-datepicker.min.css">
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.5.0/css/bootstrap-datepicker.min.css">
 
     <!-- Optional theme -->
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap-theme.min.css">
@@ -32,10 +33,12 @@
     <ul class="nav nav-pills">
         {% if session.user_id %}
         <li role="presentation"><a href="{{ url_for('logout') }}">Log out</a></li>
+        <li role="presentation"><a href="{{ url_for('wake_up_manage') }}">WakeUp management</a></li>
         <li role="presentation"><a href="{{ url_for('human_auth_start') }}">Add humans credentials</a></li>
         <li role="presentation"><a href="{{ url_for('humans') }}">Human management</a></li>
         <li role="presentation"><a href="{{ url_for('posts') }}">Comments</a></li>
         <li role="presentation"><a href="{{ url_for('actions') }}">Actions</a></li>
+        <li role="presentation"><a href="{{ url_for('gens_manage') }}">Generators</a></li>
         {% endif %}
     </ul>
     <div class="container">
@@ -44,10 +47,15 @@
                 <h1 class="green">FUCKING HUMAN MANAGEMENT</h1>
             </div>
         </div>
+        <div class="row">
+            <div class="col-md-6 col-md-offset-3">
+                {% for message in get_flashed_messages() %}
+                <div class=flash>{{ message }}</div>
+                {% endfor %}
+            </div>
+        </div>
     </div>
-    {% for message in get_flashed_messages() %}
-    <div class=flash>{{ message }}</div>
-    {% endfor %}
+
     {% block body %}
     {% endblock %}
 </div>

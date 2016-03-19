@@ -1,27 +1,37 @@
 # coding=utf-8
 import calendar
+import json
 import os
+import time
 from collections import defaultdict
+from datetime import datetime, timedelta
 from uuid import uuid4
 
 import praw
-from datetime import datetime, timedelta
-import time
-from flask import Flask, logging, request, render_template, session, url_for, g
+import re
+from flask import Flask, logging, request, render_template, session, url_for, g, flash
 from flask.json import jsonify
 from flask_debugtoolbar import DebugToolbarExtension
 from flask_login import LoginManager, login_user, login_required, logout_user
 from werkzeug.utils import redirect
 
-from wsgi.properties import want_coefficient_max, DAY, WEEK_DAYS
-from wsgi.rr_people import S_WORK, S_SUSPEND
-from wsgi.rr_people.ae import ActionGenerator, AuthorsStorage
-from wsgi.rr_people.he import HumanConfiguration, HumanOrchestra
 from wsgi.db import HumanStorage
+from wsgi.properties import want_coefficient_max, DAY
+from wsgi.rr_people import S_WORK, S_SUSPEND
+from wsgi.rr_people.ae import AuthorsStorage
+from wsgi.rr_people.he import HumanConfiguration, HumanOrchestra
+from wsgi.rr_people.posting import POST_GENERATOR_OBJECTS
+from wsgi.rr_people.posting.copy_gen import SubredditsRelationsStore
+from wsgi.rr_people.posting.posts_generator import PostsGeneratorsStorage
 from wsgi.rr_people.reader import CommentSearcher
-from wsgi.wake_up import WakeUp
+from wsgi.wake_up import WakeUp, WakeUpStorage
 
 __author__ = '4ikist'
+
+import sys
+
+reload(sys)
+sys.setdefaultencoding('utf-8')
 
 log = logging.getLogger("web")
 cur_dir = os.path.dirname(__file__)
@@ -44,8 +54,12 @@ if os.environ.get("test", False):
     app.config['DEBUG_TB_INTERCEPT_REDIRECTS'] = False
     toolbar = DebugToolbarExtension(app)
 
+
 url = "http://rr-alexeyp.rhcloud.com"
-wu = WakeUp(url)
+wus = WakeUpStorage()
+wus.add_url(url)
+
+wu = WakeUp()
 wu.daemon = True
 wu.start()
 
@@ -54,6 +68,16 @@ wu.start()
 def wake_up(salt):
     return jsonify(**{"result": salt})
 
+@app.route("/wake_up", methods=["GET", "POST"])
+def wake_up_manage():
+    if request.method == "POST":
+        urls = request.form.get("urls")
+        urls = urls.split("\n")
+        for url in urls:
+            wus.add_url(url.strip())
+
+    urls = wus.get_urls()
+    return render_template("wake_up.html", **{"urls":urls})
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -321,7 +345,7 @@ def start_comment_search(sub):
 @app.route("/posts")
 @login_required
 def posts():
-    subs = comment_searcher.comment_queue.get_founder_states()
+    subs = comment_searcher.comment_queue.get_comment_founders_states()
     qc_s = {}
     for sub in subs.keys():
         queued_comments = comment_searcher.comment_queue.show_all_comments(sub)
@@ -375,7 +399,8 @@ author_storage = AuthorsStorage()
 def ae_represent(name):
     def get_point_x(x):
         dt = datetime.utcnow() + timedelta(seconds=x)
-        return calendar.timegm(dt.timetuple())*1000
+        return calendar.timegm(dt.timetuple()) * 1000
+
     y = 3
     ssteps = author_storage.get_sleep_steps(name)
     sleep_days = defaultdict(list)
@@ -389,7 +414,7 @@ def ae_represent(name):
 
         step = (avg_end - avg_start) / 2
         x = avg_start + step
-        data.append([get_point_x(x), y, step*1000, step*1000])
+        data.append([get_point_x(x), y, step * 1000, step * 1000])
 
     result = {"color": "blue",
               "data": data,
@@ -402,6 +427,48 @@ def ae_represent(name):
               }
               }
     return jsonify(**{"data": result, "ok": True})
+
+
+srs = SubredditsRelationsStore()
+pgs = PostsGeneratorsStorage()
+
+splitter = re.compile('[^\w\d_-]*')
+
+
+@app.route("/generators", methods=["GET", "POST"])
+@login_required
+def gens_manage():
+    if request.method == "POST":
+        sub = request.form.get("sub")
+        generators = request.form.getlist("gens[]")
+        related_subs = request.form.get("related-subs")
+        key_words = request.form.get("key-words")
+
+        related_subs = splitter.split(related_subs)
+        key_words = splitter.split(key_words)
+
+        srs.add_sub_relations(sub, related_subs)
+        pgs.set_subreddit_generator(sub, generators, key_words)
+
+        flash(u"Генераторъ постановленъ!")
+    gens = POST_GENERATOR_OBJECTS.keys()
+    cfg = db.human_config.find({})
+    subs = []
+    for el in cfg:
+        subs.extend(el.get("subs", []))
+    return render_template("generators.html", **{"subs": subs, "gens": gens})
+
+
+@app.route("/generators/sub_info", methods=["POST"])
+@login_required
+def sub_gens_cfg():
+    data = json.loads(request.data)
+    sub = data.get("sub")
+    related = srs.get_related_subs(sub)
+    generators = pgs.get_subreddit_generators(sub)
+
+    return jsonify(**{"ok": True, "related_subs": related, "key_words": generators.get("key_words"),
+                      "generators": generators.get("gens")})
 
 
 if __name__ == '__main__':

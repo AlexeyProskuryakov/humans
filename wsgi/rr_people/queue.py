@@ -3,7 +3,7 @@ import redis
 
 from wsgi.properties import c_queue_redis_addres, c_queue_redis_password, c_queue_redis_port
 from wsgi.rr_people import deserialize, S_STOP, serialize
-from wsgi.rr_people.posting.generator import PostSource
+from wsgi.rr_people.posting.posts import PostSource
 
 log = logging.getLogger("pq")
 
@@ -55,7 +55,7 @@ class ProductionQueue():
 
     def show_all_posts(self, sbrdt):
         result = self.redis.lrange(QUEUE_PG(sbrdt), 0, -1)
-        return dict(map(lambda x: deserialize(x), result))
+        return dict(map(lambda x: PostSource.deserialize(x), result))
 
     def set_comment_founder_state(self, sbrdt, state, ex=None):
         pipe = self.redis.pipeline()

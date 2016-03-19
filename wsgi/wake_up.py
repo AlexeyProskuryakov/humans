@@ -6,29 +6,56 @@ import time
 
 from flask import logging
 
+from wsgi.db import DBHandler
+
 log = logging.getLogger("wake_up")
 
-class WakeUp(Process):
-    def __init__(self, what):
-        super(WakeUp, self).__init__()
-        self.what = what
-        self.mutex = Lock()
 
-    def set_what(self, what):
-        with self.mutex:
-            self.what = what
+class WakeUpStorage(DBHandler):
+    def __init__(self):
+        super(WakeUpStorage, self).__init__()
+        self.urls = self.db.get_collection("wake_up")
+        if not self.urls:
+            self.urls = self.db.create_collection("wake_up")
+            self.urls.create_index("url_hash", unique=True)
+
+    def get_urls(self):
+        return map(lambda x: x.get("url"), self.urls.find({}, projection={'_id': False, "url_hash": False}))
+
+    def add_url(self, url):
+        hash_url = hash(url)
+        found = self.urls.find_one({"url_hash": hash_url})
+        if not found:
+            log.info("add new url [%s]" % url)
+            self.urls.insert_one({"url_hash": hash_url, "url": url})
+
+
+class WakeUp(Process):
+    def __init__(self):
+        super(WakeUp, self).__init__()
+        self.store = WakeUpStorage()
+        self.mutex = Lock()
 
     def run(self):
         while 1:
-            salt = ''.join(random.choice(string.lowercase) for _ in range(20))
-            result = requests.post("%s/wake_up/%s"%(self.what, salt))
-            if result.status_code != 200:
-                time.sleep(1)
-                log.info("not work will trying next times...")
-                continue
-            else:
-                log.info(result.content)
-            time.sleep(3600)
+            try:
+                for url in self.store.get_urls():
+                    salt = ''.join(random.choice(string.lowercase) for _ in range(20))
+                    addr = "%s/wake_up/%s" % (url, salt)
+
+                    result = requests.post(addr)
+                    if result.status_code != 200:
+                        time.sleep(1)
+                        log.info("not work will trying next times...")
+                        continue
+                    else:
+                        log.info("send: [%s] OK" % addr)
+                    time.sleep(10)
+
+                time.sleep(3600)
+            except Exception as e:
+                log.exception(e)
+
 
 if __name__ == '__main__':
-    WakeUp("http://127.0.0.1:65010").start()
+    WakeUp().start()
