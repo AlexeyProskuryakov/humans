@@ -5,6 +5,7 @@ $("#sub-choose option").click(function(e){
     if (sub_name == undefined){
         $("#sub-generators-form-submit").addClass("disabled");
     } else{
+        $("#loader-gif").show();
         $.ajax({
             type:"post",
             url:"/generators/sub_info",
@@ -22,6 +23,7 @@ $("#sub-choose option").click(function(e){
                     $("#related-subs").text(data.related_subs);
                     $("#key-words").text(data.key_words);
                 }
+                 $("#loader-gif").hide();
             }
         });
         $("#sub-generators-form-submit").removeClass("disabled");

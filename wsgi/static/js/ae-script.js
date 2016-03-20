@@ -8,8 +8,9 @@ var show_ae_steps_data = function(name){
                 var data = result['data'];
                 console.log(data);
                 $("#loader-gif").hide();
-
-                var plot = $.plot("#ae-represent-placeholder",
+                $("#ae-represent-container").append("<h4>"+name+"</h4>");
+                $("#ae-represent-container").append("<div id='ae-"+name+"' class='ae-represent'></div>");
+                var plot = $.plot("#ae-"+name,
                     [data],
                     {
                         series: {

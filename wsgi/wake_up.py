@@ -52,9 +52,9 @@ class WakeUp(Process):
                         log.info("send: [%s] OK" % addr)
                     time.sleep(10)
 
-                time.sleep(3600)
             except Exception as e:
                 log.exception(e)
+            time.sleep(3600)
 
 
 if __name__ == '__main__':

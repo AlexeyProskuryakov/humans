@@ -5,6 +5,11 @@
 <div class="container-fluid">
     <div class="row">
         <div class="col-md-6 col-md-offset-3">
+            <img id='loader-gif' src="{{url_for('static', filename='img/giphy.gif')}}">
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-md-6 col-md-offset-3">
             <h2>Сопоставление сабов да генераторовъ</h2>
             <hr>
             <form class="form-horizontal" id="sub-generators-form" action="{{url_for('gens_manage')}}" method="post">

@@ -74,7 +74,9 @@ def wake_up_manage():
         urls = request.form.get("urls")
         urls = urls.split("\n")
         for url in urls:
-            wus.add_url(url.strip())
+            url = url.strip()
+            if url:
+                wus.add_url(url)
 
     urls = wus.get_urls()
     return render_template("wake_up.html", **{"urls":urls})
