@@ -1,4 +1,4 @@
-$("#sub-choose option").click(function(e){
+$("#sub-choose option").on('click', function(e){
     console.log(e);
     var sub_name = $(e.target).attr("value");
     console.log(sub_name);
