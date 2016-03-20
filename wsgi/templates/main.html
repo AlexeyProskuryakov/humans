@@ -7,21 +7,16 @@
 <div class="content">
     <div class="container-fluid">
         <div class="row">
-            <div class="col-md-3 col-md-offset-1">
+            <div class="col-md-3 col-md-offset-5">
                 <h1>
-                    HELLO {{username}}
+                    Hello {{username}} !
                 </h1>
             </div>
         </div>
         <div class="row">
-            <h1>Form for wake up</h1>
-            <form action="/" method="post">
-                <input type="text" name="url" placeholder="your url" value="{{ url }}">
-                <input type="submit" value="change">
-            </form>
-        </div>
-        <div class="row">
-
+            <div class="col-md-6 col-md-offset-4">
+               <img src="{{url_for('static', filename='img/cat.jpg')}}" class="img-rounded"/>
+            </div>
         </div>
     </div>
 </div>

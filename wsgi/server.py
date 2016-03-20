@@ -211,7 +211,7 @@ def main():
         wu.what = _url
 
     user = g.user
-    return render_template("main.html", **{"username": user.name, "url": wu.what})
+    return render_template("main.html", **{"username": user.name})
 
 
 REDIRECT_URI = "http://rr-alexeyp.rhcloud.com/authorize_callback"
