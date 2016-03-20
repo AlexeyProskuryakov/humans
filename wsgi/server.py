@@ -22,7 +22,7 @@ from wsgi.rr_people.ae import AuthorsStorage
 from wsgi.rr_people.he import HumanConfiguration, HumanOrchestra
 from wsgi.rr_people.posting import POST_GENERATOR_OBJECTS
 from wsgi.rr_people.posting.copy_gen import SubredditsRelationsStore
-from wsgi.rr_people.posting.posts_generator import PostsGeneratorsStorage
+from wsgi.rr_people.posting.posts_generator import PostsGeneratorsStorage, PostsGenerator
 from wsgi.rr_people.reader import CommentSearcher
 from wsgi.wake_up import WakeUp, WakeUpStorage
 
@@ -331,7 +331,7 @@ def humans_info(name):
 
 
 comment_searcher = CommentSearcher(db)
-
+posts_generator = PostsGenerator()
 
 @app.route("/comment_search/start/<sub>", methods=["POST"])
 @login_required
@@ -344,17 +344,27 @@ def start_comment_search(sub):
         time.sleep(1)
 
 
-@app.route("/posts")
+@app.route("/comments")
 @login_required
-def posts():
+def comments():
     subs = comment_searcher.comment_queue.get_comment_founders_states()
     qc_s = {}
     for sub in subs.keys():
         queued_comments = comment_searcher.comment_queue.show_all_comments(sub)
         qc_s[sub] = queued_comments
 
-    return render_template("posts_and_comments.html", **{"subs": subs, "qc_s": qc_s})
+    return render_template("comments.html", **{"subs": subs, "qc_s": qc_s})
 
+@app.route("/posts")
+@login_required
+def posts():
+    generators_for_subs = posts_generator.queue.get_posts_generator_states()
+    qc_s = {}
+    for sub in generators_for_subs.keys():
+        queued_comments = comment_searcher.comment_queue.show_all_posts(sub)
+        qc_s[sub] = queued_comments
+
+    return render_template("posts.html", **{"subs": generators_for_subs, "qc_s": qc_s})
 
 @app.route("/comment_search/info/<sub>")
 @login_required
@@ -432,7 +442,6 @@ def ae_represent(name):
 
 
 srs = SubredditsRelationsStore("srs server")
-pgs = PostsGeneratorsStorage("pgs server")
 
 splitter = re.compile('[^\w\d_-]*')
 
@@ -450,7 +459,7 @@ def gens_manage():
         key_words = splitter.split(key_words)
 
         srs.add_sub_relations(sub, related_subs)
-        pgs.set_subreddit_generator(sub, generators, key_words)
+        posts_generator.storage.set_subreddit_generator(sub, generators, key_words)
 
         flash(u"Генераторъ постановленъ!")
     gens = POST_GENERATOR_OBJECTS.keys()
@@ -467,10 +476,18 @@ def sub_gens_cfg():
     data = json.loads(request.data)
     sub = data.get("sub")
     related = srs.get_related_subs(sub)
-    generators = pgs.get_subreddit_generators(sub)
+    generators = posts_generator.storage.get_subreddit_generators(sub)
 
     return jsonify(**{"ok": True, "related_subs": related, "key_words": generators.get("key_words"),
                       "generators": generators.get("gens")})
+
+@app.route("/generators/start", methods=["POST"])
+@login_required
+def sub_gens_start():
+    data = json.loads(request.data)
+    sub = data.get("sub")
+    posts_generator.start_generate_posts(sub)
+    return jsonify(**{"ok": True})
 
 
 if __name__ == '__main__':

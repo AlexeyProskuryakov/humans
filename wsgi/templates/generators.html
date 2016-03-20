@@ -48,15 +48,23 @@
                 </div>
                 <div class="form-group">
                     <div class="col-md-5 col-md-offset-3">
-                        <button class="submit btn btn-info btn-lg disabled" type="submit" id="sub-generators-form-submit">Постановить</button>
+                        <button class="submit btn btn-info btn-lg disabled sub-generator-btn" type="submit">Постановить</button>
                     </div>
                 </div>
 
             </form>
         </div>
     </div>
-
+    <div class="row">
+        <div class="col-md-6 col-md-offset-3">
+            <button class="btn btn-success btn-lg btn-block disabled sub-generator-btn" onclick="start_generator()">Запустить!</button>
+        </div>
+        <div>
+            <h3>Результат гляди <small><a href="{{url_for('posts')}}">тута</a></small></h3>
+        </div>
+    </div>
 </div>
+
 <script src="{{ url_for('static', filename='js/generators.js') }}"></script>
 {% endblock %}
 

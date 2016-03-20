@@ -1,0 +1,59 @@
+{% extends "layout.html" %}
+{% block body %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-6 col-md-offset-3">
+            <h3>Состояние поиска комментариев: </h3>
+            {% for s, st in subs.items() %}
+            <div>
+                <a href="{{url_for('comment_search_info', sub=s)}}">
+                    <h3>{{s}}:
+                        <small>{{st}}</small>
+                    </h3>
+                </a>
+            </div>
+            {% endfor %}
+
+        </div>
+
+    </div>
+
+    <div class="row">
+        <div class="col-md-12">
+            {% for s, posts in qc_s.items() %}
+            <div>
+                <h3>В очереди {{s}}</h3>
+                <table class="table table-stripped">
+                    <thead>
+                    <tr>
+                        <td>post id</td>
+                        <td>text</td>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for pfn, text in posts.items() %}
+
+                    <tr>
+                        <td>
+                            {{pfn}}
+                        </td>
+                        <td>
+                            {{text}}
+                        </td>
+
+                    </tr>
+
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% endblock %}

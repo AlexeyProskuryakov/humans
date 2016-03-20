@@ -32,26 +32,28 @@ class PostsGeneratorsStorage(DBHandler):
 class PostsGenerator(object):
     def __init__(self):
         self.queue = ProductionQueue()
-        self.storage = PostsGeneratorsStorage()
-        self.gens = {}
+        self.storage = PostsGeneratorsStorage(name="posts generator")
+        self.sub_gens = {}
+        self.sub_process = {}
 
     def generate_posts(self, subreddit):
-        if subreddit not in self.gens:
+        if subreddit not in self.sub_gens:
             gen_config = self.storage.get_subreddit_generators(subreddit)
 
             gens = map(lambda x: x().generate_data(subreddit, gen_config.get("key_words")),
                        filter(lambda x: x,
                               map(lambda x: POST_GENERATOR_OBJECTS.get(x),
                                   gen_config.get('gens'))))
-            self.gens[subreddit] = gens
+            self.sub_gens[subreddit] = gens
+            log.info("for [%s] have this generators: %s"%(subreddit, gen_config.get("gens")))
         else:
-            gens = self.gens[subreddit]
-
+            gens = self.sub_gens[subreddit]
         stopped = set()
         while 1:
             for gen in gens:
                 try:
                     post = gen.next()
+                    log.info("[%s] generate this post: %s"%(subreddit, post))
                     yield post
                 except StopIteration:
                     stopped.add(hash(gen))
@@ -62,6 +64,9 @@ class PostsGenerator(object):
             random.shuffle(gens)
 
     def start_generate_posts(self, subrreddit):
+        if subrreddit in self.sub_process and self.sub_process[subrreddit].is_alive():
+            return
+
         def f():
             while 1:
                 self.queue.set_posts_generator_state(subrreddit, S_WORK)
@@ -82,3 +87,8 @@ class PostsGenerator(object):
 
         ps = Process(name="[%s] posts generator" % subrreddit, target=f)
         ps.start()
+        self.sub_process[subrreddit] = ps
+
+if __name__ == '__main__':
+    pg = PostsGenerator()
+    pg.start_generate_posts("videos")

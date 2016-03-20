@@ -45,7 +45,7 @@ class ProductionQueue():
         return dict(map(lambda x: deserialize(x), result))
 
     def put_post(self, sbrdt, post):
-        post_raw = post.serialise()
+        post_raw = post.serialize()
         self.redis.rpush(QUEUE_PG(sbrdt), post_raw)
 
     def get_post(self, sbrdt):
@@ -55,7 +55,7 @@ class ProductionQueue():
 
     def show_all_posts(self, sbrdt):
         result = self.redis.lrange(QUEUE_PG(sbrdt), 0, -1)
-        return dict(map(lambda x: PostSource.deserialize(x), result))
+        return map(lambda x: PostSource.deserialize(x), result)
 
     def set_comment_founder_state(self, sbrdt, state, ex=None):
         pipe = self.redis.pipeline()

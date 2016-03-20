@@ -24,11 +24,11 @@ class PostSource(object):
         return json.dumps(self.__dict__)
 
     def __repr__(self):
-        result = "url: %s \ntitle: %s\n" % (self.url, self.title)
+        result = "url: [%s] title: [%s] " % (self.url, self.title)
         if self.for_sub:
-            result = "%sfor sub: %s\n" % (result, self.for_sub)
+            result = "%sfor sub: [%s] " % (result, self.for_sub)
         if self.at_time:
-            result = "%stime: %s" % (result, self.at_time)
+            result = "%stime: [%s]" % (result, self.at_time)
         return result
 
 
