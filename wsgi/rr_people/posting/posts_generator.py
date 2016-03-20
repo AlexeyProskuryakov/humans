@@ -63,19 +63,22 @@ class PostsGenerator(object):
 
     def start_generate_posts(self, subrreddit):
         def f():
-            self.queue.set_posts_generator_state(subrreddit, S_WORK)
-            start = time.time()
-            log.info("Will start find posts for [%s] or another" % (subrreddit))
-            for post in self.generate_posts(subrreddit):
-                self.queue.put_post(subrreddit, post)
-            end = time.time()
-            sleep_time = random.randint(DEFAULT_SLEEP_TIME_AFTER_GENERATE_DATA / 5,
-                                        DEFAULT_SLEEP_TIME_AFTER_GENERATE_DATA)
-            log.info(
-                    "Was generate posts which found for [%s] at %s seconds... Will trying next after %s" % (
-                        subrreddit, end - start, sleep_time))
-            self.queue.set_posts_generator_state(subrreddit, S_SLEEP, ex=sleep_time + 1)
-            time.sleep(sleep_time)
+            while 1:
+                self.queue.set_posts_generator_state(subrreddit, S_WORK)
+                start = time.time()
+                log.info("Will start find posts for [%s] or another" % (subrreddit))
+                counter = 0
+                for post in self.generate_posts(subrreddit):
+                    counter+=1
+                    self.queue.put_post(subrreddit, post)
+                end = time.time()
+                sleep_time = random.randint(DEFAULT_SLEEP_TIME_AFTER_GENERATE_DATA / 5,
+                                            DEFAULT_SLEEP_TIME_AFTER_GENERATE_DATA)
+                log.info(
+                        "Was generate [%s] posts which found for [%s] at %s seconds... \nWill trying next after %s" % (
+                            counter, subrreddit, end - start, sleep_time))
+                self.queue.set_posts_generator_state(subrreddit, S_SLEEP, ex=sleep_time + 1)
+                time.sleep(sleep_time)
 
         ps = Process(name="[%s] posts generator" % subrreddit, target=f)
         ps.start()

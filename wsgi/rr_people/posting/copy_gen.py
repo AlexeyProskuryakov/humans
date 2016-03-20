@@ -1,15 +1,15 @@
 import logging
 import random
-from lxml import html
-
 import re
+
+from bs4 import BeautifulSoup
 from praw.objects import MoreComments
 from requests import get
 
-from wsgi.rr_people import RedditHandler, cmp_by_created_utc, USER_AGENTS, normalize, tokens_equals
+from wsgi.db import DBHandler
+from wsgi.rr_people import RedditHandler, cmp_by_created_utc, USER_AGENTS, normalize, tokens_equals, DEFAULT_USER_AGENT
 from wsgi.rr_people.posting.generator import Generator
 from wsgi.rr_people.posting.posts import PostSource, PostChecker, PS_READY
-from wsgi.db import DBHandler
 
 COPY = "copy"
 
@@ -59,9 +59,9 @@ def prepare_url(url):
 
 class CopyPostGenerator(RedditHandler, Generator):
     def __init__(self):
-        super(CopyPostGenerator, self).__init__(name=COPY)
+        super(CopyPostGenerator, self).__init__()
         self.sub_store = SubredditsRelationsStore()
-        self.user_agent = random.choice(USER_AGENTS)
+        self.user_agent = DEFAULT_USER_AGENT
         self.checker = PostChecker()
 
     def found_copy_in_sub(self):
@@ -79,15 +79,15 @@ class CopyPostGenerator(RedditHandler, Generator):
             res = get(url, headers={"User-Agent": self.user_agent})
             if res.status_code == 200:
                 title = None
-                page = html.fromstring(res.content)
-                for meta in page.xpath("//meta"):
-                    if meta.get("name") and "title" in meta.get("name"):
-                        title = meta.get("content")
+                soup = BeautifulSoup(res.content, 'html.parser')
+
+                for meta in soup.findAll("meta"):
+                    if meta.attrs.get("name") and "title" in meta.attrs.get("name"):
+                        title = meta.attrs.get("content")
                         break
 
                 if not title:
-                    for title in page.xpath("//title"):
-                        title = title.text
+                        title = soup.title.string
 
                 if title and check_title(title):
                     return title
@@ -128,4 +128,5 @@ class CopyPostGenerator(RedditHandler, Generator):
 
 if __name__ == '__main__':
     cpg = CopyPostGenerator()
-    cpg.generate_data("woahdude", [])
+    for el in cpg.generate_data("woahdude", []):
+        print el
