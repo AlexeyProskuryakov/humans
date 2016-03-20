@@ -12,8 +12,8 @@ from wsgi.rr_people.queue import ProductionQueue
 log = logging.getLogger("post_generator")
 
 class PostsGeneratorsStorage(DBHandler):
-    def __init__(self):
-        super(PostsGeneratorsStorage, self).__init__()
+    def __init__(self, name="?"):
+        super(PostsGeneratorsStorage, self).__init__(name=name)
         self.generators = self.db.get_collection("generators")
         if not self.generators:
             self.generators = self.db.create_collection('generators')

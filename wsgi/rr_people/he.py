@@ -535,7 +535,7 @@ class HumanOrchestra():
     def __init__(self):
         self.__humans = {}
         self.lock = Lock()
-        self.db = HumanStorage()
+        self.db = HumanStorage(name="human orchestra")
         Thread(target=self.start_humans, name="Orchestra Human Starter").start()
 
     def start_humans(self):
@@ -563,9 +563,10 @@ class HumanOrchestra():
         with self.lock:
             if human_name in self.__humans:
                 def f():
-                    db = HumanStorage()
+                    db = HumanStorage(name="toggle human config")
                     human_config = db.get_human_live_configuration(human_name)
                     self.__humans[human_name].set_config(human_config)
+                    del db
 
                 Process(name="config updater", target=f).start()
 

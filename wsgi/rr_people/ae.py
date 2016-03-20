@@ -70,8 +70,8 @@ def weighted_choice_king(action_weights):
 
 
 class AuthorsStorage(DBHandler):
-    def __init__(self):
-        super(AuthorsStorage, self).__init__()
+    def __init__(self, name="?"):
+        super(AuthorsStorage, self).__init__(name=name)
         self.client = MongoClient(ae_mongo_uri)
         self.db = self.client[ae_db_name]
 
@@ -299,7 +299,7 @@ class ActionGeneratorDataFormer(object):
                     log.exception(e)
 
     def __init__(self):
-        self._storage = AuthorsStorage()
+        self._storage = AuthorsStorage("author_generator_data_former")
         self._r = praw.Reddit(user_agent=choice(USER_AGENTS))
         self._queue = Queue()
 
@@ -401,7 +401,7 @@ class ActionGenerator(object):
 
     def __init__(self, group_name=None, size=5):
         self.group_name = group_name
-        self._storage = AuthorsStorage()
+        self._storage = AuthorsStorage("author generator")
         self._r = praw.Reddit(user_agent=choice(USER_AGENTS))
         self._action_stack = ActionGenerator.ActionStack(size)
         log.info("Activity engine inited!")

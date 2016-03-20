@@ -56,7 +56,7 @@ if os.environ.get("test", False):
 
 
 url = "http://rr-alexeyp.rhcloud.com"
-wus = WakeUpStorage()
+wus = WakeUpStorage("wus server")
 wus.add_url(url)
 
 wu = WakeUp()
@@ -85,7 +85,7 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
-db = HumanStorage()
+db = HumanStorage(name="hs server")
 
 
 class User(object):
@@ -393,7 +393,7 @@ def actions():
     return render_template("actions.html")
 
 
-author_storage = AuthorsStorage()
+author_storage = AuthorsStorage("as server")
 
 
 @app.route("/ae-represent/<name>", methods=["GET"])
@@ -431,8 +431,8 @@ def ae_represent(name):
     return jsonify(**{"data": result, "ok": True})
 
 
-srs = SubredditsRelationsStore()
-pgs = PostsGeneratorsStorage()
+srs = SubredditsRelationsStore("srs server")
+pgs = PostsGeneratorsStorage("pgs server")
 
 splitter = re.compile('[^\w\d_-]*')
 

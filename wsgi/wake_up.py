@@ -12,8 +12,8 @@ log = logging.getLogger("wake_up")
 
 
 class WakeUpStorage(DBHandler):
-    def __init__(self):
-        super(WakeUpStorage, self).__init__()
+    def __init__(self, name="?"):
+        super(WakeUpStorage, self).__init__(name=name)
         self.urls = self.db.get_collection("wake_up")
         if not self.urls:
             self.urls = self.db.create_collection("wake_up")
@@ -33,7 +33,7 @@ class WakeUpStorage(DBHandler):
 class WakeUp(Process):
     def __init__(self):
         super(WakeUp, self).__init__()
-        self.store = WakeUpStorage()
+        self.store = WakeUpStorage("wake_up")
         self.mutex = Lock()
 
     def run(self):

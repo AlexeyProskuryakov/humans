@@ -20,8 +20,8 @@ MAX_RATING = 50
 
 
 class SubredditsRelationsStore(DBHandler):
-    def __init__(self):
-        super(SubredditsRelationsStore, self).__init__()
+    def __init__(self, name="?"):
+        super(SubredditsRelationsStore, self).__init__(name=name)
         self.sub_col = self.db.get_collection("sub_relations")
         if not self.sub_col:
             self.sub_col = self.db.create_collection("sub_relations")

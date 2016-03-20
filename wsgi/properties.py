@@ -50,8 +50,13 @@ mongo_uri = "mongodb://3030:sederfes100500@ds055525.mongolab.com:55525/reddit_pe
 # mongo_uri = "mongodb://localhost:27017"
 db_name = "reddit_people"
 
-ae_mongo_uri = "mongodb://localhost:27017"
-ae_db_name = "ae"
+# ae_mongo_uri = "mongodb://localhost:27017"
+# ae_db_name = "ae"
+
+ae_mongo_uri = mongo_uri
+ae_db_name = db_name
+
+
 
 c_queue_redis_addres = "pub-redis-11997.us-east-1-3.7.ec2.redislabs.com"
 c_queue_redis_port = 11997

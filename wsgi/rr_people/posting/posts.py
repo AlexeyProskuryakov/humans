@@ -33,8 +33,8 @@ class PostSource(object):
 
 
 class PostChecker(DBHandler):
-    def __init__(self):
-        super(PostChecker, self).__init__()
+    def __init__(self, name="?"):
+        super(PostChecker, self).__init__(name=name)
         self.posts = self.db.get_collection("generated_posts")
         if not self.posts:
             self.posts = self.db.create_collection("generated_posts",

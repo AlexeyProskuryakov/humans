@@ -14,15 +14,15 @@ log = logging.getLogger("DB")
 
 
 class DBHandler(object):
-    def __init__(self):
-        log.info("start db handler %s" % mongo_uri)
+    def __init__(self, name="?"):
+        log.info("start db handler for[%s] %s" % (name,mongo_uri))
         self.client = MongoClient(host=mongo_uri)
         self.db = self.client[db_name]
 
 
 class HumanStorage(DBHandler):
-    def __init__(self, delete_posts=False, expire_low_copies_posts=TIME_TO_WAIT_NEW_COPIES):
-        super(HumanStorage, self).__init__()
+    def __init__(self, delete_posts=False, expire_low_copies_posts=TIME_TO_WAIT_NEW_COPIES, name="?"):
+        super(HumanStorage, self).__init__(name=name)
         db = self.db
         self.users = db.get_collection("users")
         if not self.users:
