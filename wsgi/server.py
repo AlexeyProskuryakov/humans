@@ -54,7 +54,6 @@ if os.environ.get("test", False):
     app.config['DEBUG_TB_INTERCEPT_REDIRECTS'] = False
     toolbar = DebugToolbarExtension(app)
 
-
 url = "http://rr-alexeyp.rhcloud.com"
 wus = WakeUpStorage("wus server")
 wus.add_url(url)
@@ -68,6 +67,7 @@ wu.start()
 def wake_up(salt):
     return jsonify(**{"result": salt})
 
+
 @app.route("/wake_up", methods=["GET", "POST"])
 def wake_up_manage():
     if request.method == "POST":
@@ -79,7 +79,8 @@ def wake_up_manage():
                 wus.add_url(url)
 
     urls = wus.get_urls()
-    return render_template("wake_up.html", **{"urls":urls})
+    return render_template("wake_up.html", **{"urls": urls})
+
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -333,6 +334,7 @@ def humans_info(name):
 comment_searcher = CommentSearcher(db)
 posts_generator = PostsGenerator()
 
+
 @app.route("/comment_search/start/<sub>", methods=["POST"])
 @login_required
 def start_comment_search(sub):
@@ -355,16 +357,18 @@ def comments():
 
     return render_template("comments.html", **{"subs": subs, "qc_s": qc_s})
 
+
 @app.route("/posts")
 @login_required
 def posts():
     generators_for_subs = posts_generator.queue.get_posts_generator_states()
     qc_s = {}
     for sub in generators_for_subs.keys():
-        queued_comments = comment_searcher.comment_queue.show_all_posts(sub)
-        qc_s[sub] = queued_comments
+        queued_post = comment_searcher.comment_queue.show_all_posts(sub)
+        qc_s[sub] = queued_post
 
     return render_template("posts.html", **{"subs": generators_for_subs, "qc_s": qc_s})
+
 
 @app.route("/comment_search/info/<sub>")
 @login_required
@@ -459,7 +463,7 @@ def gens_manage():
         key_words = splitter.split(key_words)
 
         srs.add_sub_relations(sub, related_subs)
-        posts_generator.storage.set_subreddit_generator(sub, generators, key_words)
+        posts_generator.storage.set_sub_gen_info(sub, generators, key_words)
 
         flash(u"Генераторъ постановленъ!")
     gens = POST_GENERATOR_OBJECTS.keys()
@@ -476,18 +480,40 @@ def sub_gens_cfg():
     data = json.loads(request.data)
     sub = data.get("sub")
     related = srs.get_related_subs(sub)
-    generators = posts_generator.storage.get_subreddit_generators(sub)
+    generators = posts_generator.storage.get_sub_gen_info(sub)
 
     return jsonify(**{"ok": True, "related_subs": related, "key_words": generators.get("key_words"),
                       "generators": generators.get("gens")})
+
 
 @app.route("/generators/start", methods=["POST"])
 @login_required
 def sub_gens_start():
     data = json.loads(request.data)
     sub = data.get("sub")
+    posts_generator.queue.set_posts_generator_state(sub, S_WORK)
     posts_generator.start_generate_posts(sub)
-    return jsonify(**{"ok": True})
+    return jsonify(**{"ok": True, "state":S_WORK})
+
+
+@app.route("/generators/pause", methods=["POST"])
+@login_required
+def sub_gens_pause():
+    data = json.loads(request.data)
+    sub = data.get("sub")
+    posts_generator.queue.set_posts_generator_state(sub, S_SUSPEND, ex=3600 * 24 * 7)
+    return jsonify(**{"ok": True, "state":S_SUSPEND})
+
+
+@app.route("/generators/del_post", methods=["POST"])
+@login_required
+def del_post():
+    data = json.loads(request.data)
+    sub, p_hash = data.get("sub"), data.get("hash")
+    if sub and p_hash:
+        delete_count = posts_generator.queue.del_post(sub, p_hash)
+        return jsonify(**{"ok": True, "result": delete_count})
+    return jsonify(**{"ok": False, "data": ""})
 
 
 if __name__ == '__main__':

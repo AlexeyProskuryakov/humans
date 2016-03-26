@@ -27,7 +27,7 @@ $("#sub-choose option").on('click', function(e){
     }
 });
 
-function start_generator(name){
+function generator_action(name, state){
     var sub_name = name;
     if (sub_name == undefined){
         sub_name = $("#sub-choose option:selected").attr("value");
@@ -36,14 +36,20 @@ function start_generator(name){
 
     $.ajax({
             type:"post",
-            url:"/generators/start",
+            url:"/generators/"+state,
             data:JSON.stringify({"sub":sub_name}),
             contentType:    'application/json',
             dataType:       'json',
             success:function(data){
                 console.log(data);
+
                 if (data.ok == true){
-                   window.location.href = '/posts'
+                    if (name ==  undefined){
+                        window.location.href = '/posts'
+                    }else{
+                        $("#state-"+sub_name).text(data.state);
+                    }
+
                 }
 
             }

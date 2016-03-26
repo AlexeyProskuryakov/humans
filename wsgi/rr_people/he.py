@@ -515,7 +515,7 @@ class Kapellmeister(Process):
             elif action == A_POST:
                 if self.human.can_do(A_POST):
                     sub_name = random.choice(subs)
-                    post = self.comment_queue.get_post(sub_name)
+                    post = self.comment_queue.pop_post(sub_name)
                     self.human.post(post.for_sub or sub_name, post.url, post.title)
             else:
                 self.human.live_random(max_actions=random.randint(10, 60))

@@ -46,7 +46,7 @@ class WakeUp(Process):
                     result = requests.post(addr)
                     if result.status_code != 200:
                         time.sleep(1)
-                        log.info("not work will trying next times...")
+                        log.info("send: [%s][%s] not work will trying next times..." % (addr,result.status_code))
                         continue
                     else:
                         log.info("send: [%s] OK" % addr)

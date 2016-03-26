@@ -28,7 +28,7 @@ class SubredditsRelationsStore(DBHandler):
             self.sub_col.create_index([("name", 1)], unique=True)
 
     def add_sub_relations(self, sub_name, related_subs):
-        result = self.sub_col.update_one({"name": sub_name}, {"$set": {"related":  related_subs}}, upsert=True)
+        result = self.sub_col.update_one({"name": sub_name}, {"$set": {"related": related_subs}}, upsert=True)
         return result
 
     def get_related_subs(self, sub_name):
@@ -44,6 +44,26 @@ imgur_cb = lambda x: "http://%s" % x
 URLS_PROCESSORS = [
     {"re": imgur_url, "cb": imgur_cb}
 ]
+
+title_bad_validators = [
+    re.compile("[^\w\s.,-:#]"),
+    re.compile("\d{4,}"),
+    re.compile("[A-Z]{4,}"),
+]
+
+title_stop_words = {"youtube", "guardian", "rt"}
+
+
+def is_valid_title(title):
+    words = normalize(title, serialise=lambda x: x)
+    if len(words) <= 4:
+        return False
+    if set(words).intersection(title_stop_words):
+        return False
+    for validator in title_bad_validators:
+        if validator.findall(title):
+            return False
+    return True
 
 
 def prepare_url(url):
@@ -69,8 +89,8 @@ class CopyPostGenerator(RedditHandler, Generator):
 
     def get_title(self, url):
         def check_title(title):
-            url_tokens = normalize(url, lambda x:x)
-            title_tokens = normalize(title, lambda x:x)
+            url_tokens = normalize(url, lambda x: x)
+            title_tokens = normalize(title, lambda x: x)
             if len(set(url_tokens).intersection(set(title_tokens))) > 0:
                 return False
             return True
@@ -87,7 +107,7 @@ class CopyPostGenerator(RedditHandler, Generator):
                         break
 
                 if not title:
-                        title = soup.title.string
+                    title = soup.title.string
 
                 if title and check_title(title):
                     return title
@@ -121,12 +141,28 @@ class CopyPostGenerator(RedditHandler, Generator):
                         title = comments_title
                     else:
                         continue
-                if title:
+                if title and is_valid_title(title):
                     self.checker.set_post_state(url_hash, PS_READY)
                     yield PostSource(post.url, title.strip(), for_sub=random.choice(related_subs))
 
 
-if __name__ == '__main__':
-    cpg = CopyPostGenerator()
-    for el in cpg.generate_data("woahdude", []):
-        print el
+def __clear_posts():
+    from wsgi.rr_people.queue import ProductionQueue
+
+    pq = ProductionQueue()
+    subs = pq.get_posts_generator_states()
+    for s, _ in subs.iteritems():
+        posts = []
+        log.info("\n\nwill show posts fo sub: %s\n-----------------------------" % (s))
+        while 1:
+            post = pq.pop_post(s)
+            if not post:
+                break
+            if is_valid_title(post.title):
+                log.info(post)
+                posts.append(post)
+
+        log.info("-----------------------------")
+        for post in posts:
+            pq.put_post(s, post)
+

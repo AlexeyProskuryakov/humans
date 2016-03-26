@@ -10,15 +10,19 @@ class PostSource(object):
     @staticmethod
     def deserialize(raw_data):
         data_dict = json.loads(raw_data)
-        ps = PostSource()
-        ps.__dict__ = data_dict
+        ps = PostSource(data_dict.get("url"),
+                        data_dict.get("title"),
+                        data_dict.get("for_sub"),
+                        data_dict.get("at_time"),
+                        data_dict.get("hash"))
         return ps
 
-    def __init__(self, url=None, title=None, for_sub=None, at_time=None):
+    def __init__(self, url=None, title=None, for_sub=None, at_time=None, hash_=None):
         self.url = url
         self.title = title
         self.for_sub = for_sub
         self.at_time = at_time
+        self.hash = hash_
 
     def serialize(self):
         return json.dumps(self.__dict__)
@@ -29,6 +33,8 @@ class PostSource(object):
             result = "%sfor sub: [%s] " % (result, self.for_sub)
         if self.at_time:
             result = "%stime: [%s]" % (result, self.at_time)
+        if self.hash:
+            result = "%shash: [%s]" % (result, self.hash)
         return result
 
 

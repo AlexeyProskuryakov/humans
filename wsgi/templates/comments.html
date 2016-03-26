@@ -23,32 +23,46 @@
     <div class="row">
         <div class="col-md-12">
             {% for s, posts in qc_s.items() %}
+            {{%if posts%}}
             <div>
-                <h3>В очереди {{s}}</h3>
-                <table class="table table-stripped">
-                    <thead>
-                    <tr>
-                        <td>post id</td>
-                        <td>text</td>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    {% for pfn, text in posts.items() %}
+                <div class="accordion" id="info-accordion">
+                    <div class="accordion-group">
+                        <div class="accordion-heading">
+                            <a class="accordion-toggle" data-toggle="collapse" data-parent="#info-accordion"
+                               href="#statistic">
+                                <h3>В очереди: {{s}}</h3>
+                            </a>
+                        </div>
+                        <div class="accordion-body collapse">
+                            <div class="accordion-inner">
+                                <table class="table table-stripped table-hover table-condensed">
+                                    <thead>
+                                    <tr>
+                                        <td>post id</td>
+                                        <td>text</td>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    {% for pfn, text in posts.items() %}
 
-                    <tr>
-                        <td>
-                            {{pfn}}
-                        </td>
-                        <td>
-                            {{text}}
-                        </td>
+                                    <tr>
+                                        <td>
+                                            {{pfn}}
+                                        </td>
+                                        <td>
+                                            {{text}}
+                                        </td>
 
-                    </tr>
-
-                    {% endfor %}
-                    </tbody>
-                </table>
+                                    </tr>
+                                    {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
+            {{%endif%}}
             {% endfor %}
         </div>
     </div>

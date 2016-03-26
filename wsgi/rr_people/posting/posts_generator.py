@@ -5,11 +5,12 @@ from multiprocessing import Process
 
 from wsgi.db import DBHandler
 from wsgi.properties import DEFAULT_SLEEP_TIME_AFTER_GENERATE_DATA
-from wsgi.rr_people import S_WORK, S_SLEEP
+from wsgi.rr_people import S_WORK, S_SLEEP, S_SUSPEND
 from wsgi.rr_people.posting import POST_GENERATOR_OBJECTS
 from wsgi.rr_people.queue import ProductionQueue
 
 log = logging.getLogger("post_generator")
+
 
 class PostsGeneratorsStorage(DBHandler):
     def __init__(self, name="?"):
@@ -19,10 +20,10 @@ class PostsGeneratorsStorage(DBHandler):
             self.generators = self.db.create_collection('generators')
             self.generators.create_index([("sub", 1)], unque=True)
 
-    def set_subreddit_generator(self, sub, generators, key_words):
+    def set_sub_gen_info(self, sub, generators, key_words):
         self.generators.update_one({"sub": sub}, {"$set": {"gens": generators, "key_words": key_words}}, upsert=True)
 
-    def get_subreddit_generators(self, sub):
+    def get_sub_gen_info(self, sub):
         found = self.generators.find_one({"sub": sub})
         if found:
             return dict(found)
@@ -38,14 +39,14 @@ class PostsGenerator(object):
 
     def generate_posts(self, subreddit):
         if subreddit not in self.sub_gens:
-            gen_config = self.storage.get_subreddit_generators(subreddit)
+            gen_config = self.storage.get_sub_gen_info(subreddit)
 
             gens = map(lambda x: x().generate_data(subreddit, gen_config.get("key_words")),
                        filter(lambda x: x,
                               map(lambda x: POST_GENERATOR_OBJECTS.get(x),
                                   gen_config.get('gens'))))
             self.sub_gens[subreddit] = gens
-            log.info("for [%s] have this generators: %s"%(subreddit, gen_config.get("gens")))
+            log.info("for [%s] have this generators: %s" % (subreddit, gen_config.get("gens")))
         else:
             gens = self.sub_gens[subreddit]
         stopped = set()
@@ -53,7 +54,7 @@ class PostsGenerator(object):
             for gen in gens:
                 try:
                     post = gen.next()
-                    log.info("[%s] generate this post: %s"%(subreddit, post))
+                    log.info("[%s] generate this post: %s" % (subreddit, post))
                     yield post
                 except StopIteration:
                     stopped.add(hash(gen))
@@ -69,12 +70,17 @@ class PostsGenerator(object):
 
         def f():
             while 1:
+                if self.queue.get_posts_generator_state(subrreddit) == S_SUSPEND:
+                    log.info("Generator [%s] suspend..." % subrreddit)
+                    time.sleep(10)
+                    continue
+
                 self.queue.set_posts_generator_state(subrreddit, S_WORK)
                 start = time.time()
                 log.info("Will start find posts for [%s] or another" % (subrreddit))
                 counter = 0
                 for post in self.generate_posts(subrreddit):
-                    counter+=1
+                    counter += 1
                     self.queue.put_post(subrreddit, post)
                 end = time.time()
                 sleep_time = random.randint(DEFAULT_SLEEP_TIME_AFTER_GENERATE_DATA / 5,
@@ -88,6 +94,7 @@ class PostsGenerator(object):
         ps = Process(name="[%s] posts generator" % subrreddit, target=f)
         ps.start()
         self.sub_process[subrreddit] = ps
+
 
 if __name__ == '__main__':
     pg = PostsGenerator()
