@@ -55,3 +55,26 @@ function generator_action(name, state){
             }
         });
 }
+
+function prepare_for_posting(name){
+    var sub_name = name;
+    if (sub_name == undefined){
+        sub_name = $("#sub-choose option:selected").attr("value");
+    }
+    console.log("sub name: ", sub_name);
+
+    $.ajax({
+            type:"post",
+            url:"/generators/prepare_for_posting",
+            data:JSON.stringify({"sub":sub_name}),
+            contentType:    'application/json',
+            dataType:       'json',
+            success:function(data){
+                console.log(data);
+                if (data.ok == true){
+                        $("#"+sub_name).addClass("more-opacity");
+                }
+
+            }
+        });
+}

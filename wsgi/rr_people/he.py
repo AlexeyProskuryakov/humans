@@ -22,6 +22,7 @@ from wsgi.rr_people import USER_AGENTS, \
     S_WORK, S_BAN, S_SLEEP, S_SUSPEND, \
     RedditHandler, re_url, Singleton, normalize
 from wsgi.rr_people.ae import ActionGenerator, time_hash
+from wsgi.rr_people.posting.posts import PostsStorage, PS_POSTED
 from wsgi.rr_people.queue import ProductionQueue
 
 log = logging.getLogger("he")
@@ -446,13 +447,14 @@ class Consumer(RedditHandler):
 
 
 class Kapellmeister(Process):
-    def __init__(self, name, db, ae):
+    def __init__(self, name, ae):
         super(Kapellmeister, self).__init__()
-        self.db = db
+        self.main_storage = HumanStorage(name="main storage for %s" % name)
+        self.posts_storage = PostsStorage(name="posts storage for %s" % name)
         self.human_name = name
         self.human = Consumer(db, login=name)
         self.ae = ae
-        self.comment_queue = ProductionQueue()
+        self.queue = ProductionQueue()
 
         self.lock = Lock()
         log.info("Human kapellmeister inited.")
@@ -465,16 +467,16 @@ class Kapellmeister(Process):
     def human_check(self):
         ok = check_any_login(self.human_name)
         if not ok:
-            self.db.set_human_state(self.human_name, S_BAN)
+            self.main_storage.set_human_state(self.human_name, S_BAN)
         return ok
 
     def set_state(self, new_state):
-        state = self.db.get_human_state(self.human_name)
+        state = self.main_storage.get_human_state(self.human_name)
         if state == S_SUSPEND:
             log.info("%s is suspended will stop" % self.human_name)
             return False
         else:
-            self.db.set_human_state(self.human_name, new_state)
+            self.main_storage.set_human_state(self.human_name, new_state)
             return True
 
     def run(self):
@@ -482,7 +484,7 @@ class Kapellmeister(Process):
         t_start = time_hash(datetime.utcnow())
         step = t_start
         last_token_refresh_time = t_start
-        subs = self.db.get_human_subs(self.human_name)
+        subs = self.main_storage.get_human_subs(self.human_name)
         while 1:
             _start = time.time()
 
@@ -506,7 +508,7 @@ class Kapellmeister(Process):
             elif action == A_COMMENT:
                 if self.human.can_do(A_COMMENT):
                     sub_name = random.choice(subs)
-                    comment = self.comment_queue.get_comment(sub_name)
+                    comment = self.queue.pop_comment(sub_name)
                     if comment:
                         pfn, ct = comment
                         self.human.do_comment_post(pfn, sub_name, ct)
@@ -515,8 +517,10 @@ class Kapellmeister(Process):
             elif action == A_POST:
                 if self.human.can_do(A_POST):
                     sub_name = random.choice(subs)
-                    post = self.comment_queue.pop_post(sub_name)
+                    post_hash = self.queue.pop_post_hash(sub_name)
+                    post = self.posts_storage.get_post(post_hash)
                     self.human.post(post.for_sub or sub_name, post.url, post.title)
+                    self.posts_storage.set_post_state(post_hash, PS_POSTED)
             else:
                 self.human.live_random(max_actions=random.randint(10, 60))
 
@@ -552,7 +556,7 @@ class HumanOrchestra():
         with self.lock:
             try:
                 ae = ActionGenerator(group_name=human_name)
-                human = Kapellmeister(human_name, HumanStorage(), ae)
+                human = Kapellmeister(human_name, ae)
                 self.__humans[human_name] = human
                 human.start()
             except Exception as e:

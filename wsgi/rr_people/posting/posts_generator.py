@@ -7,6 +7,7 @@ from wsgi.db import DBHandler
 from wsgi.properties import DEFAULT_SLEEP_TIME_AFTER_GENERATE_DATA
 from wsgi.rr_people import S_WORK, S_SLEEP, S_SUSPEND
 from wsgi.rr_people.posting import POST_GENERATOR_OBJECTS
+from wsgi.rr_people.posting.posts import PostSource, PostsStorage
 from wsgi.rr_people.queue import ProductionQueue
 
 log = logging.getLogger("post_generator")
@@ -19,6 +20,13 @@ class PostsGeneratorsStorage(DBHandler):
         if not self.generators:
             self.generators = self.db.create_collection('generators')
             self.generators.create_index([("sub", 1)], unque=True)
+
+        self.posts = self.db.get_collection("generated_posts")
+
+        if not self.posts:
+            self.posts = self.db.create_collection("generated_posts")
+            self.posts.create_index("sub")
+            self.posts.create_index("hash", unique=True)
 
     def set_sub_gen_info(self, sub, generators, key_words):
         self.generators.update_one({"sub": sub}, {"$set": {"gens": generators, "key_words": key_words}}, upsert=True)
@@ -33,13 +41,19 @@ class PostsGeneratorsStorage(DBHandler):
 class PostsGenerator(object):
     def __init__(self):
         self.queue = ProductionQueue()
-        self.storage = PostsGeneratorsStorage(name="posts generator")
+        self.generators_storage = PostsGeneratorsStorage(name="pg gens")
+        self.posts_storage = PostsStorage(name="pg posts")
         self.sub_gens = {}
         self.sub_process = {}
 
+        for sub, state in self.queue.get_posts_generator_states().iteritems():
+            if S_WORK in state:
+                self.start_generate_posts(sub)
+
+
     def generate_posts(self, subreddit):
         if subreddit not in self.sub_gens:
-            gen_config = self.storage.get_sub_gen_info(subreddit)
+            gen_config = self.generators_storage.get_sub_gen_info(subreddit)
 
             gens = map(lambda x: x().generate_data(subreddit, gen_config.get("key_words")),
                        filter(lambda x: x,
@@ -68,27 +82,39 @@ class PostsGenerator(object):
         if subrreddit in self.sub_process and self.sub_process[subrreddit].is_alive():
             return
 
+        def set_state(state, ex=None):
+            if get_state() == S_SUSPEND:
+                return False
+            else:
+                self.queue.set_posts_generator_state(subrreddit, state, ex=ex)
+                return True
+
+        def get_state():
+            return self.queue.get_posts_generator_state(subrreddit)
+
         def f():
             while 1:
-                if self.queue.get_posts_generator_state(subrreddit) == S_SUSPEND:
-                    log.info("Generator [%s] suspend..." % subrreddit)
+                if not set_state(S_WORK):
                     time.sleep(10)
                     continue
 
-                self.queue.set_posts_generator_state(subrreddit, S_WORK)
                 start = time.time()
-                log.info("Will start find posts for [%s] or another" % (subrreddit))
+                log.info("Will start find posts in [%s]" % (subrreddit))
                 counter = 0
                 for post in self.generate_posts(subrreddit):
                     counter += 1
-                    self.queue.put_post(subrreddit, post)
+                    self.posts_storage.add_generated_post(post, subrreddit)
+                    if not set_state("%s generate: [%s]" % (S_WORK, counter)):
+                        break
+
                 end = time.time()
                 sleep_time = random.randint(DEFAULT_SLEEP_TIME_AFTER_GENERATE_DATA / 5,
                                             DEFAULT_SLEEP_TIME_AFTER_GENERATE_DATA)
-                log.info(
-                        "Was generate [%s] posts which found for [%s] at %s seconds... \nWill trying next after %s" % (
-                            counter, subrreddit, end - start, sleep_time))
-                self.queue.set_posts_generator_state(subrreddit, S_SLEEP, ex=sleep_time + 1)
+
+                log.info("Was generate [%s] posts in [%s] at %s seconds... \nWill trying next after %s" % (
+                    counter, subrreddit, end - start, sleep_time))
+
+                set_state(S_SLEEP, ex=sleep_time)
                 time.sleep(sleep_time)
 
         ps = Process(name="[%s] posts generator" % subrreddit, target=f)

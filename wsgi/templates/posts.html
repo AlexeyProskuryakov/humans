@@ -3,18 +3,18 @@
 
 {% block content %}
 <script>
-function delete_post(sub, hash){
-    console.log(sub,hash);
+function delete_post(sub, url_hash){
+    console.log(sub,url_hash);
     $.ajax({
             type:"post",
             url:"/generators/del_post",
-            data:JSON.stringify({"sub":sub,"hash":hash}),
+            data:JSON.stringify({"sub":sub,"url_hash":url_hash}),
             contentType:    'application/json',
             dataType:       'json',
             success:function(data){
                 console.log(data);
                 if (data.ok == true){
-                    $("#"+hash).addClass("more-opacity");
+                    $("#"+url_hash).addClass("more-opacity");
                 }
 
             }
@@ -38,13 +38,17 @@ function delete_post(sub, hash){
                 [
                 <small id="state-{{s}}">{{st}}</small>
                 ]
-                <button type="button" class="btn btn-success" aria-label="Left Align"
-                        onclick="generator_action('{{s}}', 'start')">
+                <button type="button" class="btn btn-success" aria-label="Left Align" data-toggle="tooltip" data-placement="top" title="Запустить генерацию постов"
+                        onclick="generator_action('{{s}}', 'start');">
                     <span class="glyphicon glyphicon-play" aria-hidden="true"></span>
                 </button>
-                <button type="button" class="btn btn-default" aria-label="Left Align"
-                        onclick="generator_action('{{s}}', 'pause')">
+                <button type="button" class="btn btn-default" aria-label="Left Align" data-toggle="tooltip" data-placement="top" title="Приостановить генерацию постов"
+                        onclick="generator_action('{{s}}', 'pause');">
                     <span class="glyphicon glyphicon-pause" aria-hidden="true"></span>
+                </button>
+                 <button type="button" class="btn btn-info" aria-label="Left Align"
+                        onclick="prepare_for_posting('{{s}}');" data-toggle="tooltip" data-placement="top" title="Засунуть обработанное в очередь">
+                    <span class="glyphicon glyphicon-option-horizontal" aria-hidden="true"></span>
                 </button>
             </h3>
 
@@ -54,7 +58,7 @@ function delete_post(sub, hash){
                         <div class="accordion-heading">
                             <a class="accordion-toggle" data-toggle="collapse" data-parent="#info-accordion"
                                href="#{{s}}">
-                                <h3>В очереди: {{s}}</h3>
+                                <h3>Найденные посты: {{s}}</h3>
                             </a>
                         </div>
                         <div id="{{s}}" class="accordion-body collapse">
@@ -62,7 +66,7 @@ function delete_post(sub, hash){
                                 <table class="table table-stripped table-hover table-condensed">
                                     <tbody>
                                     {% for post in qc_s[s] %}
-                                    <tr id="{{post.hash}}">
+                                    <tr id="{{post.url_hash}}">
                                         <td>
                                             <a href="{{post.url}}">{{post.title}}</a>
                                         </td>
@@ -71,7 +75,7 @@ function delete_post(sub, hash){
                                         </td>
                                         <td>
                                             <button class="btn btn-danger"
-                                                    onclick="delete_post('{{s}}','{{post.hash}}');">
+                                                    onclick="delete_post('{{s}}','{{post.url_hash}}');">
                                                 Нахуй
                                             </button>
                                         </td>
@@ -110,7 +114,7 @@ function delete_post(sub, hash){
                                 <!--<table class="table table-stripped table-hover table-condensed">-->
                                     <!--<tbody>-->
                                     <!--{% for post in posts %}-->
-                                    <!--<tr id="{{post.hash}}">-->
+                                    <!--<tr id="{{post.url_hash}}">-->
                                         <!--<td>-->
                                             <!--<a href="{{post.url}}">{{post.title}}</a>-->
                                         <!--</td>-->
@@ -119,7 +123,7 @@ function delete_post(sub, hash){
                                         <!--</td>-->
                                         <!--<td>-->
                                             <!--<button class="btn btn-danger"-->
-                                                    <!--onclick="delete_post('{{s}}','{{post.hash}}');">-->
+                                                    <!--onclick="delete_post('{{s}}','{{post.url_hash}}');">-->
                                                 <!--Нахуй-->
                                             <!--</button>-->
                                         <!--</td>-->

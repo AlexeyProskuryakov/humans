@@ -22,6 +22,7 @@ from wsgi.rr_people.ae import AuthorsStorage
 from wsgi.rr_people.he import HumanConfiguration, HumanOrchestra
 from wsgi.rr_people.posting import POST_GENERATOR_OBJECTS
 from wsgi.rr_people.posting.copy_gen import SubredditsRelationsStore
+from wsgi.rr_people.posting.posts import PS_BAD, PS_AT_QUEUE
 from wsgi.rr_people.posting.posts_generator import PostsGeneratorsStorage, PostsGenerator
 from wsgi.rr_people.reader import CommentSearcher
 from wsgi.wake_up import WakeUp, WakeUpStorage
@@ -364,7 +365,7 @@ def posts():
     generators_for_subs = posts_generator.queue.get_posts_generator_states()
     qc_s = {}
     for sub in generators_for_subs.keys():
-        queued_post = comment_searcher.comment_queue.show_all_posts(sub)
+        queued_post = posts_generator.posts_storage.get_posts_for_sub(sub)
         qc_s[sub] = queued_post
 
     return render_template("posts.html", **{"subs": generators_for_subs, "qc_s": qc_s})
@@ -463,7 +464,7 @@ def gens_manage():
         key_words = splitter.split(key_words)
 
         srs.add_sub_relations(sub, related_subs)
-        posts_generator.storage.set_sub_gen_info(sub, generators, key_words)
+        posts_generator.generators_storage.set_sub_gen_info(sub, generators, key_words)
 
         flash(u"Генераторъ постановленъ!")
     gens = POST_GENERATOR_OBJECTS.keys()
@@ -480,7 +481,7 @@ def sub_gens_cfg():
     data = json.loads(request.data)
     sub = data.get("sub")
     related = srs.get_related_subs(sub)
-    generators = posts_generator.storage.get_sub_gen_info(sub)
+    generators = posts_generator.generators_storage.get_sub_gen_info(sub)
 
     return jsonify(**{"ok": True, "related_subs": related, "key_words": generators.get("key_words"),
                       "generators": generators.get("gens")})
@@ -491,29 +492,44 @@ def sub_gens_cfg():
 def sub_gens_start():
     data = json.loads(request.data)
     sub = data.get("sub")
-    posts_generator.queue.set_posts_generator_state(sub, S_WORK)
-    posts_generator.start_generate_posts(sub)
-    return jsonify(**{"ok": True, "state":S_WORK})
-
+    if sub:
+        posts_generator.queue.set_posts_generator_state(sub, S_WORK)
+        posts_generator.start_generate_posts(sub)
+        return jsonify(**{"ok": True, "state": S_WORK})
+    return jsonify(**{"ok":False, "error":"sub is not exists"})
 
 @app.route("/generators/pause", methods=["POST"])
 @login_required
 def sub_gens_pause():
     data = json.loads(request.data)
     sub = data.get("sub")
-    posts_generator.queue.set_posts_generator_state(sub, S_SUSPEND, ex=3600 * 24 * 7)
-    return jsonify(**{"ok": True, "state":S_SUSPEND})
+    if sub:
+        posts_generator.queue.set_posts_generator_state(sub, S_SUSPEND, ex=3600 * 24 * 7)
+        return jsonify(**{"ok": True, "state": S_SUSPEND})
+    return jsonify(**{"ok":False, "error":"sub is not exists"})
 
 
 @app.route("/generators/del_post", methods=["POST"])
 @login_required
 def del_post():
     data = json.loads(request.data)
-    sub, p_hash = data.get("sub"), data.get("hash")
-    if sub and p_hash:
-        delete_count = posts_generator.queue.del_post(sub, p_hash)
-        return jsonify(**{"ok": True, "result": delete_count})
-    return jsonify(**{"ok": False, "data": ""})
+    p_hash = data.get("hash")
+    if p_hash:
+        posts_generator.posts_storage.set_post_state(int(p_hash), PS_BAD)
+        return jsonify(**{"ok": True})
+    return jsonify(**{"ok": False, "error":"post url hash is not exists" })
+
+@app.route("/generators/prepare_for_posting", methods=["POST"])
+@login_required
+def prepare_for_posting():
+    data = json.loads(request.data)
+    sub = data.get("sub")
+    if sub:
+        for post in posts_generator.posts_storage.get_posts_for_sub(sub):
+            posts_generator.queue.put_post_hash(sub, post)
+            posts_generator.posts_storage.set_post_state(post.url_hash, PS_AT_QUEUE)
+        return jsonify(**{"ok":True})
+    return jsonify(**{"ok":False, "error":"sub is not exists"})
 
 
 if __name__ == '__main__':

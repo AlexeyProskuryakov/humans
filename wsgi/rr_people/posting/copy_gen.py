@@ -9,7 +9,7 @@ from requests import get
 from wsgi.db import DBHandler
 from wsgi.rr_people import RedditHandler, cmp_by_created_utc, USER_AGENTS, normalize, tokens_equals, DEFAULT_USER_AGENT
 from wsgi.rr_people.posting.generator import Generator
-from wsgi.rr_people.posting.posts import PostSource, PostChecker, PS_READY
+from wsgi.rr_people.posting.posts import PostSource, PostsStorage, PS_READY
 
 COPY = "copy"
 
@@ -82,7 +82,7 @@ class CopyPostGenerator(RedditHandler, Generator):
         super(CopyPostGenerator, self).__init__()
         self.sub_store = SubredditsRelationsStore()
         self.user_agent = DEFAULT_USER_AGENT
-        self.checker = PostChecker()
+        self.checker = PostsStorage()
 
     def found_copy_in_sub(self):
         pass
@@ -106,7 +106,7 @@ class CopyPostGenerator(RedditHandler, Generator):
                         title = meta.attrs.get("content")
                         break
 
-                if not title:
+                if not title and soup.title:
                     title = soup.title.string
 
                 if title and check_title(title):
@@ -155,7 +155,7 @@ def __clear_posts():
         posts = []
         log.info("\n\nwill show posts fo sub: %s\n-----------------------------" % (s))
         while 1:
-            post = pq.pop_post(s)
+            post = pq.pop_post_hash(s)
             if not post:
                 break
             if is_valid_title(post.title):
@@ -164,5 +164,5 @@ def __clear_posts():
 
         log.info("-----------------------------")
         for post in posts:
-            pq.put_post(s, post)
+            pq.put_post_hash(s, post)
 

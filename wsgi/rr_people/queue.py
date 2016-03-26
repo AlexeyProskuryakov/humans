@@ -34,7 +34,7 @@ class ProductionQueue():
         log.debug("redis: push to %s \nthis:%s" % (sbrdt, key))
         self.redis.rpush(QUEUE_CF(sbrdt), key)
 
-    def get_comment(self, sbrdt):
+    def pop_comment(self, sbrdt):
         result = self.redis.lpop(QUEUE_CF(sbrdt))
         log.debug("redis: get by %s\nthis: %s" % (sbrdt, result))
         return deserialize(result)
@@ -43,37 +43,12 @@ class ProductionQueue():
         result = self.redis.lrange(QUEUE_CF(sbrdt), 0, -1)
         return dict(map(lambda x: deserialize(x), result))
 
-    def del_post(self, sbrdt, post_hash):
-        post_raw = self.redis.get(POST_ID(post_hash))
-        if post_raw:
-            p = self.redis.pipeline()
-            p.delete(POST_ID(post_hash))
-            p.lrem(QUEUE_PG(sbrdt), 0, post_raw)
-            p.execute()
+    def put_post_hash(self, sbrdt, post_hash):
+        self.redis.rpush(QUEUE_PG(sbrdt), post_hash)
 
-    def put_post(self, sbrdt, post):
-        if not post.hash:
-            p_hash = hash(post.title)
-            post.hash = p_hash
-        else:
-            p_hash = post.hash
-
-        post_raw = post.serialize()
-
-        p = self.redis.pipeline()
-
-        p.rpush(QUEUE_PG(sbrdt), post_raw)
-        p.set(POST_ID(p_hash), post_raw)
-        p.execute()
-        return p_hash
-
-    def pop_post(self, sbrdt):
+    def pop_post_hash(self, sbrdt):
         result = self.redis.lpop(QUEUE_PG(sbrdt))
-        if result:
-            post = PostSource.deserialize(result)
-            if post.hash:
-                self.redis.delete(POST_ID(post.hash))
-            return post
+        return result
 
     def show_all_posts(self, sbrdt):
         result = self.redis.lrange(QUEUE_PG(sbrdt), 0, -1)
@@ -103,7 +78,7 @@ class ProductionQueue():
         pipe.execute()
 
     def get_posts_generator_state(self, sbrdt):
-        return self.redis.get(sbrdt)
+        return self.redis.get(STATE_PG(sbrdt))
 
     def get_posts_generator_states(self):
         result = self.redis.hgetall(HASH_STATES_PG)

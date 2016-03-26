@@ -51,6 +51,7 @@ class ImgurPostsProvider(RedditHandler, Generator):
 
     def generate_data(self, subreddit, key_words):
         try:#todo fix rate limit
+            #todo add posts statuses
             for page in xrange(MAX_PAGES):
                 q = "tag:%s OR title:%s OR album:%s" % (subreddit, subreddit, subreddit)
                 log.info("retrieve for %s at page %s" % (subreddit, page))
