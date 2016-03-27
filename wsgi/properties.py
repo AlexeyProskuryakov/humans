@@ -47,14 +47,13 @@ logging.getLogger("requests").setLevel(logging.WARNING)
 logging.getLogger("werkzeug").setLevel(logging.WARNING)
 
 mongo_uri = "mongodb://3030:sederfes100500@ds055525.mongolab.com:55525/reddit_people"
-# mongo_uri = "mongodb://localhost:27017"
 db_name = "reddit_people"
 
 # ae_mongo_uri = "mongodb://localhost:27017"
 # ae_db_name = "ae"
 
-ae_mongo_uri = mongo_uri
-ae_db_name = db_name
+ae_mongo_uri = "mongodb://aliper:sederfes100500@ds025449.mlab.com:25449/ae"
+ae_db_name = "ae"
 
 
 

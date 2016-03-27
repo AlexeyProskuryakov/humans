@@ -14,9 +14,9 @@ log = logging.getLogger("DB")
 
 
 class DBHandler(object):
-    def __init__(self, name="?"):
-        log.info("start db handler for[%s] %s" % (name,mongo_uri))
-        self.client = MongoClient(host=mongo_uri)
+    def __init__(self, name="?", uri=mongo_uri, db_name=db_name):
+        log.info("start db handler for [%s] %s" % (name,uri))
+        self.client = MongoClient(host=uri)
         self.db = self.client[db_name]
 
 
@@ -46,7 +46,7 @@ class HumanStorage(DBHandler):
             self.human_config = db.create_collection("human_config")
             self.human_config.create_index([("user", 1)], unique=True)
 
-        self.human_posts = db.get_collection("human_posts")
+        self.human_posts = db.get_collection("commented_posts")
         if not self.human_posts or delete_posts:
             db.drop_collection("human_posts")
 
