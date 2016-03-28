@@ -259,7 +259,7 @@ class AuthorsStorage(DBHandler):
         if not authors:
             return
 
-        found = self.author_groups.find_one(group_name)
+        found = self.author_groups.find_one({"name":group_name})
         if not found:
             self.author_groups.insert_one({"name": group_name, "authors": authors})
         else:
@@ -529,20 +529,21 @@ def copy_data(from_uri, from_db_name, to_uri, to_db_name):
     src_as = AuthorsStorage(name="from", mongo_uri=from_uri, db_name=from_db_name)
     dest_as = AuthorsStorage(name="to", mongo_uri=to_uri, db_name=to_db_name)
 
-    a_count = 0
-    for author in src_as.authors.find({}):
-        found = dest_as.authors.find_one(author)
-        if not found:
-            log.info("will store author: %s", author)
-            a_count += 1
-            dest_as.authors.insert_one(author)
-
-    log.info("copied %s authors" % a_count)
-
     g_count = 0
     for group in src_as.author_groups.find({}):
-        g_count += 1
-        dest_as.author_groups.insert_one(group)
+        a_count = 0
+        for author in src_as.authors.find({"author":{"$in":group.get("authors")}}):
+            found = dest_as.authors.find_one(author)
+            if not found:
+                log.info("will store author: %s", author)
+                a_count += 1
+                dest_as.authors.insert_one(author)
+
+        if a_count > 0:
+            log.info("copied %s authors at group %s" % (a_count, group.get("name")))
+            dest_as.author_groups.insert_one(group)
+            g_count += 1
+
     log.info("copied %s groups" % g_count)
 
 
