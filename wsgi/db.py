@@ -126,6 +126,7 @@ class HumanStorage(DBHandler):
         if update:
             update = {"$addToSet": update}
             result = self.human_config.update_one({"user": name}, update)
+            return result
 
     def get_human_internal_state(self, name):
         found = self.human_config.find_one({"user": name})

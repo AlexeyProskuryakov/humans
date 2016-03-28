@@ -17,7 +17,7 @@ log = logging.getLogger("copy")
 
 MIN_RATING = 2
 MAX_RATING = 50
-
+MIN_WORDS_IN_TITLE = 3
 
 class SubredditsRelationsStore(DBHandler):
     def __init__(self, name="?"):
@@ -56,7 +56,7 @@ title_stop_words = {"youtube", "guardian", "rt"}
 
 def is_valid_title(title):
     words = normalize(title, serialise=lambda x: x)
-    if len(words) <= 4:
+    if len(words) < MIN_WORDS_IN_TITLE:
         return False
     if set(words).intersection(title_stop_words):
         return False

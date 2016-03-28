@@ -7,7 +7,10 @@
     <div class="row">
     </div>
     <div class="row">
-        <div class="col-md-6 col-md-offset-3">
+        <div class="col-md-3">
+            <h5>Выберай чувака ниже в табличке и заходи на его манаж. Там и включай его <small>или выключай...</small></h5>
+        </div>
+        <div class="col-md-6">
             <h2>Добавление бота. Процедура после добавления информации о приложении и заведении
                 пользователя
                 <a href="{{url_for('human_auth_start')}}"> тут</a>
@@ -16,19 +19,20 @@
                 <div class="form-group">
                     <label for="human-name">Select human name:</label>
                     <select class="form-control" id="human-name" name="human-name">
+                        <option>Выберай чувака</option>
                         {% for human in humans %}
-                        <option>{{human.user}}</option>
+                        <option id="{{human.user}}">{{human.user}}</option>
                         {% endfor %}
                     </select>
                 </div>
 
                 <div class="form-group">
-                    <label for="sbrdts">Subreddits в которых будет тусоваться чувак (ентером разделяй):</label>
-                    <textarea id='sbrdts' name="sbrdts" class="form-control" rows="5">
+                    <label for="human-subs">Subreddits в которых будет тусоваться чувак (пробелом али ентером разделяй):</label>
+                    <textarea id='human-subs' name="sbrdts" class="form-control" rows="5">
 
                     </textarea>
 
-                    <input type="submit" class="form-control" value="Начать">
+                    <input type="submit" class="form-control" value="Постановить">
                 </div>
             </form>
         </div>
@@ -73,7 +77,7 @@
                         {%endif%}
                     </td>
                     <td>
-                        {{human.subs}}
+                        {{array_to_string(human.subs)}}
                     </td>
                 </tr>
                 {% endfor %}
@@ -82,6 +86,7 @@
         </div>
     </div>
 </div>
+<script src="{{url_for('static',filename='js/humans-script.js')}}"></script>
 {% endblock %}
 
 {% endblock %}

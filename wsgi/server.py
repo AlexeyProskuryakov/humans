@@ -45,8 +45,11 @@ app.config['SESSION_TYPE'] = 'filesystem'
 def tst_to_dt(value):
     return datetime.fromtimestamp(value).strftime("%H:%M %d.%m.%Y")
 
+def array_to_string(array):
+    return " ".join([str(el) for el in array])
 
 app.jinja_env.filters["tst_to_dt"] = tst_to_dt
+app.jinja_env.globals.update(array_to_string=array_to_string)
 
 if os.environ.get("test", False):
     log.info("will run at test mode")
@@ -280,8 +283,7 @@ def humans():
         human_name = human_name.strip()
         log.info("Add subreddits: \n%s\n to human with name: %s" % ('\n'.join([el for el in subreddits]), human_name))
 
-        db.set_human_subs(human_name, subreddits)
-
+        db.set_human_subs(human_name, list(set(subreddits)))
         human_orchestra.add_human(human_name)
 
         return redirect(url_for('humans_info', name=human_name))
@@ -330,6 +332,17 @@ def humans_info(name):
                                                   "friends": human_cfg.get("frds", []),
                                                   "want_coefficient": want_coefficient_max
                                                   })
+
+
+@app.route("/humans/<name>/config", methods=["POST"])
+@login_required
+def human_config(name):
+    config_data = db.get_human_config(name)
+    if config_data:
+        config_data = dict(config_data)
+        config_data.pop("_id")
+        return jsonify(**{"ok":True, "data":config_data})
+    return jsonify(**{"ok":False})
 
 
 comment_searcher = CommentSearcher(db)
@@ -390,8 +403,8 @@ def comment_search_info(sub):
         for sb in sbs["_id"]:
             if sub != sb:
                 subs.append(sb)
-    subs_states = comment_searcher.comment_queue.get_founder_states()
-    state = comment_searcher.comment_queue.get_founder_state(sub)
+    subs_states = comment_searcher.comment_queue.get_comment_founders_states()
+    state = comment_searcher.comment_queue.get_comment_founder_state(sub)
 
     result = {"posts_found_comment_text": posts,
               "posts_commented": posts_commented,
@@ -472,7 +485,7 @@ def gens_manage():
     subs = []
     for el in cfg:
         subs.extend(el.get("subs", []))
-    return render_template("generators.html", **{"subs": subs, "gens": gens})
+    return render_template("generators.html", **{"subs": list(set(subs)), "gens": gens})
 
 
 @app.route("/generators/sub_info", methods=["POST"])

@@ -452,8 +452,8 @@ class Kapellmeister(Process):
         self.main_storage = HumanStorage(name="main storage for %s" % name)
         self.posts_storage = PostsStorage(name="posts storage for %s" % name)
         self.human_name = name
-        self.human = Consumer(db, login=name)
         self.ae = ae
+        self.human = Consumer(db, login=name)
         self.queue = ProductionQueue()
 
         self.lock = Lock()
@@ -554,14 +554,16 @@ class HumanOrchestra():
 
     def add_human(self, human_name):
         with self.lock:
-            try:
-                ae = ActionGenerator(group_name=human_name)
-                human = Kapellmeister(human_name, ae)
-                self.__humans[human_name] = human
-                human.start()
-            except Exception as e:
-                log.info("Error at starting human %s", human_name, )
-                log.exception(e)
+            human_kapellmeister = self.__humans.get(human_name)
+            if not human_kapellmeister or not human_kapellmeister.is_alive():
+                try:
+                    ae = ActionGenerator(group_name=human_name)
+                    human = Kapellmeister(human_name, ae)
+                    self.__humans[human_name] = human
+                    human.start()
+                except Exception as e:
+                    log.info("Error at starting human %s", human_name, )
+                    log.exception(e)
 
     def toggle_human_config(self, human_name):
         with self.lock:

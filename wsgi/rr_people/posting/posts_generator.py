@@ -50,7 +50,6 @@ class PostsGenerator(object):
             if S_WORK in state:
                 self.start_generate_posts(sub)
 
-
     def generate_posts(self, subreddit):
         if subreddit not in self.sub_gens:
             gen_config = self.generators_storage.get_sub_gen_info(subreddit)
@@ -94,28 +93,31 @@ class PostsGenerator(object):
 
         def f():
             while 1:
-                if not set_state(S_WORK):
-                    time.sleep(10)
-                    continue
+                try:
+                    if not set_state(S_WORK):
+                        time.sleep(10)
+                        continue
 
-                start = time.time()
-                log.info("Will start find posts in [%s]" % (subrreddit))
-                counter = 0
-                for post in self.generate_posts(subrreddit):
-                    counter += 1
-                    self.posts_storage.add_generated_post(post, subrreddit)
-                    if not set_state("%s generate: [%s]" % (S_WORK, counter)):
-                        break
+                    start = time.time()
+                    log.info("Will start find posts in [%s]" % (subrreddit))
+                    counter = 0
+                    for post in self.generate_posts(subrreddit):
+                        counter += 1
+                        self.posts_storage.add_generated_post(post, subrreddit)
+                        if not set_state("%s generate: [%s]" % (S_WORK, counter)):
+                            break
 
-                end = time.time()
-                sleep_time = random.randint(DEFAULT_SLEEP_TIME_AFTER_GENERATE_DATA / 5,
-                                            DEFAULT_SLEEP_TIME_AFTER_GENERATE_DATA)
+                    end = time.time()
+                    sleep_time = random.randint(DEFAULT_SLEEP_TIME_AFTER_GENERATE_DATA / 5,
+                                                DEFAULT_SLEEP_TIME_AFTER_GENERATE_DATA)
 
-                log.info("Was generate [%s] posts in [%s] at %s seconds... \nWill trying next after %s" % (
-                    counter, subrreddit, end - start, sleep_time))
+                    log.info("Was generate [%s] posts in [%s] at %s seconds... \nWill trying next after %s" % (
+                        counter, subrreddit, end - start, sleep_time))
 
-                set_state(S_SLEEP, ex=sleep_time)
-                time.sleep(sleep_time)
+                    break
+                except Exception as e:
+                    log.error("Was error at generating for sub: %s" % subrreddit)
+                    log.exception(e)
 
         ps = Process(name="[%s] posts generator" % subrreddit, target=f)
         ps.start()
