@@ -77,6 +77,11 @@ class PostsGenerator(object):
 
             random.shuffle(gens)
 
+    def terminate_generate_posts(self, sub_name):
+        if sub_name in self.sub_process:
+            log.info("will terminate generating posts for [%s]"%sub_name)
+            self.sub_process[sub_name].terminate()
+
     def start_generate_posts(self, subrreddit):
         if subrreddit in self.sub_process and self.sub_process[subrreddit].is_alive():
             return

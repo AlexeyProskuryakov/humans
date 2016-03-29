@@ -80,6 +80,12 @@ class ProductionQueue():
     def get_posts_generator_state(self, sbrdt):
         return self.redis.get(STATE_PG(sbrdt))
 
+    def remove_post_generator(self, sbrdt):
+        pipe = self.redis.pipeline()
+        pipe.hdel(HASH_STATES_PG, sbrdt)
+        pipe.delete(STATE_PG(sbrdt))
+        pipe.execute()
+
     def get_posts_generator_states(self):
         result = self.redis.hgetall(HASH_STATES_PG)
         for k, v in result.iteritems():

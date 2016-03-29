@@ -15,7 +15,7 @@ log = logging.getLogger("DB")
 
 class DBHandler(object):
     def __init__(self, name="?", uri=mongo_uri, db_name=db_name):
-        log.info("start db handler for [%s] %s" % (name,uri))
+        log.info("start db handler for [%s] %s" % (name, uri))
         self.client = MongoClient(host=uri)
         self.db = self.client[db_name]
 
@@ -38,7 +38,7 @@ class HumanStorage(DBHandler):
                     size=1024 * 1024 * 50,
             )
             self.human_log.create_index([("human_name", 1)])
-            self.human_log.create_index([("time", 1)], expireAfterSeconds=3600*24)
+            self.human_log.create_index([("time", 1)], expireAfterSeconds=3600 * 24)
             self.human_log.create_index([("action", 1)])
 
         self.human_config = db.get_collection("human_config")
@@ -117,6 +117,10 @@ class HumanStorage(DBHandler):
             return found.get("subs", [])
         return []
 
+    def remove_sub_for_humans(self, sub_name):
+        result = self.human_config.update_many({"subs": sub_name}, {"$pull": {"subs": sub_name}})
+        return result
+
     def update_human_internal_state(self, name, state):
         update = {}
         if state.get("ss"):
@@ -178,7 +182,8 @@ class HumanStorage(DBHandler):
             to_add = {"fullname": post_fullname, "commented": True, "time": time.time(), "text_hash": hash, "by": by}
             self.human_posts.insert_one(to_add)
         else:
-            to_set = {"commented": True, "text_hash": hash, "by": by, "time": time.time(), "low_copies": datetime.utcnow()}
+            to_set = {"commented": True, "text_hash": hash, "by": by, "time": time.time(),
+                      "low_copies": datetime.utcnow()}
             self.human_posts.update_one({"fullname": post_fullname}, {"$set": to_set})
 
     def can_comment_post(self, who, post_fullname, hash):
@@ -192,7 +197,8 @@ class HumanStorage(DBHandler):
             return
         elif found:
             return self.human_posts.update_one(found,
-                                               {"$set": {"ready_for_comment": True}, "$unset": {"low_copies": datetime.utcnow()}})
+                                               {"$set": {"ready_for_comment": True},
+                                                "$unset": {"low_copies": datetime.utcnow()}})
         else:
             return self.human_posts.insert_one({"fullname": post_fullname, "ready_for_comment": True})
 
@@ -212,7 +218,8 @@ class HumanStorage(DBHandler):
         """
         found = self.human_posts.find_one({"fullname": fullname})
         if found:
-            if (datetime.utcnow() - found.get("low_copies", datetime.utcnow())).total_seconds() > TIME_TO_WAIT_NEW_COPIES:
+            if (datetime.utcnow() - found.get("low_copies",
+                                              datetime.utcnow())).total_seconds() > TIME_TO_WAIT_NEW_COPIES:
                 self.human_posts.remove(found)
                 return True
             return False
@@ -233,7 +240,8 @@ class HumanStorage(DBHandler):
     def set_post_low_copies(self, post_fullname):
         found = self.human_posts.find_one({"fullname": post_fullname})
         if not found:
-            self.human_posts.insert_one({"fullname": post_fullname, "low_copies": datetime.utcnow(), "time": time.time()})
+            self.human_posts.insert_one(
+                    {"fullname": post_fullname, "low_copies": datetime.utcnow(), "time": time.time()})
         else:
             self.human_posts.update_one({"fullname": post_fullname},
                                         {'$set': {"low_copies": datetime.utcnow(), "time": time.time()}})

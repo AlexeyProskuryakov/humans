@@ -81,6 +81,9 @@ class PostsStorage(DBHandler):
         _q = q or {}
         return map(lambda x: PostSource.from_dict(x), self.posts.find(_q))
 
+    def remove_posts_of_sub(self, subname):
+        result = self.posts.delete_many({"sub":subname})
+        return result
 
 if __name__ == '__main__':
     ps = PostSource("http://foo.bar.baz?k=100500&w=qwerty&tt=ttrtt", "Foo{bar}Baz", "someSub", 100500600)

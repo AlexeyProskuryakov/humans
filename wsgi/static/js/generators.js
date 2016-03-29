@@ -1,32 +1,3 @@
-$("#sub-choose option").on('click', function(e){
-    var sub_name = $(e.target).attr("value");
-    if (sub_name == undefined){
-        $(".sub-generator-btn").addClass("disabled");
-    } else{
-        $("#loader-gif").show();
-        $.ajax({
-            type:"post",
-            url:"/generators/sub_info",
-            data:JSON.stringify({"sub":sub_name}),
-            contentType:    'application/json',
-            dataType:       'json',
-            success:function(data){
-                console.log(data);
-                if (data.ok == true){
-                    $(".gen-name").prop('selected', false);
-                    data.generators.forEach(function(x, el){
-                        $("#choose-sub-"+x).prop('selected', true);
-                    });
-                    $("#related-subs").text(data.related_subs);
-                    $("#key-words").text(data.key_words);
-                }
-                 $("#loader-gif").hide();
-            }
-        });
-        $(".sub-generator-btn").removeClass("disabled");
-    }
-});
-
 function generator_action(name, state){
     var sub_name = name;
     if (sub_name == undefined){
@@ -73,6 +44,42 @@ function prepare_for_posting(name){
                 console.log(data);
                 if (data.ok == true){
                         $("#"+sub_name).addClass("more-opacity");
+                }
+
+            }
+        });
+};
+
+function delete_post(sub, url_hash){
+    console.log(sub,url_hash);
+    $.ajax({
+            type:"post",
+            url:"/generators/del_post",
+            data:JSON.stringify({"sub":sub,"url_hash":url_hash}),
+            contentType:    'application/json',
+            dataType:       'json',
+            success:function(data){
+                console.log(data);
+                if (data.ok == true){
+                    $("#"+url_hash).addClass("more-opacity");
+                }
+
+            }
+    })
+}
+
+function delete_sub(name){
+    $.ajax({
+            type:"post",
+            url:"/generators/del_sub",
+            data:JSON.stringify({"sub_name":name}),
+            contentType:    'application/json',
+            dataType:       'json',
+            success:function(data){
+                console.log(data);
+                if (data.ok == true){
+                        $("."+name+"-main").addClass("more-opacity");
+                        $("#"+name+"-result-info").text("Удалил везде все.");
                 }
 
             }

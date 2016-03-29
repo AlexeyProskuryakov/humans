@@ -45,8 +45,10 @@ app.config['SESSION_TYPE'] = 'filesystem'
 def tst_to_dt(value):
     return datetime.fromtimestamp(value).strftime("%H:%M %d.%m.%Y")
 
+
 def array_to_string(array):
     return " ".join([str(el) for el in array])
+
 
 app.jinja_env.filters["tst_to_dt"] = tst_to_dt
 app.jinja_env.globals.update(array_to_string=array_to_string)
@@ -341,8 +343,8 @@ def human_config(name):
     if config_data:
         config_data = dict(config_data)
         config_data.pop("_id")
-        return jsonify(**{"ok":True, "data":config_data})
-    return jsonify(**{"ok":False})
+        return jsonify(**{"ok": True, "data": config_data})
+    return jsonify(**{"ok": False})
 
 
 comment_searcher = CommentSearcher(db)
@@ -376,6 +378,7 @@ def comments():
 @login_required
 def posts():
     generators_for_subs = posts_generator.queue.get_posts_generator_states()
+    posts_generator.queue.get_posts_generator_states()
     qc_s = {}
     for sub in generators_for_subs.keys():
         queued_post = posts_generator.posts_storage.get_posts_for_sub(sub)
@@ -509,7 +512,8 @@ def sub_gens_start():
         posts_generator.queue.set_posts_generator_state(sub, S_WORK)
         posts_generator.start_generate_posts(sub)
         return jsonify(**{"ok": True, "state": S_WORK})
-    return jsonify(**{"ok":False, "error":"sub is not exists"})
+    return jsonify(**{"ok": False, "error": "sub is not exists"})
+
 
 @app.route("/generators/pause", methods=["POST"])
 @login_required
@@ -519,18 +523,33 @@ def sub_gens_pause():
     if sub:
         posts_generator.queue.set_posts_generator_state(sub, S_SUSPEND, ex=3600 * 24 * 7)
         return jsonify(**{"ok": True, "state": S_SUSPEND})
-    return jsonify(**{"ok":False, "error":"sub is not exists"})
+    return jsonify(**{"ok": False, "error": "sub is not exists"})
 
 
 @app.route("/generators/del_post", methods=["POST"])
 @login_required
 def del_post():
     data = json.loads(request.data)
-    p_hash = data.get("hash")
+    p_hash = data.get("url_hash")
     if p_hash:
         posts_generator.posts_storage.set_post_state(int(p_hash), PS_BAD)
         return jsonify(**{"ok": True})
-    return jsonify(**{"ok": False, "error":"post url hash is not exists" })
+    return jsonify(**{"ok": False, "error": "post url hash is not exists"})
+
+
+@app.route("/generators/del_sub", methods=["POST"])
+@login_required
+def del_sub():
+    data = json.loads(request.data)
+    sub_name = data.get("sub_name")
+    if sub_name:
+        posts_generator.terminate_generate_posts(sub_name)
+        db.remove_sub_for_humans(sub_name)
+        posts_generator.posts_storage.remove_posts_of_sub(sub_name)
+        posts_generator.queue.remove_post_generator(sub_name)
+        return jsonify(**{"ok": True})
+
+    return jsonify(**{"ok": False, "error": "sub is not exists"})
 
 @app.route("/generators/prepare_for_posting", methods=["POST"])
 @login_required
@@ -541,8 +560,9 @@ def prepare_for_posting():
         for post in posts_generator.posts_storage.get_posts_for_sub(sub):
             posts_generator.queue.put_post_hash(sub, post)
             posts_generator.posts_storage.set_post_state(post.url_hash, PS_AT_QUEUE)
-        return jsonify(**{"ok":True})
-    return jsonify(**{"ok":False, "error":"sub is not exists"})
+        return jsonify(**{"ok": True})
+
+    return jsonify(**{"ok": False, "error": "sub is not exists"})
 
 
 if __name__ == '__main__':

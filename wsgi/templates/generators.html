@@ -2,6 +2,8 @@
 {% block body %}
 
 {% block content %}
+<script src="{{ url_for('static', filename='js/generators.js') }}"></script>
+
 <div class="container-fluid">
     <div class="row">
         <div class="col-md-6 col-md-offset-3">
@@ -48,7 +50,9 @@
                 </div>
                 <div class="form-group">
                     <div class="col-md-5 col-md-offset-3">
-                        <button class="submit btn btn-info btn-lg disabled sub-generator-btn" type="submit">Постановить</button>
+                        <button class="submit btn btn-info btn-lg disabled sub-generator-btn" type="submit">
+                            Постановить
+                        </button>
                     </div>
                 </div>
 
@@ -57,18 +61,54 @@
     </div>
     <div class="row">
         <div class="col-md-6 col-md-offset-3">
-            <button class="btn btn-success btn-lg btn-block disabled sub-generator-btn" onclick="generator_action(undefined, 'start')">Запустить!</button>
+            <button class="btn btn-success btn-lg btn-block disabled sub-generator-btn"
+                    onclick="generator_action(undefined, 'start')">Запустить!
+            </button>
         </div>
         <div class="col-md-6 col-md-offset-3">
-            <button class="btn btn-default btn-lg btn-block disabled sub-generator-btn" onclick="generator_action(undefined, 'pause')">Приостановить...</button>
+            <button class="btn btn-default btn-lg btn-block disabled sub-generator-btn"
+                    onclick="generator_action(undefined, 'pause')">Приостановить...
+            </button>
         </div>
         <div>
-            <h3>Результат гляди <small><a href="{{url_for('posts')}}">тута</a></small></h3>
+            <h3>Результат гляди
+                <small><a href="{{url_for('posts')}}">тута</a></small>
+            </h3>
         </div>
     </div>
 </div>
+<script>
+    $("#sub-choose option").on('click', function(e){
+    var sub_name = $(e.target).attr("value");
+    if (sub_name == undefined){
+        $(".sub-generator-btn").addClass("disabled");
+    } else{
+        $("#loader-gif").show();
+        $.ajax({
+            type:"post",
+            url:"/generators/sub_info",
+            data:JSON.stringify({"sub":sub_name}),
+            contentType:    'application/json',
+            dataType:       'json',
+            success:function(data){
+                console.log(data);
+                if (data.ok == true){
+                    $(".gen-name").prop('selected', false);
+                    data.generators.forEach(function(x, el){
+                        $("#choose-sub-"+x).prop('selected', true);
+                    });
+                    $("#related-subs").text(data.related_subs);
+                    $("#key-words").text(data.key_words);
+                }
+                 $("#loader-gif").hide();
+            }
+        });
+        $(".sub-generator-btn").removeClass("disabled");
+    }
+});
 
-<script src="{{ url_for('static', filename='js/generators.js') }}"></script>
+</script>
+
 {% endblock %}
 
 {%endblock%}

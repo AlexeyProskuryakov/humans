@@ -3,23 +3,6 @@
 
 {% block content %}
 <script>
-function delete_post(sub, url_hash){
-    console.log(sub,url_hash);
-    $.ajax({
-            type:"post",
-            url:"/generators/del_post",
-            data:JSON.stringify({"sub":sub,"url_hash":url_hash}),
-            contentType:    'application/json',
-            dataType:       'json',
-            success:function(data){
-                console.log(data);
-                if (data.ok == true){
-                    $("#"+url_hash).addClass("more-opacity");
-                }
-
-            }
-    })
-}
 
 
 </script>
@@ -34,25 +17,36 @@ function delete_post(sub, url_hash){
             <h3>Состояние поиска постов-хуестов: </h3>
             {% for s, st in subs.items() %}
 
-            <h3>{{s}}:
+            <h3 class="{{s}}-main">{{s}}:
                 [
                 <small id="state-{{s}}">{{st}}</small>
                 ]
-                <button type="button" class="btn btn-success" aria-label="Left Align" data-toggle="tooltip" data-placement="top" title="Запустить генерацию постов"
+                <button type="button" class="btn btn-success" aria-label="Left Align" data-toggle="tooltip"
+                        data-placement="top" title="Запустить генерацию постов"
                         onclick="generator_action('{{s}}', 'start');">
                     <span class="glyphicon glyphicon-play" aria-hidden="true"></span>
                 </button>
-                <button type="button" class="btn btn-default" aria-label="Left Align" data-toggle="tooltip" data-placement="top" title="Приостановить генерацию постов"
+                <button type="button" class="btn btn-default" aria-label="Left Align" data-toggle="tooltip"
+                        data-placement="top" title="Приостановить генерацию постов"
                         onclick="generator_action('{{s}}', 'pause');">
                     <span class="glyphicon glyphicon-pause" aria-hidden="true"></span>
                 </button>
-                 <button type="button" class="btn btn-info" aria-label="Left Align"
-                        onclick="prepare_for_posting('{{s}}');" data-toggle="tooltip" data-placement="top" title="Засунуть обработанное в очередь">
+                <button type="button" class="btn btn-info" aria-label="Left Align"
+                        onclick="prepare_for_posting('{{s}}');" data-toggle="tooltip" data-placement="top"
+                        title="Засунуть обработанное в очередь">
                     <span class="glyphicon glyphicon-option-horizontal" aria-hidden="true"></span>
                 </button>
+                <button type="button" class="btn btn-danger" aria-label="Left Align"
+                        onclick="delete_sub('{{s}}');" data-toggle="tooltip" data-placement="top"
+                        title="Удалить саб причем даже из тех которые будет посещать чувак">
+                    <span class="glyphicon glyphicon-remove" aria-hidden="true"></span>
+                </button>
             </h3>
+            <div id="{{s}}-result-info">
 
-            <div>
+            </div>
+
+            <div class="{{s}}-main">
                 <div class="accordion" id="info-accordion">
                     <div class="accordion-group">
                         <div class="accordion-heading">
@@ -96,51 +90,51 @@ function delete_post(sub, url_hash){
     </div>
 
     <!--<div class="row">-->
-        <!--<div class="col-md-6 col-md-offset-3">-->
+    <!--<div class="col-md-6 col-md-offset-3">-->
 
-            <!--{% for s, posts in qc_s.items() %}-->
-            <!--{%if posts %}-->
-            <!--<div>-->
-                <!--<div class="accordion" id="info-accordion">-->
-                    <!--<div class="accordion-group">-->
-                        <!--<div class="accordion-heading">-->
-                            <!--<a class="accordion-toggle" data-toggle="collapse" data-parent="#info-accordion"-->
-                               <!--href="#{{s}}">-->
-                                <!--<h3>В очереди: {{s}}</h3>-->
-                            <!--</a>-->
-                        <!--</div>-->
-                        <!--<div id="{{s}}" class="accordion-body collapse">-->
-                            <!--<div class="accordion-inner">-->
-                                <!--<table class="table table-stripped table-hover table-condensed">-->
-                                    <!--<tbody>-->
-                                    <!--{% for post in posts %}-->
-                                    <!--<tr id="{{post.url_hash}}">-->
-                                        <!--<td>-->
-                                            <!--<a href="{{post.url}}">{{post.title}}</a>-->
-                                        <!--</td>-->
-                                        <!--<td>-->
-                                            <!--{{post.for_sub}}-->
-                                        <!--</td>-->
-                                        <!--<td>-->
-                                            <!--<button class="btn btn-danger"-->
-                                                    <!--onclick="delete_post('{{s}}','{{post.url_hash}}');">-->
-                                                <!--Нахуй-->
-                                            <!--</button>-->
-                                        <!--</td>-->
-                                    <!--</tr>-->
+    <!--{% for s, posts in qc_s.items() %}-->
+    <!--{%if posts %}-->
+    <!--<div>-->
+    <!--<div class="accordion" id="info-accordion">-->
+    <!--<div class="accordion-group">-->
+    <!--<div class="accordion-heading">-->
+    <!--<a class="accordion-toggle" data-toggle="collapse" data-parent="#info-accordion"-->
+    <!--href="#{{s}}">-->
+    <!--<h3>В очереди: {{s}}</h3>-->
+    <!--</a>-->
+    <!--</div>-->
+    <!--<div id="{{s}}" class="accordion-body collapse">-->
+    <!--<div class="accordion-inner">-->
+    <!--<table class="table table-stripped table-hover table-condensed">-->
+    <!--<tbody>-->
+    <!--{% for post in posts %}-->
+    <!--<tr id="{{post.url_hash}}">-->
+    <!--<td>-->
+    <!--<a href="{{post.url}}">{{post.title}}</a>-->
+    <!--</td>-->
+    <!--<td>-->
+    <!--{{post.for_sub}}-->
+    <!--</td>-->
+    <!--<td>-->
+    <!--<button class="btn btn-danger"-->
+    <!--onclick="delete_post('{{s}}','{{post.url_hash}}');">-->
+    <!--Нахуй-->
+    <!--</button>-->
+    <!--</td>-->
+    <!--</tr>-->
 
-                                    <!--{% endfor %}-->
-                                    <!--</tbody>-->
-                                <!--</table>-->
-                            <!--</div>-->
-                        <!--</div>-->
-                    <!--</div>-->
-                <!--</div>-->
-            <!--</div>-->
-            <!--{%endif%}-->
-            <!--{% endfor %}-->
+    <!--{% endfor %}-->
+    <!--</tbody>-->
+    <!--</table>-->
+    <!--</div>-->
+    <!--</div>-->
+    <!--</div>-->
+    <!--</div>-->
+    <!--</div>-->
+    <!--{%endif%}-->
+    <!--{% endfor %}-->
 
-        <!--</div>-->
+    <!--</div>-->
     <!--</div>-->
 </div>
 
