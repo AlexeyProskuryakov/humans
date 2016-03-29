@@ -259,14 +259,14 @@ class AuthorsStorage(DBHandler):
         if not authors:
             return
 
-        found = self.author_groups.find_one({"name":group_name})
+        found = self.author_groups.find_one({"name": group_name})
         if not found:
             self.author_groups.insert_one({"name": group_name, "authors": authors})
         else:
             self.author_groups.update_one({"name": group_name}, {'$set': {"authors": authors}})
             self.authors.update_many({"author": {"$in": found.get("authors")}}, {"$unset": {"used", ""}})
 
-        self.authors.update_many({"author": {"$in": authors}}, {"$set": {"used": group_name}})
+        self.authors.update_many({"author": {"$in": authors}, "used":{"$ne":group_name}}, {"$set": {"used": group_name}})
 
     def get_sleep_steps(self, group):
         return list(self.authors.find({"used": group, "action_type": A_SLEEP}))
@@ -525,27 +525,20 @@ def create():
     agdf.fill_consume_and_sleep()
 
 
-def copy_data(from_uri, from_db_name, to_uri, to_db_name):
+def copy_data(from_uri, from_db_name, to_uri, to_db_name, drop_dest=False):
     src_as = AuthorsStorage(name="from", mongo_uri=from_uri, db_name=from_db_name)
     dest_as = AuthorsStorage(name="to", mongo_uri=to_uri, db_name=to_db_name)
+    if drop_dest:
+        dest_as.authors.drop()
+        dest_as.author_groups.drop()
 
-    g_count = 0
-    for group in src_as.author_groups.find({}):
-        a_count = 0
-        for author in src_as.authors.find({"author":{"$in":group.get("authors")}}):
-            found = dest_as.authors.find_one(author)
-            if not found:
-                log.info("will store author: %s", author)
-                a_count += 1
-                dest_as.authors.insert_one(author)
+    for group in src_as.authors.aggregate([{"$match": {"used": {"$exists": True}}}, {"$group": {"_id": "$used", "authors":{"$addToSet":"$author"}}}]):
+        src_authors = list(src_as.authors.find({"used":group.get("_id")}))
+        dest_as.authors.insert_many(src_authors)
+        log.info("was insert %s authors rows for group %s"%(len(src_authors), group.get("_id")))
+        dest_as.set_group(group.get("authors"), group.get("_id"))
 
-        if a_count > 0:
-            log.info("copied %s authors at group %s" % (a_count, group.get("name")))
-            dest_as.author_groups.insert_one(group)
-            g_count += 1
-
-    log.info("copied %s groups" % g_count)
 
 
 if __name__ == '__main__':
-    copy_data("mongodb://localhost:27017", "ae", ae_mongo_uri, ae_db_name)
+    copy_data("mongodb://localhost:27017", "ae", ae_mongo_uri, ae_db_name, drop_dest=True)
