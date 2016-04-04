@@ -73,7 +73,7 @@ class HumanStorage(DBHandler):
             self.human_posts.create_index([("state", 1)])
 
     def update_human_access_credentials_info(self, user, info):
-        if isinstance(info.pop_comment("scope"), set):
+        if isinstance(info.get("scope"), set):
             info['scope'] = list(info['scope'])
         self.human_config.update_one({"user": user}, {"$set": {"info": info, "time": time.time()}})
 
@@ -153,15 +153,17 @@ class HumanStorage(DBHandler):
 
     ############STATES################
     def get_humans_available(self):
-        worked = self.humans_states.find({"state": {"$in": ["work", "sleep"]}})
+        worked = self.humans_states.find(
+                {"$or": [{"state": "work"}, {"state": "sleep", "time": {"lte": time.time() - 3600}}]})
         return worked
 
     def set_human_state(self, name, state):
         if state == "ban":
-            self.humans_states.update_one({"name": name}, {"$inc": {"ban_count": 1}, "$set": {'state': state}},
+            self.humans_states.update_one({"name": name},
+                                          {"$inc": {"ban_count": 1}, "$set": {'state': state, 'time': time.time()}},
                                           upsert=True)
         else:
-            self.humans_states.update_one({"name": name}, {"$set": {'state': state}}, upsert=True)
+            self.humans_states.update_one({"name": name}, {"$set": {'state': state, 'time': time.time()}}, upsert=True)
 
     def get_human_state(self, name):
         found = self.humans_states.find_one({"name": name})

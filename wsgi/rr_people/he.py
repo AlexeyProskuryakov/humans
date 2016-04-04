@@ -116,11 +116,11 @@ class HumanConfiguration(object):
 
 
 class Consumer(RedditHandler):
-    def __init__(self, db, login):
+    def __init__(self, login):
         super(Consumer, self).__init__()
-        self.db = db
-        state = db.get_human_config(login)
-        login_credentials = db.get_human_access_credentials(login)
+        self.db = HumanStorage(name="consumer %s" % login)
+        state = self.db.get_human_config(login)
+        login_credentials = self.db.get_human_access_credentials(login)
         if not login_credentials:
             raise Exception("Can not have login credentials at %s", login)
         self.subscribed_subreddits = set(state.get("ss", [])) or set()
@@ -178,6 +178,9 @@ class Consumer(RedditHandler):
 
     def incr_counter(self, name):
         self.counters[name] += 1
+
+    def decr_counter(self, name):
+        self.counters[name] -= 1
 
     @property
     def action_function_params(self):
@@ -395,7 +398,6 @@ class Consumer(RedditHandler):
                                                    by=self.user_name,
                                                    hash=text_hash)
                         self.register_step(A_COMMENT, info={"fullname": post_fullname, "sub": subreddit_name})
-                        log.info("Comment text: %s" % (comment_text))
                 except Exception as e:
                     log.error(e)
 
@@ -443,6 +445,7 @@ class Consumer(RedditHandler):
     def post(self, sub_name, url, title):
         subreddit = self.get_subreddit(sub_name)
         result = subreddit.submit(save=True, title=title, url=url)
+        log.info("was post at [%s]; title: [%s]; url: [%s] \n with result: %s" % (sub_name, title, url, result))
         return result
 
 
@@ -453,7 +456,7 @@ class Kapellmeister(Process):
         self.posts_storage = PostsStorage(name="posts storage for %s" % name)
         self.human_name = name
         self.ae = ae
-        self.human = Consumer(db, login=name)
+        self.human = Consumer(login=name)
         self.queue = ProductionQueue()
 
         self.lock = Lock()
@@ -496,6 +499,7 @@ class Kapellmeister(Process):
                 return
 
             if step - last_token_refresh_time > HOUR - 100:
+                log.info("will refresh token")
                 self.human.refresh_token()
                 last_token_refresh_time = step
 
@@ -511,18 +515,28 @@ class Kapellmeister(Process):
                     comment = self.queue.pop_comment(sub_name)
                     if comment:
                         pfn, ct = comment
+                        log.info("will comment [%s] [%s]" % (pfn, ct))
                         self.human.do_comment_post(pfn, sub_name, ct)
+                    else:
+                        #send signal for start comment search
+                        pass
                 else:
+                    log.info("will live random can not comment")
                     self.human.live_random(max_actions=random.randint(10, 20))
+
             elif action == A_POST:
                 if self.human.can_do(A_POST):
                     sub_name = random.choice(subs)
-                    post_hash = self.queue.pop_post_hash(sub_name)
-                    post = self.posts_storage.get_post(post_hash)
-                    self.human.post(post.for_sub or sub_name, post.url, post.title)
-                    self.posts_storage.set_post_state(post_hash, PS_POSTED)
+                    url_hash = self.queue.pop_post_hash(sub_name)
+                    post = self.posts_storage.get_post(url_hash)
+                    if post:
+                        log.info("will post %s" % post)
+                        self.human.post(post.for_sub or sub_name, post.url, post.title)
+                        self.posts_storage.set_post_state(url_hash, PS_POSTED)
+                    else:
+                        log.error("can not find post for url hash: [%s] :(" % (url_hash))
             else:
-                self.human.live_random(max_actions=random.randint(10, 60))
+                self.human.live_random(max_actions=random.randint(10, 20))
 
             _diff = time.time() - _start
             step += _diff

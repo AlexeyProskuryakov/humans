@@ -1,4 +1,5 @@
 # coding=utf-8
+import json
 import logging
 import random
 import time
@@ -79,7 +80,24 @@ class CommentSearcher(RedditHandler):
             from wsgi.rr_people.ae import ActionGeneratorDataFormer
             self.agdf = ActionGeneratorDataFormer()
 
+        self.start_supply_comments()
         log.info("Read human inited!")
+
+    def comment_retrieve_iteration(self, sub, sleep=True):
+        self.comment_queue.set_comment_founder_state(sub, S_WORK)
+        start = time.time()
+        log.info("Will start find comments for [%s]" % (sub))
+        for pfn, ct in self.find_comment(sub):
+            self.comment_queue.put_comment(sub, pfn, ct)
+        end = time.time()
+        sleep_time = random.randint(DEFAULT_SLEEP_TIME_AFTER_GENERATE_DATA / 5,
+                                    DEFAULT_SLEEP_TIME_AFTER_GENERATE_DATA)
+        log.info(
+                "Was get all comments which found for [%s] at %s seconds... Will trying next after %s" % (
+                    sub, end - start, sleep_time))
+        self.comment_queue.set_comment_founder_state(sub, S_SLEEP, ex=sleep_time + 1)
+        if sleep:
+            time.sleep(sleep_time)
 
     def start_find_comments(self, sub):
         if sub in self.subs and self.subs[sub].is_alive():
@@ -87,28 +105,34 @@ class CommentSearcher(RedditHandler):
 
         def f():
             while 1:
-                self.comment_queue.set_comment_founder_state(sub, S_WORK)
-                start = time.time()
-                log.info("Will start find comments for [%s]" % (sub))
-                for pfn, ct in self.find_comment(sub):
-                    self.comment_queue.put_comment(sub, pfn, ct)
-                end = time.time()
-                sleep_time = random.randint(DEFAULT_SLEEP_TIME_AFTER_GENERATE_DATA / 5,
-                                            DEFAULT_SLEEP_TIME_AFTER_GENERATE_DATA)
-                log.info(
-                        "Was get all comments which found for [%s] at %s seconds... Will trying next after %s" % (
-                            sub, end - start, sleep_time))
-                self.comment_queue.set_comment_founder_state(sub, S_SLEEP, ex=sleep_time + 1)
-                time.sleep(sleep_time)
+                self.comment_retrieve_iteration(sub)
 
         ps = Process(name="[%s] comment founder" % sub, target=f)
         ps.start()
         self.subs[sub] = ps
 
-    def find_comment(self, at_subreddit, add_authors=False):#todo вынести загрузку всех постов в отдельную хуйню чтоб не делать это много раз
+    def start_supply_comments(self):
+        log.info("start supplying comments")
+
+        def f():
+            for message in self.comment_queue.get_who_needs_comments():
+                nc_sub = message.get("data")
+                log.info("receive need comments for sub [%s]" % nc_sub)
+                founder_state = self.comment_queue.get_comment_founder_state(nc_sub)
+                if not founder_state or founder_state is S_SLEEP:
+                    log.info("will forced start found comments for [%s]"%(nc_sub))
+                    self.comment_retrieve_iteration(nc_sub, sleep=False)
+
+
+
+        Process(name="comment supplier", target=f).start()
+
+    def find_comment(self, at_subreddit,
+                     add_authors=False):  # todo вынести загрузку всех постов в отдельную хуйню чтоб не делать это много раз
         subreddit = at_subreddit
         all_posts = self.get_hot_and_new(subreddit, sort=cmp_by_created_utc)
-        self.comment_queue.set_comment_founder_state(subreddit, "%s found %s" % (S_WORK, len(all_posts)), ex=len(all_posts) * 2)
+        self.comment_queue.set_comment_founder_state(subreddit, "%s found %s" % (S_WORK, len(all_posts)),
+                                                     ex=len(all_posts) * 2)
         for post in all_posts:
             if self.db.is_can_see_post(post.fullname):
                 try:
@@ -188,5 +212,8 @@ if __name__ == '__main__':
     queue = ProductionQueue()
     db = HumanStorage()
     cs = CommentSearcher(db)
-    for res in cs.find_comment("videos"):
-        print res
+    time.sleep(5)
+    queue.need_comment("test1")
+    queue.need_comment("test2")
+    queue.need_comment("test3")
+    queue.need_comment("test4")

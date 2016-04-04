@@ -18,6 +18,7 @@ HASH_STATES_PG = "pg_states_hashset"
 STATE_CF = lambda x: "cf_state_%s" % x
 STATE_PG = lambda x: "pg_state_%s" % x
 
+NEED_COMMENT = "need_comment"
 
 class ProductionQueue():
     def __init__(self, clear=False):
@@ -26,8 +27,19 @@ class ProductionQueue():
                                        password=c_queue_redis_password,
                                        db=0
                                        )
+        if clear:
+            self.redis.flushdb()
 
         log.info("Production Queue inited!")
+
+    def need_comment(self, sbrdt):
+        self.redis.publish(NEED_COMMENT, sbrdt)
+
+    def get_who_needs_comments(self):
+        pubsub = self.redis.pubsub(ignore_subscribe_messages=True)
+        pubsub.subscribe(NEED_COMMENT)
+        for el in pubsub.listen():
+            yield el
 
     def put_comment(self, sbrdt, post_fn, text):
         key = serialize(post_fn, text)
@@ -50,9 +62,9 @@ class ProductionQueue():
         result = self.redis.lpop(QUEUE_PG(sbrdt))
         return result
 
-    def show_all_posts(self, sbrdt):
+    def show_all_posts_hashes(self, sbrdt):
         result = self.redis.lrange(QUEUE_PG(sbrdt), 0, -1)
-        return map(lambda x: PostSource.deserialize(x), result)
+        return result
 
     def set_comment_founder_state(self, sbrdt, state, ex=None):
         pipe = self.redis.pipeline()
@@ -96,5 +108,5 @@ class ProductionQueue():
 
 if __name__ == '__main__':
     q = ProductionQueue()
-    for post in q.show_all_posts("funny"):
+    for post in q.show_all_posts_hashes("funny"):
         print q.redis.get(POST_ID(post.hash))
