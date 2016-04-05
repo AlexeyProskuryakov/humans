@@ -171,6 +171,11 @@ class CommentSearcher(RedditHandler):
             from wsgi.rr_people.ae import ActionGeneratorDataFormer
             self.agdf = ActionGeneratorDataFormer()
 
+        for sub, state in self.comment_queue.get_comment_founders_states().iteritems():
+            if S_WORK in state:
+                self.start_find_comments(sub)
+                time.sleep(60*5)
+
         self.start_supply_comments()
         log.info("Read human inited!")
 
