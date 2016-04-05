@@ -21,13 +21,6 @@ class PostsGeneratorsStorage(DBHandler):
             self.generators = self.db.create_collection('generators')
             self.generators.create_index([("sub", 1)], unque=True)
 
-        self.posts = self.db.get_collection("generated_posts")
-
-        if not self.posts:
-            self.posts = self.db.create_collection("generated_posts")
-            self.posts.create_index("sub")
-            self.posts.create_index("hash", unique=True)
-
     def set_sub_gen_info(self, sub, generators, key_words):
         self.generators.update_one({"sub": sub}, {"$set": {"gens": generators, "key_words": key_words}}, upsert=True)
 
@@ -40,7 +33,7 @@ class PostsGeneratorsStorage(DBHandler):
 
 class PostsGenerator(object):
     def __init__(self):
-        self.queue = ProductionQueue()
+        self.queue = ProductionQueue(name="pg queue")
         self.generators_storage = PostsGeneratorsStorage(name="pg gens")
         self.posts_storage = PostsStorage(name="pg posts")
         self.sub_gens = {}

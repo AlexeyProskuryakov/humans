@@ -20,8 +20,9 @@ STATE_PG = lambda x: "pg_state_%s" % x
 
 NEED_COMMENT = "need_comment"
 
+
 class ProductionQueue():
-    def __init__(self, clear=False):
+    def __init__(self, name="?", clear=False):
         self.redis = redis.StrictRedis(host=c_queue_redis_addres,
                                        port=c_queue_redis_port,
                                        password=c_queue_redis_password,
@@ -30,7 +31,7 @@ class ProductionQueue():
         if clear:
             self.redis.flushdb()
 
-        log.info("Production Queue inited!")
+        log.info("Production Queue inited for [%s]"%name)
 
     def need_comment(self, sbrdt):
         self.redis.publish(NEED_COMMENT, sbrdt)
@@ -105,6 +106,7 @@ class ProductionQueue():
             if v is None or ks is None:
                 result[k] = S_STOP
         return result
+
 
 if __name__ == '__main__':
     q = ProductionQueue()

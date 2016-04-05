@@ -82,7 +82,7 @@ class CopyPostGenerator(RedditHandler, Generator):
         super(CopyPostGenerator, self).__init__()
         self.sub_store = SubredditsRelationsStore()
         self.user_agent = DEFAULT_USER_AGENT
-        self.checker = PostsStorage()
+        self.post_storage = PostsStorage()
 
     def found_copy_in_sub(self):
         pass
@@ -130,7 +130,7 @@ class CopyPostGenerator(RedditHandler, Generator):
         hot_and_new = self.get_hot_and_new(subreddit, sort=cmp_by_created_utc)
         for post in hot_and_new:
             url_hash = hash(post.url)
-            if self.checker.get_post_state(url_hash):
+            if self.post_storage.get_post_state(url_hash):
                 continue
             if post.ups > MIN_RATING and post.ups < MAX_RATING:
                 title = self.get_title(prepare_url(post.url))
@@ -142,7 +142,7 @@ class CopyPostGenerator(RedditHandler, Generator):
                     else:
                         continue
                 if title and is_valid_title(title):
-                    self.checker.set_post_state(url_hash, PS_READY)
+                    self.post_storage.set_post_state(url_hash, PS_READY)
                     yield PostSource(post.url, title.strip(), for_sub=random.choice(related_subs))
 
 

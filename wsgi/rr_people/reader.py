@@ -72,7 +72,7 @@ class CommentSearcher(RedditHandler):
         """
         super(CommentSearcher, self).__init__(user_agent)
         self.db = db
-        self.comment_queue = ProductionQueue()
+        self.comment_queue = ProductionQueue(name="comment searcher")
         self.subs = {}
 
         self.add_authors = add_authors
@@ -92,11 +92,11 @@ class CommentSearcher(RedditHandler):
         end = time.time()
         sleep_time = random.randint(DEFAULT_SLEEP_TIME_AFTER_GENERATE_DATA / 5,
                                     DEFAULT_SLEEP_TIME_AFTER_GENERATE_DATA)
-        log.info(
-                "Was get all comments which found for [%s] at %s seconds... Will trying next after %s" % (
-                    sub, end - start, sleep_time))
         self.comment_queue.set_comment_founder_state(sub, S_SLEEP, ex=sleep_time + 1)
         if sleep:
+            log.info(
+                "Was get all comments which found for [%s] at %s seconds... Will trying next after %s" % (
+                    sub, end - start, sleep_time))
             time.sleep(sleep_time)
 
     def start_find_comments(self, sub):
@@ -123,9 +123,9 @@ class CommentSearcher(RedditHandler):
                     log.info("will forced start found comments for [%s]"%(nc_sub))
                     self.comment_retrieve_iteration(nc_sub, sleep=False)
 
-
-
-        Process(name="comment supplier", target=f).start()
+        process = Process(name="comment supplier", target=f)
+        process.daemon = True
+        process.start()
 
     def find_comment(self, at_subreddit,
                      add_authors=False):  # todo вынести загрузку всех постов в отдельную хуйню чтоб не делать это много раз
@@ -213,7 +213,5 @@ if __name__ == '__main__':
     db = HumanStorage()
     cs = CommentSearcher(db)
     time.sleep(5)
-    queue.need_comment("test1")
-    queue.need_comment("test2")
-    queue.need_comment("test3")
-    queue.need_comment("test4")
+    queue.need_comment("videos")
+

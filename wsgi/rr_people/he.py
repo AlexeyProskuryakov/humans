@@ -457,7 +457,7 @@ class Kapellmeister(Process):
         self.human_name = name
         self.ae = ae
         self.human = Consumer(login=name)
-        self.queue = ProductionQueue()
+        self.queue = ProductionQueue(name="kplmtr of [%s]" % name)
 
         self.lock = Lock()
         log.info("Human kapellmeister inited.")
@@ -518,8 +518,9 @@ class Kapellmeister(Process):
                         log.info("will comment [%s] [%s]" % (pfn, ct))
                         self.human.do_comment_post(pfn, sub_name, ct)
                     else:
-                        #send signal for start comment search
-                        pass
+                        log.info("will send need comment for sub [%s]" % sub_name)
+                        self.queue.need_comment(sub_name)
+
                 else:
                     log.info("will live random can not comment")
                     self.human.live_random(max_actions=random.randint(10, 20))
