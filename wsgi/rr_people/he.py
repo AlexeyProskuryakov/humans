@@ -24,6 +24,7 @@ from wsgi.rr_people import USER_AGENTS, \
 from wsgi.rr_people.ae import ActionGenerator, time_hash
 from wsgi.rr_people.posting.posts import PostsStorage, PS_POSTED
 from wsgi.rr_people.queue import ProductionQueue
+from wsgi.rr_people.reader import CommentsStorage
 
 log = logging.getLogger("he")
 
@@ -48,13 +49,19 @@ def net_tryings(fn):
 
 @net_tryings
 def check_any_login(login):
-    res = requests.get(
-            "http://www.reddit.com/user/%s/about.json" % login,
-            headers={"origin": "http://www.reddit.com",
-                     "User-Agent": random.choice(USER_AGENTS)})
-    if res.status_code != 200:
+    statuses = set()
+    errors = set()
+    for i in range(3):
+        res = requests.get(
+                "http://www.reddit.com/user/%s/about.json" % login,
+                headers={"origin": "http://www.reddit.com",
+                         "User-Agent": random.choice(USER_AGENTS)})
+        time.sleep(random.randint(1,5))
+        statuses.add(res.status_code)
+        errors.add(res.json().get("error"))
+    if 200 not in statuses:
         return False
-    if res.json().get("error", None):
+    if len(errors) != 1 and None not in errors:
         return False
     return True
 
@@ -119,6 +126,7 @@ class Consumer(RedditHandler):
     def __init__(self, login):
         super(Consumer, self).__init__()
         self.db = HumanStorage(name="consumer %s" % login)
+        self.comment_storage = CommentsStorage(name="consumer %s")
         state = self.db.get_human_config(login)
         login_credentials = self.db.get_human_access_credentials(login)
         if not login_credentials:
@@ -390,11 +398,11 @@ class Consumer(RedditHandler):
 
                 try:
                     text_hash = hash(normalize(comment_text))
-                    if self.db.can_comment_post(self.user_name,
+                    if self.comment_storage.can_comment_post(self.user_name,
                                                 post_fullname=_post.fullname,
                                                 hash=text_hash):
                         response = _post.add_comment(comment_text)
-                        self.db.set_post_commented(_post.fullname,
+                        self.comment_storage.set_post_commented(_post.fullname,
                                                    by=self.user_name,
                                                    hash=text_hash)
                         self.register_step(A_COMMENT, info={"fullname": post_fullname, "sub": subreddit_name})
@@ -594,9 +602,12 @@ class HumanOrchestra():
 
 if __name__ == '__main__':
     name = "Shlak2k15"
-    db = HumanStorage()
-    c = Consumer(db, name)
-    c.post("test", "http://praw.readthedocs.org/en/stable/", "PRAW docs...")
+    # db = HumanStorage()
+    c = Consumer(name)
+    # c.post("test", "http://praw.readthedocs.org/en/stable/", "PRAW docs...")
+    check_any_login(name)
+    kplmstr = Kapellmeister(name, None)
+    kplmstr.set_state(S_SUSPEND)
     #
     # from wsgi.rr_people.reader import CommentSearcher
     #

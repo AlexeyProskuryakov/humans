@@ -25,7 +25,7 @@
             </h1>
 
 
-            <button type="submit" class="form-control form-inline btn btn-lg btn-primary" onclick="start_find('{{sub}}')">
+            <button type="submit" class="form-control form-inline btn btn-lg btn-primary" onclick="start_find_comments('{{sub}}')">
                 Начать поиск в
                 {{sub}}?
             </button>
@@ -37,7 +37,7 @@
             {%if s != sub %}
             <div>
                  <h4>
-                     <button  class="btn btn-sm btn-default" onclick="start_find('{{s}}')"> Начать поиск в {{s}} </button>
+                     <button  class="btn btn-sm btn-default" onclick="start_find_comments('{{s}}')"> Начать поиск в {{s}} </button>
                      <small id="{{s}}_st">({{st}})</small>
                  </h4>
 

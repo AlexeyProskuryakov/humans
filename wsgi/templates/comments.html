@@ -8,11 +8,14 @@
             <h3>Состояние поиска комментариев: </h3>
             {% for s, st in subs.items() %}
             <div>
-                <a href="{{url_for('comment_search_info', sub=s)}}">
+
                     <h3>{{s}}:
-                        <small>{{st}}</small>
+                        <a href="{{url_for('comment_search_info', sub=s)}}">
+                        <small id="{{s}}-st">{{st}}</small>
+                            </a>
+                        <button type="button" class="btn btn-default" onclick="start_find_comments('{{s}}')">Начать поиск комментариев</button>
                     </h3>
-                </a>
+
             </div>
             {% endfor %}
 
@@ -29,11 +32,11 @@
                     <div class="accordion-group">
                         <div class="accordion-heading">
                             <a class="accordion-toggle" data-toggle="collapse" data-parent="#info-accordion"
-                               href="#statistic">
+                               href="#{{s}}">
                                 <h3>В очереди: {{s}}</h3>
                             </a>
                         </div>
-                        <div class="accordion-body collapse">
+                        <div id="{{s}}" class="accordion-body collapse">
                             <div class="accordion-inner">
                                 <table class="table table-stripped table-hover table-condensed">
                                     <thead>

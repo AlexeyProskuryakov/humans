@@ -55,7 +55,9 @@ db_name = "reddit_people"
 ae_mongo_uri = "mongodb://aliper:sederfes100500@ds025449.mlab.com:25449/ae"
 ae_db_name = "ae"
 
-
+comments_mongo_uri = "mongodb://milena:sederfes100500@ds015760.mlab.com:15760/humans_comments"
+comments_db_name = "humans_comments"
+expire_low_copies_posts = 3600 * 24 * 7
 
 c_queue_redis_addres = "pub-redis-11997.us-east-1-3.7.ec2.redislabs.com"
 c_queue_redis_port = 11997
@@ -97,7 +99,6 @@ min_consuming = 60
 min_voting = 65
 max_voting = 85
 
-
 step_time_after_trying = 60
 tryings_count = 10
 
@@ -108,7 +109,6 @@ want_coefficient_max = 100
 # imgur properties
 ImgrClientID = 'd7e9f9350ebe5a8'
 ImgrClientSecret = '945c124e48fd9ca208788c70028d7e8d8c7dc7c1'
-
 
 test_mode = os.environ.get("RR_TEST", "false").strip().lower() in ("true", "1", "yes")
 print "TEST? ", test_mode

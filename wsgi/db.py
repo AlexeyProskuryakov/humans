@@ -21,7 +21,7 @@ class DBHandler(object):
 
 
 class HumanStorage(DBHandler):
-    def __init__(self, delete_posts=False, expire_low_copies_posts=TIME_TO_WAIT_NEW_COPIES, name="?"):
+    def __init__(self, name="?"):
         super(HumanStorage, self).__init__(name=name)
         db = self.db
         self.users = db.get_collection("users")
@@ -46,31 +46,11 @@ class HumanStorage(DBHandler):
             self.human_config = db.create_collection("human_config")
             self.human_config.create_index([("user", 1)], unique=True)
 
-        self.human_posts = db.get_collection("commented_posts")
-        if not self.human_posts or delete_posts:
-            db.drop_collection("human_posts")
-
-            self.human_posts = db.create_collection(
-                    "human_posts",
-                    capped=True,
-                    size=1024 * 1024 * 256,
-            )
-            self.human_posts.drop_indexes()
-
-            self.human_posts.create_index([("fullname", 1)], unique=True)
-            self.human_posts.create_index([("commented", 1)], sparse=True)
-            self.human_posts.create_index([("ready_for_comment", 1)], sparse=True)
-            self.human_posts.create_index([("ready_for_post", 1)], sparse=True)
-
-            self.human_log.create_index("low_copies", expireAfterSeconds=expire_low_copies_posts, sparse=True)
-
-            self.human_posts.create_index([("text_hash", 1)], sparse=True)
-
         self.humans_states = db.get_collection("human_states")
         if not self.humans_states:
             self.humans_states = db.create_collection("human_states")
-            self.human_posts.create_index([("name", 1)])
-            self.human_posts.create_index([("state", 1)])
+            self.humans_states.create_index([("name", 1)])
+            self.humans_states.create_index([("state", 1)])
 
     def update_human_access_credentials_info(self, user, info):
         if isinstance(info.get("scope"), set):
@@ -116,6 +96,13 @@ class HumanStorage(DBHandler):
         if found:
             return found.get("subs", [])
         return []
+
+    def get_all_humans_subs(self):
+        cfg = self.human_config.find({})
+        subs = []
+        for el in cfg:
+            subs.extend(el.get("subs", []))
+        return list(set(subs))
 
     def remove_sub_for_humans(self, sub_name):
         result = self.human_config.update_many({"subs": sub_name}, {"$pull": {"subs": sub_name}})
@@ -177,76 +164,6 @@ class HumanStorage(DBHandler):
     def get_humans_with_state(self, state):
         return self.humans_states.find({"state": state})
 
-    ######POSTS###########################
-    def set_post_commented(self, post_fullname, by, hash):
-        found = self.human_posts.find_one({"fullname": post_fullname, "commented": {"$exists": False}})
-        if not found:
-            to_add = {"fullname": post_fullname, "commented": True, "time": time.time(), "text_hash": hash, "by": by}
-            self.human_posts.insert_one(to_add)
-        else:
-            to_set = {"commented": True, "text_hash": hash, "by": by, "time": time.time(),
-                      "low_copies": datetime.utcnow()}
-            self.human_posts.update_one({"fullname": post_fullname}, {"$set": to_set})
-
-    def can_comment_post(self, who, post_fullname, hash):
-        q = {"by": who, "commented": True, "$or": [{"fullname": post_fullname}, {"text_hash": hash}]}
-        found = self.human_posts.find_one(q)
-        return found is None
-
-    def set_post_ready_for_comment(self, post_fullname):
-        found = self.human_posts.find_one({"fullname": post_fullname})
-        if found and found.get("commented"):
-            return
-        elif found:
-            return self.human_posts.update_one(found,
-                                               {"$set": {"ready_for_comment": True},
-                                                "$unset": {"low_copies": datetime.utcnow()}})
-        else:
-            return self.human_posts.insert_one({"fullname": post_fullname, "ready_for_comment": True})
-
-    def get_posts_ready_for_comment(self):
-        return list(self.human_posts.find({"ready_for_comment": True, "commented": {"$exists": False}}))
-
-    def get_post(self, post_fullname):
-        found = self.human_posts.find_one({"fullname": post_fullname})
-        return found
-
-    def is_can_see_post(self, fullname):
-        """
-        Можем посмотреть пост только если у него было мало копий давно.
-        Или же поста нет в бд.
-        :param fullname:
-        :return:
-        """
-        found = self.human_posts.find_one({"fullname": fullname})
-        if found:
-            if (datetime.utcnow() - found.get("low_copies",
-                                              datetime.utcnow())).total_seconds() > TIME_TO_WAIT_NEW_COPIES:
-                self.human_posts.remove(found)
-                return True
-            return False
-        return True
-
-    def is_post_commented(self, post_fullname):
-        found = self.human_posts.find_one({"fullname": post_fullname})
-        if found:
-            return found.get("commented") or False
-        return False
-
-    def get_posts_commented(self, by=None):
-        q = {"commented": True}
-        if by:
-            q["by"] = by
-        return list(self.human_posts.find(q))
-
-    def set_post_low_copies(self, post_fullname):
-        found = self.human_posts.find_one({"fullname": post_fullname})
-        if not found:
-            self.human_posts.insert_one(
-                    {"fullname": post_fullname, "low_copies": datetime.utcnow(), "time": time.time()})
-        else:
-            self.human_posts.update_one({"fullname": post_fullname},
-                                        {'$set': {"low_copies": datetime.utcnow(), "time": time.time()}})
 
     #################HUMAN LOG
     def save_log_human_row(self, human_name, action_name, info):

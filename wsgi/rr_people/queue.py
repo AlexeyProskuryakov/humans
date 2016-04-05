@@ -74,7 +74,7 @@ class ProductionQueue():
         pipe.execute()
 
     def get_comment_founder_state(self, sbrdt):
-        return self.redis.get(sbrdt)
+        return self.redis.get(STATE_CF(sbrdt))
 
     def get_comment_founders_states(self):
         result = self.redis.hgetall(HASH_STATES_CF)

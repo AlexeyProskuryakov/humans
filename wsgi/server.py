@@ -2,13 +2,13 @@
 import calendar
 import json
 import os
+import re
 import time
 from collections import defaultdict
 from datetime import datetime, timedelta
 from uuid import uuid4
 
 import praw
-import re
 from flask import Flask, logging, request, render_template, session, url_for, g, flash
 from flask.json import jsonify
 from flask_debugtoolbar import DebugToolbarExtension
@@ -23,8 +23,8 @@ from wsgi.rr_people.he import HumanConfiguration, HumanOrchestra
 from wsgi.rr_people.posting import POST_GENERATOR_OBJECTS
 from wsgi.rr_people.posting.copy_gen import SubredditsRelationsStore
 from wsgi.rr_people.posting.posts import PS_BAD, PS_AT_QUEUE
-from wsgi.rr_people.posting.posts_generator import PostsGeneratorsStorage, PostsGenerator
-from wsgi.rr_people.reader import CommentSearcher
+from wsgi.rr_people.posting.posts_generator import PostsGenerator
+from wsgi.rr_people.reader import CommentSearcher, CommentsStorage
 from wsgi.wake_up import WakeUp, WakeUpStorage
 
 __author__ = '4ikist'
@@ -93,6 +93,7 @@ login_manager.init_app(app)
 login_manager.login_view = 'login'
 
 db = HumanStorage(name="hs server")
+comment_storage = CommentsStorage(name="cs server")
 
 
 class User(object):
@@ -208,6 +209,7 @@ def login():
 def logout():
     logout_user()
     return redirect(url_for('login'))
+
 
 @app.route("/")
 @login_required
@@ -346,7 +348,7 @@ def human_config(name):
     return jsonify(**{"ok": False})
 
 
-comment_searcher = CommentSearcher(db)
+comment_searcher = CommentSearcher()
 posts_generator = PostsGenerator()
 
 
@@ -355,7 +357,7 @@ posts_generator = PostsGenerator()
 def start_comment_search(sub):
     comment_searcher.start_find_comments(sub)
     while 1:
-        state = comment_searcher.comment_queue.get_founder_state(sub)
+        state = comment_searcher.comment_queue.get_comment_founder_state(sub)
         if state and "work" in state:
             return jsonify({"state": state})
         time.sleep(1)
@@ -364,11 +366,13 @@ def start_comment_search(sub):
 @app.route("/comments")
 @login_required
 def comments():
-    subs = comment_searcher.comment_queue.get_comment_founders_states()
+    subs_names = db.get_all_humans_subs()
     qc_s = {}
-    for sub in subs.keys():
+    subs = {}
+    for sub in subs_names:
         queued_comments = comment_searcher.comment_queue.show_all_comments(sub)
         qc_s[sub] = queued_comments
+        subs[sub] = comment_searcher.comment_queue.get_comment_founder_state(sub)
 
     return render_template("comments.html", **{"subs": subs, "qc_s": qc_s})
 
@@ -389,7 +393,7 @@ def posts():
 @app.route("/comment_search/info/<sub>")
 @login_required
 def comment_search_info(sub):
-    posts = db.get_posts_ready_for_comment()
+    posts = comment_storage.get_posts_ready_for_comment()
     comments = comment_searcher.comment_queue.show_all_comments(sub)
     if comments:
         for i, post in enumerate(posts):
@@ -398,13 +402,9 @@ def comment_search_info(sub):
                 post['text'] = comments.get(post.get("fullname"), "")
             posts[i] = post
 
-    posts_commented = db.get_posts_commented()
-    subs_ = db.human_config.aggregate([{"$group": {"_id": "$subs"}}])
-    subs = []
-    for sbs in subs_:
-        for sb in sbs["_id"]:
-            if sub != sb:
-                subs.append(sb)
+    posts_commented = comment_storage.get_posts_commented()
+    subs = db.get_all_humans_subs()
+
     subs_states = comment_searcher.comment_queue.get_comment_founders_states()
     state = comment_searcher.comment_queue.get_comment_founder_state(sub)
 
@@ -483,11 +483,8 @@ def gens_manage():
 
         flash(u"Генераторъ постановленъ!")
     gens = POST_GENERATOR_OBJECTS.keys()
-    cfg = db.human_config.find({})
-    subs = []
-    for el in cfg:
-        subs.extend(el.get("subs", []))
-    return render_template("generators.html", **{"subs": list(set(subs)), "gens": gens})
+    subs = db.get_all_humans_subs()
+    return render_template("generators.html", **{"subs": subs, "gens": gens})
 
 
 @app.route("/generators/sub_info", methods=["POST"])
@@ -549,6 +546,7 @@ def del_sub():
         return jsonify(**{"ok": True})
 
     return jsonify(**{"ok": False, "error": "sub is not exists"})
+
 
 @app.route("/generators/prepare_for_posting", methods=["POST"])
 @login_required
