@@ -255,6 +255,8 @@ class CommentSearcher(RedditHandler):
                 loaded_count = float(state.get(LOADED_COUNT))
 
                 _limit = ((time.time() - end) * loaded_count) / ((end - start) or 1.0)
+                if _limit < 1:
+                    _limit = 25
             else:
                 _limit = int(state.get(LOADED_COUNT, DEFAULT_LIMIT)) - int(state.get(PROCESSED_COUNT, 0))
 

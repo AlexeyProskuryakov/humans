@@ -93,7 +93,6 @@ login_manager.init_app(app)
 login_manager.login_view = 'login'
 
 db = HumanStorage(name="hs server")
-comment_storage = CommentsStorage(name="cs server")
 
 
 class User(object):
@@ -348,34 +347,7 @@ def human_config(name):
     return jsonify(**{"ok": False})
 
 
-comment_searcher = CommentSearcher()
 posts_generator = PostsGenerator()
-
-
-@app.route("/comment_search/start/<sub>", methods=["POST"])
-@login_required
-def start_comment_search(sub):
-    comment_searcher.start_find_comments(sub)
-    while 1:
-        state = comment_searcher.comment_queue.get_comment_founder_state(sub)
-        if state and "work" in state:
-            return jsonify({"state": state})
-        time.sleep(1)
-
-
-@app.route("/comments")
-@login_required
-def comments():
-    subs_names = db.get_all_humans_subs()
-    qc_s = {}
-    subs = {}
-    for sub in subs_names:
-        queued_comments = comment_searcher.comment_queue.show_all_comments(sub)
-        qc_s[sub] = queued_comments
-        subs[sub] = comment_searcher.comment_queue.get_comment_founder_state(sub)
-
-    return render_template("comments.html", **{"subs": subs, "qc_s": qc_s})
-
 
 @app.route("/posts")
 @login_required
@@ -388,33 +360,6 @@ def posts():
         qc_s[sub] = queued_post
 
     return render_template("posts.html", **{"subs": generators_for_subs, "qc_s": qc_s})
-
-
-@app.route("/comment_search/info/<sub>")
-@login_required
-def comment_search_info(sub):
-    posts = comment_storage.get_posts_ready_for_comment()
-    comments = comment_searcher.comment_queue.show_all_comments(sub)
-    if comments:
-        for i, post in enumerate(posts):
-            post['is_in_queue'] = post.get("fullname") in comments
-            if post["is_in_queue"]:
-                post['text'] = comments.get(post.get("fullname"), "")
-            posts[i] = post
-
-    posts_commented = comment_storage.get_posts_commented()
-    subs = db.get_all_humans_subs()
-
-    subs_states = comment_searcher.comment_queue.get_comment_founders_states()
-    state = comment_searcher.comment_queue.get_comment_founder_state(sub)
-
-    result = {"posts_found_comment_text": posts,
-              "posts_commented": posts_commented,
-              "sub": sub,
-              "a_subs": subs,
-              "subs_states": subs_states,
-              "state": state}
-    return render_template("comment_search_info.html", **result)
 
 
 @app.route("/actions")
