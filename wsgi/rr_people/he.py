@@ -126,7 +126,7 @@ class Consumer(RedditHandler):
     def __init__(self, login):
         super(Consumer, self).__init__()
         self.db = HumanStorage(name="consumer %s" % login)
-        self.comment_storage = CommentsStorage(name="consumer %s")
+        self.comment_storage = CommentsStorage(name="consumer %s" % login)
         state = self.db.get_human_config(login)
         login_credentials = self.db.get_human_access_credentials(login)
         if not login_credentials:

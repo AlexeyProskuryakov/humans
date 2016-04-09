@@ -3,7 +3,6 @@ import calendar
 import json
 import os
 import re
-import time
 from collections import defaultdict
 from datetime import datetime, timedelta
 from uuid import uuid4
@@ -24,7 +23,6 @@ from wsgi.rr_people.posting import POST_GENERATOR_OBJECTS
 from wsgi.rr_people.posting.copy_gen import SubredditsRelationsStore
 from wsgi.rr_people.posting.posts import PS_BAD, PS_AT_QUEUE
 from wsgi.rr_people.posting.posts_generator import PostsGenerator
-from wsgi.rr_people.reader import CommentSearcher, CommentsStorage
 from wsgi.wake_up import WakeUp, WakeUpStorage
 
 __author__ = '4ikist'
