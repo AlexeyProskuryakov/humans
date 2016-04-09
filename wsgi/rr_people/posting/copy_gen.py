@@ -116,10 +116,9 @@ class CopyPostGenerator(RedditHandler, Generator):
             log.exception(e)
 
     def get_title_from_comments(self, post, title):
-        comments = self.retrieve_comments(post.comments, post.fullname)
         title_tokens = normalize(title, lambda x: x)
 
-        for comment in comments:
+        for comment in self.comments_sequence(post.comments):
             if not isinstance(comment, MoreComments) and comment.created_utc + 3600 * 7 < post.created_utc:
                 comment_tokens = normalize(comment.body, lambda x: x)
                 if tokens_equals(title_tokens, comment_tokens):

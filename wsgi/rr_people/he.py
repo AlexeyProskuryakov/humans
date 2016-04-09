@@ -56,7 +56,7 @@ def check_any_login(login):
                 "http://www.reddit.com/user/%s/about.json" % login,
                 headers={"origin": "http://www.reddit.com",
                          "User-Agent": random.choice(USER_AGENTS)})
-        time.sleep(random.randint(1,5))
+        time.sleep(random.randint(1, 5))
         statuses.add(res.status_code)
         errors.add(res.json().get("error"))
     if 200 not in statuses:
@@ -327,11 +327,8 @@ class Consumer(RedditHandler):
 
                 if self._is_want_to(self.configuration.comment_url):  # go to url in comment
                     if isinstance(comment, MoreComments):
-                        comments = self.retrieve_comments(comment.comments(), comment.fullname, [])
-                        if comments:
-                            comment = random.choice(comments)
-                        else:
-                            continue
+                        continue
+
                     urls = re_url.findall(comment.body)
                     for url in urls:
                         try:
@@ -399,12 +396,12 @@ class Consumer(RedditHandler):
                 try:
                     text_hash = hash(normalize(comment_text))
                     if self.comment_storage.can_comment_post(self.user_name,
-                                                post_fullname=_post.fullname,
-                                                hash=text_hash):
+                                                             post_fullname=_post.fullname,
+                                                             hash=text_hash):
                         response = _post.add_comment(comment_text)
                         self.comment_storage.set_post_commented(_post.fullname,
-                                                   by=self.user_name,
-                                                   hash=text_hash)
+                                                                by=self.user_name,
+                                                                hash=text_hash)
                         self.register_step(A_COMMENT, info={"fullname": post_fullname, "sub": subreddit_name})
                 except Exception as e:
                     log.error(e)

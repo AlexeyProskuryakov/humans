@@ -1,4 +1,5 @@
 # coding=utf-8
+import json
 import logging
 import random
 import time
@@ -6,14 +7,16 @@ from datetime import datetime
 from multiprocessing import Process
 
 import praw
+import redis
 from praw.objects import MoreComments
 
-from wsgi.db import HumanStorage, DBHandler
-from wsgi.properties import DEFAULT_SLEEP_TIME_AFTER_GENERATE_DATA, min_donor_num_comments, \
-    min_comment_create_time_difference, min_copy_count, \
+from wsgi.db import DBHandler
+from wsgi.properties import DEFAULT_SLEEP_TIME_AFTER_GENERATE_DATA, min_copy_count, \
     shift_copy_comments_part, min_donor_comment_ups, max_donor_comment_ups, \
-    comments_mongo_uri, comments_db_name, expire_low_copies_posts, TIME_TO_WAIT_NEW_COPIES
-from wsgi.rr_people import RedditHandler, cmp_by_created_utc
+    comments_mongo_uri, comments_db_name, expire_low_copies_posts, TIME_TO_WAIT_NEW_COPIES, queue_redis_address, \
+    queue_redis_port, queue_redis_password, DEFAULT_LIMIT
+from wsgi.rr_people import RedditHandler, cmp_by_created_utc, post_to_dict, \
+    cmp_by_comments_count
 from wsgi.rr_people import re_url, normalize, S_WORK, S_SLEEP, re_crying_chars
 from wsgi.rr_people.queue import ProductionQueue
 
@@ -31,35 +34,86 @@ def is_good_text(text):
            "Edit" not in text
 
 
-__doc__ = """
-    По сути марковская цепь: где узлы есть временные точки, а связи - события произошедшие между этими точками, имеющие вес равный
-    у скольких авторов эти события произошли. Ввсегда есть событие - ниего не делать.
-    Определяет что делать чуваку в текущий момент: потреблять, комментировать, постить, ничего не делать.
-    Для создания требуется мена авторов, по которым будет строиться модель.
+PERSIST_STATE = lambda x: "load_state_%s" % x
+
+START_TIME = "t_start"
+END_TIME = "t_end"
+LOADED_COUNT = "loaded_count"
+
+PREV_START_TIME = "p_t_start"
+PREV_END_TIME = "p_t_end"
+PREV_LOADED_COUNT = "p_loaded_count"
+
+IS_ENDED = "ended"
+IS_STARTED = "started"
+PROCESSED_COUNT = "processed_count"
+CURRENT = "current"
 
 
-    Строится в два этапа.
-    Первый, выделение авторов поведение которых будет номиналом:
-    1) При извлечении комментариев, выделяем авторов коментариев и авторов постов.
-    Наполняем информацию об авторах таким образом: <час>;<день недели>:<автор>:<тип действия><количество>.
-    2) В этой таблице делаем аггрегацию: автор:количество действий. Выбираем средне постящих или много постящих.
-    3) В этой же таблице делаем аггрегацию по <час>, <день недели> и находим последовательности бездействия авторов (цепочки отсутствия).
-    Это будет список [<час>, <день недели>] которые идут подряд и в которых нету какой-либо активности выбранных на 2 этапе авторов.
-    Берем те списки которые длины от 2 до 8 часов.
-    Метрикой класстеризации будет пересечение этих списков. Класстеризуем с использованием метрикии и получаем класстеры из авторов,
-    сидящих примерно в одно и то же время.
+class CommentFounderStateStorage(object):
+    def __init__(self, name="?", clear=False):
+        self.redis = redis.StrictRedis(host=queue_redis_address,
+                                       port=queue_redis_port,
+                                       password=queue_redis_password,
+                                       db=0
+                                       )
+        if clear:
+            self.redis.flushdb()
 
-    Второй этап получение инфорации об этих авторах.
-    1) Строим модель на основе комментариев данных реддитом по авторам извлеченным на первом этапе. GET /user/username/comments
-    То есть сохраняем каждый комментрарий так: <минута: час: день недели> : автор : количество. И делаем аггрегацию:
-    <минута: час: день недели> : количество комментариев: количество авторов сделавших комментарий.
-    Также можно и с воутами сделать.
-    2) Модель отвечает что делать в определенную минуту часа дня недели. Высчитывая веса сколько авторов сделали комментарии а сколько
-      в этот промежуток времени отсутсвовали.
-      Отсутствие считаем тогда когда время попадает в цепочку отсутствия.
-    3) В модель можно добавлять или удалять авторов.
+        log.info("Comment founder state storage for %s inited!" % name)
 
-    """
+    def persist_load_state(self, sub, start, stop, count):
+        p = self.redis.pipeline()
+
+        key = PERSIST_STATE(sub)
+        persisted_state = self.redis.hgetall(key)
+        if persisted_state:
+            p.hset(key, PREV_START_TIME, persisted_state.get(START_TIME))
+            p.hset(key, PREV_END_TIME, persisted_state.get(END_TIME))
+            p.hset(key, PREV_LOADED_COUNT, persisted_state.get(LOADED_COUNT))
+            p.hset(key, PROCESSED_COUNT, 0)
+            p.hset(key, CURRENT, json.dumps({}))
+
+        p.hset(key, START_TIME, start)
+        p.hset(key, END_TIME, stop)
+        p.hset(key, LOADED_COUNT, count)
+        p.execute()
+
+    def set_ended(self, sub):
+        p = self.redis.pipeline()
+        p.hset(PERSIST_STATE(sub), IS_ENDED, True)
+        p.hset(PERSIST_STATE(sub), IS_STARTED, False)
+        p.execute()
+
+    def set_started(self, sub):
+        p = self.redis.pipeline()
+        p.hset(PERSIST_STATE(sub), IS_ENDED, False)
+        p.hset(PERSIST_STATE(sub), IS_STARTED, True)
+        p.execute()
+
+    def is_ended(self, sub):
+        return self.redis.hget(PERSIST_STATE(sub), IS_ENDED)
+
+    def is_started(self, sub):
+        return self.redis.hget(PERSIST_STATE(sub), IS_STARTED)
+
+    def set_current(self, sub, current):
+        p = self.redis.pipeline()
+
+        p.hset(PERSIST_STATE(sub), CURRENT, json.dumps(current))
+        p.hincrby(PERSIST_STATE(sub), PROCESSED_COUNT, 1)
+        p.execute()
+
+    def get_current(self, sub):
+        data = self.redis.hget(PERSIST_STATE(sub), CURRENT)
+        if data:
+            return json.loads(data)
+
+    def get_proc_count(self, sub):
+        return self.redis.hget(PERSIST_STATE(sub), PROCESSED_COUNT)
+
+    def get_state(self, sub):
+        return self.redis.hgetall(PERSIST_STATE(sub))
 
 
 class CommentsStorage(DBHandler):
@@ -77,9 +131,6 @@ class CommentsStorage(DBHandler):
             self.comments.create_index([("fullname", 1)], unique=True)
             self.comments.create_index([("commented", 1)], sparse=True)
             self.comments.create_index([("ready_for_comment", 1)], sparse=True)
-            self.comments.create_index([("ready_for_post", 1)], sparse=True)
-
-            self.comments.create_index("low_copies", expireAfterSeconds=expire_low_copies_posts, sparse=True)
             self.comments.create_index([("text_hash", 1)], sparse=True)
 
     def set_post_commented(self, post_fullname, by, hash):
@@ -115,46 +166,15 @@ class CommentsStorage(DBHandler):
         found = self.comments.find_one({"fullname": post_fullname})
         return found
 
-    def is_can_see_post(self, fullname):
-        """
-        Можем посмотреть пост только если у него было мало копий давно.
-        Или же поста нет в бд.
-        :param fullname:
-        :return:
-        """
-        found = self.comments.find_one({"fullname": fullname})
-        if found:
-            if (datetime.utcnow() - found.get("low_copies",
-                                              datetime.utcnow())).total_seconds() > TIME_TO_WAIT_NEW_COPIES:
-                self.comments.remove(found)
-                return True
-            return False
-        return True
-
-    def is_post_commented(self, post_fullname):
-        found = self.comments.find_one({"fullname": post_fullname})
-        if found:
-            return found.get("commented") or False
-        return False
-
     def get_posts_commented(self, by=None):
         q = {"commented": True}
         if by:
             q["by"] = by
         return list(self.comments.find(q))
 
-    def set_post_low_copies(self, post_fullname):
-        found = self.comments.find_one({"fullname": post_fullname})
-        if not found:
-            self.comments.insert_one(
-                    {"fullname": post_fullname, "low_copies": datetime.utcnow(), "time": time.time()})
-        else:
-            self.comments.update_one({"fullname": post_fullname},
-                                     {'$set': {"low_copies": datetime.utcnow(), "time": time.time()}})
-
 
 class CommentSearcher(RedditHandler):
-    def __init__(self, user_agent=None, add_authors=False):
+    def __init__(self, user_agent=None, add_authors=False, start_worked=True):
         """
         :param user_agent: for reddit non auth and non oauth client
         :param lcp: low copies posts if persisted
@@ -171,12 +191,14 @@ class CommentSearcher(RedditHandler):
             from wsgi.rr_people.ae import ActionGeneratorDataFormer
             self.agdf = ActionGeneratorDataFormer()
 
-        for sub, state in self.comment_queue.get_comment_founders_states().iteritems():
-            if S_WORK in state:
-                self.start_find_comments(sub)
-                time.sleep(60*5)
-
+        self.state_storage = CommentFounderStateStorage()
         self.start_supply_comments()
+
+        if start_worked:
+            for sub, state in self.comment_queue.get_comment_founders_states().iteritems():
+                if S_WORK in state:
+                    self.start_find_comments(sub)
+                    time.sleep(60 * 5)
         log.info("Read human inited!")
 
     def comment_retrieve_iteration(self, sub, sleep=True):
@@ -223,62 +245,93 @@ class CommentSearcher(RedditHandler):
         process.daemon = True
         process.start()
 
-    def find_comment(self, at_subreddit,
-                     add_authors=False):  # todo вынести загрузку всех постов в отдельную хуйню чтоб не делать это много раз
-        subreddit = at_subreddit
-        all_posts = self.get_hot_and_new(subreddit, sort=cmp_by_created_utc)
-        self.comment_queue.set_comment_founder_state(subreddit, "%s found %s" % (S_WORK, len(all_posts)),
-                                                     ex=len(all_posts) * 2)
-        for post in all_posts:
-            if self.db.is_can_see_post(post.fullname):
-                try:
-                    copies = self.get_post_copies(post)
-                    copies = filter(
-                            lambda copy: _so_long(copy.created_utc, min_comment_create_time_difference) and \
-                                         copy.num_comments > min_donor_num_comments,
-                            copies)
-                    if len(copies) >= min_copy_count:
-                        copies.sort(cmp=cmp_by_created_utc)
-                        comment = None
-                        for copy in copies:
-                            if copy.subreddit != post.subreddit and copy.fullname != post.fullname:
-                                comment = self._retrieve_interested_comment(copy, post)
-                                if comment:
-                                    log.info("Find comment: [%s] in post: [%s] at subreddit: [%s]" % (
-                                        comment, post.fullname, subreddit))
-                                    break
+    def get_posts(self, sub):
+        state = self.state_storage.get_state(sub)
+        limit = DEFAULT_LIMIT
+        if state:
+            if state.get(IS_ENDED) == "True":
+                end = float(state.get(END_TIME))
+                start = float(state.get(START_TIME))
+                loaded_count = float(state.get(LOADED_COUNT))
 
-                        if comment and self.db.set_post_ready_for_comment(post.fullname):
-                            yield post.fullname, comment.body
-                    else:
-                        self.db.set_post_low_copies(post.fullname)
-                except Exception as e:
-                    log.exception(e)
+                _limit = ((time.time() - end) * loaded_count) / ((end - start) or 1.0)
+            else:
+                _limit = int(state.get(LOADED_COUNT, DEFAULT_LIMIT)) - int(state.get(PROCESSED_COUNT, 0))
+
+            limit = _limit if _limit < DEFAULT_LIMIT else DEFAULT_LIMIT
+
+        posts = self.get_hot_and_new(sub, sort=cmp_by_created_utc, limit=limit)
+        current = self.state_storage.get_current(sub)
+        if current:
+            posts = filter(lambda x: x.created_utc > current.get("created_utc"), posts)
+        self.state_storage.persist_load_state(sub, posts[0].created_utc, posts[-1].created_utc, len(posts))
+        return posts
+
+    def get_acceptor(self, posts):
+        posts.sort(cmp_by_created_utc)
+        half_avg = float(reduce(lambda x, y: x + y.num_comments, posts, 0)) / (len(posts) * 2)
+        for post in posts:
+            if not post.archived and post.num_comments < half_avg:
+                log.info("found acceptor old: %s, comments: %s, between: \n%s" % (
+                    datetime.utcfromtimestamp(post.created_utc), post.num_comments, '\n'.join(
+                            ["[%s]\t%s" % (datetime.utcfromtimestamp(post.created_utc), post.num_comments) for post in
+                             posts])))
+                return post
+
+    def find_comment(self, sub, add_authors=False):
+        # todo вынести загрузку всех постов в отдельную хуйню чтоб не делать это много раз
+        log.info("Start finding comments to sub %s" % sub)
+        posts = self.get_posts(sub)
+        self.comment_queue.set_comment_founder_state(sub, "%s found %s" % (S_WORK, len(posts)), ex=len(posts) * 2)
+        self.state_storage.set_started(sub)
+
+        for post in posts:
+            self.state_storage.set_current(sub, post_to_dict(post))
+
+            try:
+                copies = self.get_post_copies(post)
+                if len(copies) >= min_copy_count:
+                    post = self.get_acceptor(copies)
+                    comment = None
+                    for copy in copies:
+                        if copy.subreddit != post.subreddit and copy.fullname != post.fullname:
+                            comment = self._retrieve_interested_comment(copy, post)
+                            if comment:
+                                log.info("Find comment: [%s] in post: [%s] at subreddit: [%s]" % (
+                                    comment, post.fullname, sub))
+                                break
+
+                    if comment and self.db.set_post_ready_for_comment(post.fullname):
+                        yield post.fullname, comment.body
+
+            except Exception as e:
+                log.exception(e)
 
             if add_authors or self.add_authors:
                 self.agdf.add_author_data(post.author.name)
 
+        self.state_storage.set_ended(sub)
+
     def get_post_copies(self, post):
         search_request = "url:\'%s\'" % post.url
-        copies = list(self.reddit.search(search_request))
+        copies = list(self.reddit.search(search_request)) + [post]
         return list(copies)
 
     def _retrieve_interested_comment(self, copy, post):
         # prepare comments from donor to selection
-        comments = self.retrieve_comments(copy.comments, copy.fullname)
-        after = len(comments) / shift_copy_comments_part
-        for i in range(after, len(comments)):
-            comment = comments[i]
+        after = copy.num_comments / shift_copy_comments_part
+        if not after:
+            return
+        if after > 34:
+            after = 34
+        for i, comment in enumerate(self.comments_sequence(copy.comments)):
+            if i < after:
+                continue
             if comment.ups >= min_donor_comment_ups and \
                             comment.ups <= max_donor_comment_ups and \
                             post.author != comment.author and \
                     self.check_comment_text(comment.body, post):
                 return comment
-
-    def _get_all_post_comments(self, post, filter_func=lambda x: x):
-        result = self.retrieve_comments(post.comments, post.fullname)
-        result = set(map(lambda x: x.body, result))
-        return result
 
     def check_comment_text(self, text, post):
         """
@@ -289,24 +342,26 @@ class CommentSearcher(RedditHandler):
         :return:
         """
         if is_good_text(text):
-            normalized_text = normalize(text)
-            tokens = set(normalized_text.split())
-            if (float(len(tokens)) / 100) * 20 >= len(re_crying_chars.findall(text)):
-                for comment in praw.helpers.flatten_tree(post.comments):
-                    if isinstance(comment, MoreComments):
-                        continue
-                    c_text = comment.body
-                    if is_good_text(c_text):
-                        pc_tokens = set(normalize(c_text).split())
-                        if len(tokens) == len(pc_tokens) and len(pc_tokens.intersection(tokens)) == len(pc_tokens):
-                            log.info("found similar text [%s] in post %s" % (tokens, post.fullname))
+            c_tokens = set(normalize(text, lambda x: x))
+            if (float(len(c_tokens)) / 100) * 20 >= len(re_crying_chars.findall(text)):
+                for p_comment in self.get_all_comments(post):
+                    p_text = p_comment.body
+                    if is_good_text(p_text):
+                        p_tokens = set(normalize(p_text, lambda x: x))
+                        if len(c_tokens) == len(p_tokens) and len(p_tokens.intersection(c_tokens)) == len(p_tokens):
+                            log.info("found similar text [%s] in post %s" % (c_tokens, post.fullname))
                             return False
+                self.clear_cache(post)
                 return True
 
 
 if __name__ == '__main__':
-    queue = ProductionQueue()
-    db = HumanStorage()
-    cs = CommentSearcher(db)
-    time.sleep(5)
-    queue.need_comment("videos")
+    # queue = ProductionQueue()
+    # db = HumanStorage()
+    # cs = CommentSearcher(db)
+    # time.sleep(5)
+    # queue.need_comment("videos")
+    CommentFounderStateStorage(clear=True)
+    cs = CommentSearcher(start_worked=False)
+    for el in cs.find_comment("videos"):
+        print el

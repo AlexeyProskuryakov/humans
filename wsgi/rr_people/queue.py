@@ -1,7 +1,7 @@
 import logging
 import redis
 
-from wsgi.properties import c_queue_redis_addres, c_queue_redis_password, c_queue_redis_port
+from wsgi.properties import queue_redis_address, queue_redis_password, queue_redis_port
 from wsgi.rr_people import deserialize, S_STOP, serialize
 from wsgi.rr_people.posting.posts import PostSource
 
@@ -23,9 +23,9 @@ NEED_COMMENT = "need_comment"
 
 class ProductionQueue():
     def __init__(self, name="?", clear=False):
-        self.redis = redis.StrictRedis(host=c_queue_redis_addres,
-                                       port=c_queue_redis_port,
-                                       password=c_queue_redis_password,
+        self.redis = redis.StrictRedis(host=queue_redis_address,
+                                       port=queue_redis_port,
+                                       password=queue_redis_password,
                                        db=0
                                        )
         if clear:

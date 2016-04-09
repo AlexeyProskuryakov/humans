@@ -3,6 +3,7 @@ import random
 import re
 
 import praw
+import time
 from praw.objects import MoreComments
 from stemming.porter2 import stem
 
@@ -66,6 +67,7 @@ class RedditHandler(object):
     def __init__(self, user_agent=None):
         self.reddit = praw.Reddit(user_agent=user_agent or random.choice(USER_AGENTS))
         self.subreddits_cache = {}
+        self.posts_comments_cache = {}
 
     def get_subreddit(self, name):
         if name not in self.subreddits_cache:
@@ -79,7 +81,9 @@ class RedditHandler(object):
         try:
             subreddit = self.get_subreddit(subreddit_name)
             hot = list(subreddit.get_hot(limit=limit))
+            log.info("%s hot loaded limit: %s, result: %s" % (subreddit_name, limit, len(hot)))
             new = list(subreddit.get_new(limit=limit))
+            log.info("%s new loaded limit: %s, result: %s" % (subreddit_name, limit, len(new)))
             result_dict = dict(map(lambda x: (x.fullname, x), hot), **dict(map(lambda x: (x.fullname, x), new)))
 
             log.info("Will search for dest posts candidates at %s posts in %s" % (len(result_dict), subreddit_name))
@@ -91,20 +95,39 @@ class RedditHandler(object):
             log.exception(e)
             return []
 
-    def retrieve_comments(self, comments, parent_id, acc=None):
-        if acc is None:
-            acc = []
-        for comment in comments:
-            if isinstance(comment, MoreComments):
-                try:
-                    self.retrieve_comments(comment.comments(), parent_id, acc)
-                except Exception as e:
-                    log.exception("Exception in unwind more comments: %s" % e)
-                    continue
-            else:
-                if comment.author and comment.parent_id == parent_id:
-                    acc.append(comment)
-        return acc
+    def get_all_comments(self, post):
+        if post.fullname in self.posts_comments_cache:
+            return self.posts_comments_cache[post.fullname]
+
+        comments = list(self.comments_sequence(post.comments))
+        self.posts_comments_cache[post.fullname] = comments
+        return comments
+
+    def clear_cache(self, post):
+        if post.fullname in self.posts_comments_cache:
+            del self.posts_comments_cache[post.fullname]
+
+    def comments_sequence(self, comments):
+        sequence = list(comments)
+        position = 0
+        while 1:
+            to_add = []
+            for i in xrange(position, len(sequence)):
+                position = i
+                comment = sequence[i]
+                if isinstance(comment, MoreComments):
+                    to_add = comment.comments()
+                    break
+                else:
+                    yield comment
+
+            if to_add:
+                sequence.pop(position)
+                for el in reversed(to_add):
+                    sequence.insert(position, el)
+
+            if position >= len(sequence) - 1:
+                break
 
     def search(self, query):
         copies = list(self.reddit.search(query))
@@ -132,11 +155,12 @@ def normalize(comment_body, serialise=lambda x: " ".join(x)):
                 res.append(stem(token))
     return serialise(res)
 
+
 def tokens_equals(tokens, another_tokens, more_than_perc=50):
     o = set(tokens)
     t = set(another_tokens)
     intersection = o.intersection(t)
-    return float(len(intersection)) >= ((float(len(o) + len(t))/2) * more_than_perc) / 100
+    return float(len(intersection)) >= ((float(len(o) + len(t)) / 2) * more_than_perc) / 100
 
 
 CQ_SEP = "$:$"
@@ -154,14 +178,24 @@ serialize = lambda pfn, ct: "%s%s%s" % (pfn, CQ_SEP, ct)
 
 
 def cmp_by_created_utc(x, y):
-    result = x.created_utc - y.created_utc
-    if result > 0.5:
-        return 1
-    elif result < 0.5:
-        return -1
-    else:
-        return 0
+    return int(x.created_utc - y.created_utc)
+
+def cmp_by_comments_count(x, y):
+    return x.num_comments - y.num_comments
+
+
+
+def post_to_dict(post):
+    return {
+        "created_utc": post.created_utc,
+        "fullname": post.fullname,
+        "num_comments": post.num_comments,
+    }
 
 
 if __name__ == '__main__':
-   print tokens_equals([1,2,3,4,5,6,7], [4,5,6,7,8,9, 10], 50)
+
+    rh = RedditHandler()
+    posts = rh.get_hot_and_new("videos", limit=10)
+    for post in posts:
+        print post.fullname

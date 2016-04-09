@@ -59,9 +59,13 @@ comments_mongo_uri = "mongodb://milena:sederfes100500@ds015760.mlab.com:15760/hu
 comments_db_name = "humans_comments"
 expire_low_copies_posts = 3600 * 24 * 7
 
-c_queue_redis_addres = "pub-redis-11997.us-east-1-3.7.ec2.redislabs.com"
-c_queue_redis_port = 11997
-c_queue_redis_password = "sederfes100500"
+queue_redis_address = "pub-redis-11997.us-east-1-3.7.ec2.redislabs.com"
+queue_redis_port = 11997
+queue_redis_password = "sederfes100500"
+
+cfs_redis_address = queue_redis_address
+cfs_redis_port = queue_redis_port
+cfs_redis_password = queue_redis_password
 
 SEC = 1
 MINUTE = 60
@@ -81,11 +85,11 @@ AE_AUTHOR_MIN_ACTIONS = 1000
 
 AE_ADD_AUTHORS = True
 
-DEFAULT_LIMIT = 1000
-# DEFAULT_LIMIT = 10
+# DEFAULT_LIMIT = 1000
+DEFAULT_LIMIT = 20
 DEFAULT_SLEEP_TIME_AFTER_GENERATE_DATA = 60 * 60 * 4
 
-min_copy_count = 2
+min_copy_count = 3
 min_comment_create_time_difference = 3600 * 24 * 10
 
 shift_copy_comments_part = 5  # общее количество комментариев / это число  = сколько будет пропускаться
