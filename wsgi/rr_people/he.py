@@ -53,15 +53,21 @@ def check_any_login(login):
     errors = set()
     for i in range(3):
         res = requests.get(
-                "http://www.reddit.com/user/%s/about.json" % login,
-                headers={"origin": "http://www.reddit.com",
-                         "User-Agent": random.choice(USER_AGENTS)})
+            "http://www.reddit.com/user/%s/about.json" % login,
+            headers={"origin": "http://www.reddit.com",
+                     "User-Agent": random.choice(USER_AGENTS)})
+        json = res.json()
+        if json:
+            if res.status_code == 200:
+                return True
+
+            errors.add(json.get("error"))
+
         time.sleep(random.randint(1, 5))
         statuses.add(res.status_code)
-        errors.add(res.json().get("error"))
     if 200 not in statuses:
         return False
-    if len(errors) != 1 and None not in errors:
+    if None not in errors:
         return False
     return True
 
