@@ -78,8 +78,8 @@
     </div>
 </div>
 <script>
-    $("#sub-choose option").on('click', function(e){
-    var sub_name = $(e.target).attr("value");
+    $("#sub-choose").change(function(e){
+    var sub_name = $(this).val();
     if (sub_name == undefined){
         $(".sub-generator-btn").addClass("disabled");
     } else{
