@@ -273,8 +273,6 @@ human_orchestra = HumanOrchestra()
 @app.route("/humans", methods=["POST", "GET"])
 @login_required
 def humans():
-    global human_orchestra
-
     if request.method == "POST":
         subreddits_raw = request.form.get("sbrdts")
         subreddits = subreddits_raw.strip().split()
@@ -290,7 +288,7 @@ def humans():
 
     humans_info = db.get_humans_info()
     for human in humans_info:
-        human['state'] = db.get_human_state(human['user'])
+        human['state'] = human_orchestra.states.get_human_state(human['user'])
     # worked_humans = map(lambda x: x.get("name"), db.get_humans_with_state(S_WORK))
 
     return render_template("humans_management.html",
@@ -300,15 +298,13 @@ def humans():
 @app.route("/humans/<name>", methods=["POST", "GET"])
 @login_required
 def humans_info(name):
-    global human_orchestra
-
     if request.method == "POST":
         if request.form.get("stop"):
-            db.set_human_state(name, S_SUSPEND)
+            human_orchestra.states.set_human_state(name, S_SUSPEND)
             return redirect(url_for('humans_info', name=name))
 
         if request.form.get("start"):
-            db.set_human_state(name, S_WORK)
+            human_orchestra.states.set_human_state(name, S_WORK)
             human_orchestra.add_human(name)
             return redirect(url_for('humans_info', name=name))
 
@@ -320,7 +316,7 @@ def humans_info(name):
     stat = db.get_log_of_human_statistics(name)
 
     human_cfg = db.get_human_config(name)
-    state = db.get_human_state(name)
+    state = human_orchestra.states.get_human_state(name)
 
     return render_template("humans_info.html", **{"human_name": name,
                                                   "human_stat": stat,

@@ -1,9 +1,9 @@
 import logging
+
 import redis
 
 from wsgi.properties import queue_redis_address, queue_redis_password, queue_redis_port
 from wsgi.rr_people import deserialize, S_STOP, serialize
-from wsgi.rr_people.posting.posts import PostSource
 
 log = logging.getLogger("pq")
 
@@ -20,6 +20,9 @@ STATE_PG = lambda x: "pg_state_%s" % x
 
 NEED_COMMENT = "need_comment"
 
+HUMAN_STATES = "hs_hashset"
+HUMAN_STATE = lambda x: "h_state_%s" % x
+
 
 class ProductionQueue():
     def __init__(self, name="?", clear=False):
@@ -31,7 +34,7 @@ class ProductionQueue():
         if clear:
             self.redis.flushdb()
 
-        log.info("Production Queue inited for [%s]"%name)
+        log.info("Production Queue inited for [%s]" % name)
 
     def need_comment(self, sbrdt):
         self.redis.publish(NEED_COMMENT, sbrdt)
@@ -105,6 +108,23 @@ class ProductionQueue():
             ks = self.get_posts_generator_state(k)
             if v is None or ks is None:
                 result[k] = S_STOP
+        return result
+
+    def set_human_state(self, human_name, state, ex=3600):
+        pipe = self.redis.pipeline()
+        pipe.hset(HUMAN_STATES, human_name, state)
+        pipe.set(HUMAN_STATE(human_name), state, ex=ex)
+        pipe.execute()
+
+    def get_human_state(self, human_name):
+        state = self.redis.get(HUMAN_STATE(human_name))
+        if not state:
+            return S_STOP
+
+    def get_all_humans_states(self):
+        result = {}
+        for k,v in self.redis.hgetall(HUMAN_STATES):
+            result[k] = self.get_human_state(k)
         return result
 
 

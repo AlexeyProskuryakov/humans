@@ -46,11 +46,6 @@ class HumanStorage(DBHandler):
             self.human_config = db.create_collection("human_config")
             self.human_config.create_index([("user", 1)], unique=True)
 
-        self.humans_states = db.get_collection("human_states")
-        if not self.humans_states:
-            self.humans_states = db.create_collection("human_states")
-            self.humans_states.create_index([("name", 1)])
-            self.humans_states.create_index([("state", 1)])
 
     def update_human_access_credentials_info(self, user, info):
         if isinstance(info.get("scope"), set):
@@ -137,32 +132,6 @@ class HumanStorage(DBHandler):
 
     def get_human_config(self, name):
         return self.human_config.find_one({"user": name})
-
-    ############STATES################
-    def get_humans_available(self):
-        worked = self.humans_states.find(
-                {"$or": [{"state": "work"}, {"state": "sleep", "time": {"lte": time.time() - 3600}}]})
-        return worked
-
-    def set_human_state(self, name, state):
-        if state == "ban":
-            self.humans_states.update_one({"name": name},
-                                          {"$inc": {"ban_count": 1}, "$set": {'state': state, 'time': time.time()}},
-                                          upsert=True)
-        else:
-            self.humans_states.update_one({"name": name}, {"$set": {'state': state, 'time': time.time()}}, upsert=True)
-
-    def get_human_state(self, name):
-        found = self.humans_states.find_one({"name": name})
-        if found:
-            state = found.get("state")
-            if state == "ban" and found.get("ban_count") <= 3:
-                return "work"
-            return state
-        return None
-
-    def get_humans_with_state(self, state):
-        return self.humans_states.find({"state": state})
 
 
     #################HUMAN LOG

@@ -20,7 +20,7 @@ from wsgi.properties import WEEK, HOUR, MINUTE
 from wsgi.rr_people import USER_AGENTS, \
     A_CONSUME, A_VOTE, A_COMMENT, A_POST, A_SUBSCRIBE, A_FRIEND, A_SLEEP, \
     S_WORK, S_BAN, S_SLEEP, S_SUSPEND, \
-    RedditHandler, re_url, Singleton, normalize
+    RedditHandler, re_url, Singleton, normalize, S_STOP
 from wsgi.rr_people.ae import ActionGenerator, time_hash
 from wsgi.rr_people.posting.posts import PostsStorage, PS_POSTED
 from wsgi.rr_people.queue import ProductionQueue
@@ -481,16 +481,16 @@ class Kapellmeister(Process):
     def human_check(self):
         ok = check_any_login(self.human_name)
         if not ok:
-            self.main_storage.set_human_state(self.human_name, S_BAN)
+            self.queue.set_human_state(self.human_name, S_BAN)
         return ok
 
     def set_state(self, new_state):
-        state = self.main_storage.get_human_state(self.human_name)
+        state = self.queue.get_human_state(self.human_name)
         if state == S_SUSPEND:
             log.info("%s is suspended will stop" % self.human_name)
             return False
         else:
-            self.main_storage.set_human_state(self.human_name, new_state)
+            self.queue.set_human_state(self.human_name, new_state)
             return True
 
     def run(self):
@@ -566,12 +566,14 @@ class HumanOrchestra():
         self.__humans = {}
         self.lock = Lock()
         self.db = HumanStorage(name="human orchestra")
+        self.states = ProductionQueue(name="orchestra")
         Thread(target=self.start_humans, name="Orchestra Human Starter").start()
 
     def start_humans(self):
         log.info("Will auto start humans")
-        for human in self.db.get_humans_available():
-            self.add_human(human.get("name"))
+        for human, state in self.states.get_all_humans_states():
+            if state != S_STOP:
+                self.add_human(human.get("name"))
 
     @property
     def humans(self):
