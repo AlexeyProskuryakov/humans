@@ -25,6 +25,7 @@ from wsgi.rr_people.ae import ActionGenerator, time_hash
 from wsgi.rr_people.posting.posts import PostsStorage, PS_POSTED
 from wsgi.rr_people.queue import ProductionQueue
 from wsgi.rr_people.reader import CommentsStorage
+from wsgi.rr_people.states import StatesHandler
 
 log = logging.getLogger("he")
 
@@ -133,10 +134,12 @@ class Consumer(RedditHandler):
         super(Consumer, self).__init__()
         self.db = HumanStorage(name="consumer %s" % login)
         self.comment_storage = CommentsStorage(name="consumer %s" % login)
+
         state = self.db.get_human_config(login)
         login_credentials = self.db.get_human_access_credentials(login)
         if not login_credentials:
             raise Exception("Can not have login credentials at %s", login)
+
         self.subscribed_subreddits = set(state.get("ss", [])) or set()
         self.friends = set(state.get("frds", [])) or set()
         self.last_friend_add = state.get("last_friend_add") or time.time() - WEEK
@@ -380,7 +383,7 @@ class Consumer(RedditHandler):
             return wt
         return max_wait_time
 
-    def do_comment_post(self, post_fullname, subreddit_name, comment_text):
+    def do_comment_post(self, post_fullname, subreddit_name, comment_id):
         near_posts = self.get_hot_and_new(subreddit_name)
         for i, _post in enumerate(near_posts):
             if _post.fullname == post_fullname:
@@ -400,6 +403,7 @@ class Consumer(RedditHandler):
                     log.error(e)
 
                 try:
+                    comment_text = self.comment_storage.get_text(comment_id)
                     text_hash = hash(normalize(comment_text))
                     if self.comment_storage.can_comment_post(self.user_name,
                                                              post_fullname=_post.fullname,
@@ -408,7 +412,7 @@ class Consumer(RedditHandler):
                         self.comment_storage.set_post_commented(_post.fullname,
                                                                 by=self.user_name,
                                                                 hash=text_hash)
-                        self.register_step(A_COMMENT, info={"fullname": post_fullname, "sub": subreddit_name})
+                        self.register_step(A_COMMENT, info={"fullname": post_fullname, "sub": subreddit_name, "response":response.__dict__})
                 except Exception as e:
                     log.error(e)
 
@@ -463,13 +467,13 @@ class Consumer(RedditHandler):
 class Kapellmeister(Process):
     def __init__(self, name, ae):
         super(Kapellmeister, self).__init__()
-        self.main_storage = HumanStorage(name="main storage for %s" % name)
-        self.posts_storage = PostsStorage(name="posts storage for %s" % name)
+        self.main_storage = HumanStorage(name="main storage for [%s]" % name)
+        self.posts_storage = PostsStorage(name="posts storage for [%s]" % name)
         self.human_name = name
         self.ae = ae
         self.human = Consumer(login=name)
-        self.queue = ProductionQueue(name="kplmtr of [%s]" % name)
-
+        self.states_handler = StatesHandler(name="kplmtr of [%s]" % name)
+        self.queue = ProductionQueue(name="klmtr of [%s]" % name)
         self.lock = Lock()
         log.info("Human kapellmeister inited.")
 
@@ -481,16 +485,16 @@ class Kapellmeister(Process):
     def human_check(self):
         ok = check_any_login(self.human_name)
         if not ok:
-            self.queue.set_human_state(self.human_name, S_BAN)
+            self.states_handler.set_human_state(self.human_name, S_BAN)
         return ok
 
     def set_state(self, new_state):
-        state = self.queue.get_human_state(self.human_name)
+        state = self.states_handler.get_human_state(self.human_name)
         if state == S_SUSPEND:
             log.info("%s is suspended will stop" % self.human_name)
             return False
         else:
-            self.queue.set_human_state(self.human_name, new_state)
+            self.states_handler.set_human_state(self.human_name, new_state)
             return True
 
     def run(self):
@@ -523,7 +527,7 @@ class Kapellmeister(Process):
             elif action == A_COMMENT:
                 if self.human.can_do(A_COMMENT):
                     sub_name = random.choice(subs)
-                    comment = self.queue.pop_comment(sub_name)
+                    comment = self.queue.pop_comment_hash(sub_name)
                     if comment:
                         pfn, ct = comment
                         log.info("will comment [%s] [%s]" % (pfn, ct))
@@ -566,14 +570,14 @@ class HumanOrchestra():
         self.__humans = {}
         self.lock = Lock()
         self.db = HumanStorage(name="human orchestra")
-        self.states = ProductionQueue(name="orchestra")
+        self.states = StatesHandler(name="human orchestra")
         Thread(target=self.start_humans, name="Orchestra Human Starter").start()
 
     def start_humans(self):
         log.info("Will auto start humans")
-        for human, state in self.states.get_all_humans_states():
+        for human_name, state in self.states.get_all_humans_states().iteritems():
             if state != S_STOP:
-                self.add_human(human.get("name"))
+                self.add_human(human_name)
 
     @property
     def humans(self):

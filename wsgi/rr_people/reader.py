@@ -6,19 +6,17 @@ import time
 from datetime import datetime
 from multiprocessing import Process
 
-import praw
 import redis
-from praw.objects import MoreComments
 
 from wsgi.db import DBHandler
 from wsgi.properties import DEFAULT_SLEEP_TIME_AFTER_GENERATE_DATA, min_copy_count, \
     shift_copy_comments_part, min_donor_comment_ups, max_donor_comment_ups, \
-    comments_mongo_uri, comments_db_name, expire_low_copies_posts, TIME_TO_WAIT_NEW_COPIES, queue_redis_address, \
-    queue_redis_port, queue_redis_password, DEFAULT_LIMIT
-from wsgi.rr_people import RedditHandler, cmp_by_created_utc, post_to_dict, \
-    cmp_by_comments_count
+    comments_mongo_uri, comments_db_name, DEFAULT_LIMIT, redis_max_connections, states_redis_address, \
+    states_redis_port, states_redis_password
+from wsgi.rr_people import RedditHandler, cmp_by_created_utc, post_to_dict
 from wsgi.rr_people import re_url, normalize, S_WORK, S_SLEEP, re_crying_chars
 from wsgi.rr_people.queue import ProductionQueue
+from wsgi.rr_people.states import StatesHandler
 
 log = logging.getLogger("reader")
 
@@ -51,11 +49,12 @@ CURRENT = "current"
 
 
 class CommentFounderStateStorage(object):
-    def __init__(self, name="?", clear=False):
-        self.redis = redis.StrictRedis(host=queue_redis_address,
-                                       port=queue_redis_port,
-                                       password=queue_redis_password,
-                                       db=0
+    def __init__(self, name="?", clear=False, max_connections=redis_max_connections):
+        self.redis = redis.StrictRedis(host=states_redis_address,
+                                       port=states_redis_port,
+                                       password=states_redis_password,
+                                       db=0,
+                                       max_connections=max_connections,
                                        )
         if clear:
             self.redis.flushdb()
@@ -122,9 +121,9 @@ class CommentsStorage(DBHandler):
         self.comments = self.db.get_collection("comments")
         if not self.comments:
             self.comments = self.db.create_collection(
-                    "comments",
-                    capped=True,
-                    size=1024 * 1024 * 256,
+                "comments",
+                capped=True,
+                size=1024 * 1024 * 256,
             )
             self.comments.drop_indexes()
 
@@ -139,25 +138,28 @@ class CommentsStorage(DBHandler):
             to_add = {"fullname": post_fullname, "commented": True, "time": time.time(), "text_hash": hash, "by": by}
             self.comments.insert_one(to_add)
         else:
-            to_set = {"commented": True, "text_hash": hash, "by": by, "time": time.time(),
-                      "low_copies": datetime.utcnow()}
-            self.comments.update_one({"fullname": post_fullname}, {"$set": to_set})
+            to_set = {"commented": True, "text_hash": hash, "by": by, "time": time.time()}
+
+            self.comments.update_one({"fullname": post_fullname}, {"$set": to_set, "$unset": {"comment_body": 1}}, )
 
     def can_comment_post(self, who, post_fullname, hash):
         q = {"by": who, "commented": True, "$or": [{"fullname": post_fullname}, {"text_hash": hash}]}
         found = self.comments.find_one(q)
         return found is None
 
-    def set_post_ready_for_comment(self, post_fullname):
+    def set_post_ready_for_comment(self, post_fullname, comment_text):
         found = self.comments.find_one({"fullname": post_fullname})
         if found and found.get("commented"):
             return
         elif found:
             return self.comments.update_one(found,
-                                            {"$set": {"ready_for_comment": True},
-                                             "$unset": {"low_copies": datetime.utcnow()}})
+                                            {"$set": {"ready_for_comment": True, "comment_body": comment_text}})
         else:
-            return self.comments.insert_one({"fullname": post_fullname, "ready_for_comment": True})
+            return self.comments.insert_one(
+                {"fullname": post_fullname, "ready_for_comment": True, "comment_body": comment_text})
+
+    def get_text(self, comment_id):
+        self.comments.find({"_id":comment_id})
 
     def get_posts_ready_for_comment(self):
         return list(self.comments.find({"ready_for_comment": True, "commented": {"$exists": False}}))
@@ -184,6 +186,7 @@ class CommentSearcher(RedditHandler):
         super(CommentSearcher, self).__init__(user_agent)
         self.db = CommentsStorage(name="comment searcher")
         self.comment_queue = ProductionQueue(name="comment searcher")
+        self.states_handler = StatesHandler(name="comment searcher")
         self.subs = {}
 
         self.add_authors = add_authors
@@ -195,26 +198,26 @@ class CommentSearcher(RedditHandler):
         self.start_supply_comments()
 
         if start_worked:
-            for sub, state in self.comment_queue.get_comment_founders_states().iteritems():
+            for sub, state in self.states_handler.get_comment_founders_states().iteritems():
                 if S_WORK in state:
                     self.start_find_comments(sub)
                     time.sleep(60 * 5)
         log.info("Read human inited!")
 
     def comment_retrieve_iteration(self, sub, sleep=True):
-        self.comment_queue.set_comment_founder_state(sub, S_WORK)
+        self.states_handler.set_comment_founder_state(sub, S_WORK)
         start = time.time()
         log.info("Will start find comments for [%s]" % (sub))
-        for pfn, ct in self.find_comment(sub):
-            self.comment_queue.put_comment(sub, pfn, ct)
+        for pfn, ct_id in self.find_comment(sub):
+            self.comment_queue.put_comment_hash(sub, pfn, ct_id)
         end = time.time()
         sleep_time = random.randint(DEFAULT_SLEEP_TIME_AFTER_GENERATE_DATA / 5,
                                     DEFAULT_SLEEP_TIME_AFTER_GENERATE_DATA)
-        self.comment_queue.set_comment_founder_state(sub, S_SLEEP, ex=sleep_time + 1)
+        self.states_handler.set_comment_founder_state(sub, S_SLEEP, ex=sleep_time + 1)
         if sleep:
             log.info(
-                    "Was get all comments which found for [%s] at %s seconds... Will trying next after %s" % (
-                        sub, end - start, sleep_time))
+                "Was get all comments which found for [%s] at %s seconds... Will trying next after %s" % (
+                    sub, end - start, sleep_time))
             time.sleep(sleep_time)
 
     def start_find_comments(self, sub):
@@ -236,7 +239,7 @@ class CommentSearcher(RedditHandler):
             for message in self.comment_queue.get_who_needs_comments():
                 nc_sub = message.get("data")
                 log.info("receive need comments for sub [%s]" % nc_sub)
-                founder_state = self.comment_queue.get_comment_founder_state(nc_sub)
+                founder_state = self.states_handler.get_comment_founder_state(nc_sub)
                 if not founder_state or founder_state is S_SLEEP:
                     log.info("will forced start found comments for [%s]" % (nc_sub))
                     self.comment_retrieve_iteration(nc_sub, sleep=False)
@@ -276,15 +279,15 @@ class CommentSearcher(RedditHandler):
             if not post.archived and post.num_comments < half_avg:
                 log.info("found acceptor old: %s, comments: %s, between: \n%s" % (
                     datetime.utcfromtimestamp(post.created_utc), post.num_comments, '\n'.join(
-                            ["[%s]\t%s" % (datetime.utcfromtimestamp(post.created_utc), post.num_comments) for post in
-                             posts])))
+                        ["[%s]\t%s" % (datetime.utcfromtimestamp(post.created_utc), post.num_comments) for post in
+                         posts])))
                 return post
 
     def find_comment(self, sub, add_authors=False):
         # todo вынести загрузку всех постов в отдельную хуйню чтоб не делать это много раз
         log.info("Start finding comments to sub %s" % sub)
         posts = self.get_posts(sub)
-        self.comment_queue.set_comment_founder_state(sub, "%s found %s" % (S_WORK, len(posts)), ex=len(posts) * 2)
+        self.states_handler.set_comment_founder_state(sub, "%s found %s" % (S_WORK, len(posts)), ex=len(posts) * 2)
         self.state_storage.set_started(sub)
 
         for post in posts:
@@ -303,8 +306,10 @@ class CommentSearcher(RedditHandler):
                                     comment, post.fullname, sub))
                                 break
 
-                    if comment and self.db.set_post_ready_for_comment(post.fullname):
-                        yield post.fullname, comment.body
+                    if comment:
+                        comment_result_info = self.db.set_post_ready_for_comment(post.fullname, comment.body)
+                        comment_id = comment_result_info.upserted_id or comment_result_info.inserted_id
+                        yield post.fullname, comment_id
 
             except Exception as e:
                 log.exception(e)

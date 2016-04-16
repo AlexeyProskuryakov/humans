@@ -548,7 +548,7 @@ def create():
 
     sbrdt = "videos"
     for post, comment in cs.find_comment(sbrdt):
-        cq.put_comment(sbrdt, post, comment)
+        cq.put_comment_hash(sbrdt, post, comment)
 
     agdf = ActionGeneratorDataFormer()
     agdf.fill_consume_and_sleep()

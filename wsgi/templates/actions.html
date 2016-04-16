@@ -13,7 +13,11 @@
                 <label for="ae-name">
                     Имя чувака:
                 </label>
-                <input type="text" id="ae-name">
+                <select class="form-control" id="ae-name">
+                    {%for human in humans%}
+                    <option value="{{human}}">{{human}}</option>
+                    {%endfor%}
+                </select>
                 <input type="submit" value="возъебенить на холст">
             </form>
         </div>

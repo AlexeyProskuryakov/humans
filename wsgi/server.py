@@ -346,8 +346,8 @@ posts_generator = PostsGenerator()
 @app.route("/posts")
 @login_required
 def posts():
-    generators_for_subs = posts_generator.queue.get_posts_generator_states()
-    posts_generator.queue.get_posts_generator_states()
+    generators_for_subs = posts_generator.states_handler.get_posts_generator_states()
+    posts_generator.states_handler.get_posts_generator_states()
     qc_s = {}
     for sub in generators_for_subs.keys():
         queued_post = posts_generator.posts_storage.get_posts_for_sub(sub)
@@ -359,7 +359,9 @@ def posts():
 @app.route("/actions")
 @login_required
 def actions():
-    return render_template("actions.html")
+    h_info = db.get_humans_info()
+    humans = map(lambda x:x['user'], h_info)
+    return render_template("actions.html", **{"humans":humans})
 
 
 author_storage = AuthorsStorage("as server")
@@ -444,7 +446,7 @@ def sub_gens_start():
     data = json.loads(request.data)
     sub = data.get("sub")
     if sub:
-        posts_generator.queue.set_posts_generator_state(sub, S_WORK)
+        posts_generator.states_handler.set_posts_generator_state(sub, S_WORK)
         posts_generator.start_generate_posts(sub)
         return jsonify(**{"ok": True, "state": S_WORK})
     return jsonify(**{"ok": False, "error": "sub is not exists"})
@@ -456,7 +458,7 @@ def sub_gens_pause():
     data = json.loads(request.data)
     sub = data.get("sub")
     if sub:
-        posts_generator.queue.set_posts_generator_state(sub, S_SUSPEND, ex=3600 * 24 * 7)
+        posts_generator.states_handler.set_posts_generator_state(sub, S_SUSPEND, ex=3600 * 24 * 7)
         return jsonify(**{"ok": True, "state": S_SUSPEND})
     return jsonify(**{"ok": False, "error": "sub is not exists"})
 
@@ -481,7 +483,7 @@ def del_sub():
         posts_generator.terminate_generate_posts(sub_name)
         db.remove_sub_for_humans(sub_name)
         posts_generator.posts_storage.remove_posts_of_sub(sub_name)
-        posts_generator.queue.remove_post_generator(sub_name)
+        posts_generator.states_handler.remove_post_generator(sub_name)
         return jsonify(**{"ok": True})
 
     return jsonify(**{"ok": False, "error": "sub is not exists"})
@@ -494,7 +496,7 @@ def prepare_for_posting():
     sub = data.get("sub")
     if sub:
         for post in posts_generator.posts_storage.get_posts_for_sub(sub):
-            posts_generator.queue.put_post_hash(sub, post)
+            posts_generator.states_handler.put_post_hash(sub, post)
             posts_generator.posts_storage.set_post_state(post.url_hash, PS_AT_QUEUE)
         return jsonify(**{"ok": True})
 

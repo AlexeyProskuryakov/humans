@@ -5,10 +5,10 @@ from multiprocessing import Process
 
 from wsgi.db import DBHandler
 from wsgi.properties import DEFAULT_SLEEP_TIME_AFTER_GENERATE_DATA
-from wsgi.rr_people import S_WORK, S_SLEEP, S_SUSPEND
+from wsgi.rr_people import S_WORK, S_SUSPEND
 from wsgi.rr_people.posting import POST_GENERATOR_OBJECTS
-from wsgi.rr_people.posting.posts import PostSource, PostsStorage
-from wsgi.rr_people.queue import ProductionQueue
+from wsgi.rr_people.posting.posts import PostsStorage
+from wsgi.rr_people.states import StatesHandler
 
 log = logging.getLogger("post_generator")
 
@@ -33,13 +33,13 @@ class PostsGeneratorsStorage(DBHandler):
 
 class PostsGenerator(object):
     def __init__(self):
-        self.queue = ProductionQueue(name="pg queue")
+        self.states_handler = StatesHandler(name="pg queue")
         self.generators_storage = PostsGeneratorsStorage(name="pg gens")
         self.posts_storage = PostsStorage(name="pg posts")
         self.sub_gens = {}
         self.sub_process = {}
 
-        for sub, state in self.queue.get_posts_generator_states().iteritems():
+        for sub, state in self.states_handler.get_posts_generator_states().iteritems():
             if S_WORK in state:
                 self.start_generate_posts(sub)
 
@@ -83,11 +83,11 @@ class PostsGenerator(object):
             if get_state() == S_SUSPEND:
                 return False
             else:
-                self.queue.set_posts_generator_state(subrreddit, state, ex=ex)
+                self.states_handler.set_posts_generator_state(subrreddit, state, ex=ex)
                 return True
 
         def get_state():
-            return self.queue.get_posts_generator_state(subrreddit)
+            return self.states_handler.get_posts_generator_state(subrreddit)
 
         def f():
             while 1:
