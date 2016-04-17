@@ -85,6 +85,7 @@ class StatesHandler(object):
         state = self.redis.get(HUMAN_STATE(human_name))
         if not state:
             return S_STOP
+        return state
 
     def get_all_humans_states(self):
         result = self.redis.hgetall(HUMAN_STATES)

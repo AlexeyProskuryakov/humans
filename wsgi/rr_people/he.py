@@ -135,19 +135,19 @@ class Consumer(RedditHandler):
         self.db = HumanStorage(name="consumer %s" % login)
         self.comment_storage = CommentsStorage(name="consumer %s" % login)
 
-        state = self.db.get_human_config(login)
+        human_configuration = self.db.get_human_config(login)
         login_credentials = self.db.get_human_access_credentials(login)
         if not login_credentials:
             raise Exception("Can not have login credentials at %s", login)
 
-        self.subscribed_subreddits = set(state.get("ss", [])) or set()
-        self.friends = set(state.get("frds", [])) or set()
-        self.last_friend_add = state.get("last_friend_add") or time.time() - WEEK
+        self.subscribed_subreddits = set(human_configuration.get("ss", [])) or set()
+        self.friends = set(human_configuration.get("frds", [])) or set()
+        self.last_friend_add = human_configuration.get("last_friend_add") or time.time() - WEEK
 
         self.init_engine(login_credentials)
         self.init_work_cycle()
 
-        live_config = state.get("live_config")
+        live_config = human_configuration.get("live_config")
         if not live_config:
             self.configuration = HumanConfiguration()
             self.db.set_human_live_configuration(login, self.configuration)
@@ -412,7 +412,8 @@ class Consumer(RedditHandler):
                         self.comment_storage.set_post_commented(_post.fullname,
                                                                 by=self.user_name,
                                                                 hash=text_hash)
-                        self.register_step(A_COMMENT, info={"fullname": post_fullname, "sub": subreddit_name, "response":response.__dict__})
+                        self.register_step(A_COMMENT, info={"fullname": post_fullname, "sub": subreddit_name,
+                                                            "response": response.__dict__})
                 except Exception as e:
                     log.error(e)
 
@@ -462,6 +463,9 @@ class Consumer(RedditHandler):
         result = subreddit.submit(save=True, title=title, url=url)
         log.info("was post at [%s]; title: [%s]; url: [%s] \n with result: %s" % (sub_name, title, url, result))
         return result
+
+
+WORK_STATE = lambda x: "%s: %s" % (S_WORK, x)
 
 
 class Kapellmeister(Process):
@@ -531,9 +535,11 @@ class Kapellmeister(Process):
                     if comment:
                         pfn, ct = comment
                         log.info("will comment [%s] [%s]" % (pfn, ct))
+                        self.set_state(WORK_STATE("comment"))
                         self.human.do_comment_post(pfn, sub_name, ct)
                     else:
                         log.info("will send need comment for sub [%s]" % sub_name)
+                        self.set_state(WORK_STATE("need comment"))
                         self.queue.need_comment(sub_name)
 
                 else:
@@ -544,14 +550,22 @@ class Kapellmeister(Process):
                 if self.human.can_do(A_POST):
                     sub_name = random.choice(subs)
                     url_hash = self.queue.pop_post_hash(sub_name)
-                    post = self.posts_storage.get_post(url_hash)
-                    if post:
-                        log.info("will post %s" % post)
-                        self.human.post(post.for_sub or sub_name, post.url, post.title)
-                        self.posts_storage.set_post_state(url_hash, PS_POSTED)
+                    if url_hash:
+                        post = self.posts_storage.get_post(url_hash)
+                        if post:
+                            log.info("will post %s" % post)
+                            self.set_state(WORK_STATE("posting"))
+                            self.human.post(post.for_sub or sub_name, post.url, post.title)
+                            self.posts_storage.set_post_state(url_hash, PS_POSTED)
+                        else:
+                            self.set_state(WORK_STATE("no post at url hash %s" % url_hash))
+                            log.error("[%s] can not find post at sub [%s] for url hash: [%s] :(" % (
+                                self.human_name, sub_name, url_hash))
                     else:
-                        log.error("can not find post for url hash: [%s] :(" % (url_hash))
+                        self.set_state(WORK_STATE("[%s] no posts at [%s] in queue :( " % (self.human_name, sub_name)))
+                        log.error("[%s] no posts at [%s] in queue :( " % (self.human_name, sub_name))
             else:
+                self.set_state(WORK_STATE("live random"))
                 self.human.live_random(max_actions=random.randint(10, 20))
 
             _diff = time.time() - _start

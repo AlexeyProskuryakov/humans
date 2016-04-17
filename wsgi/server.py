@@ -17,7 +17,7 @@ from werkzeug.utils import redirect
 from wsgi.db import HumanStorage
 from wsgi.properties import want_coefficient_max, DAY
 from wsgi.rr_people import S_WORK, S_SUSPEND
-from wsgi.rr_people.ae import AuthorsStorage
+from wsgi.rr_people.ae import AuthorsStorage, time_hash
 from wsgi.rr_people.he import HumanConfiguration, HumanOrchestra
 from wsgi.rr_people.posting import POST_GENERATOR_OBJECTS
 from wsgi.rr_people.posting.copy_gen import SubredditsRelationsStore
@@ -330,6 +330,12 @@ def humans_info(name):
                                                   })
 
 
+@app.route("/humans/<name>/state", methods=["post"])
+@login_required
+def human_state(name):
+    return jsonify(**{"state": human_orchestra.states.get_human_state(name), "human": name})
+
+
 @app.route("/humans/<name>/config", methods=["POST"])
 @login_required
 def human_config(name):
@@ -342,6 +348,7 @@ def human_config(name):
 
 
 posts_generator = PostsGenerator()
+
 
 @app.route("/posts")
 @login_required
@@ -360,8 +367,8 @@ def posts():
 @login_required
 def actions():
     h_info = db.get_humans_info()
-    humans = map(lambda x:x['user'], h_info)
-    return render_template("actions.html", **{"humans":humans})
+    humans = map(lambda x: x['user'], h_info)
+    return render_template("actions.html", **{"humans": humans})
 
 
 author_storage = AuthorsStorage("as server")
@@ -376,21 +383,22 @@ def ae_represent(name):
 
     y = 3
     ssteps = author_storage.get_sleep_steps(name)
+    log.info("get sleep steps ^ %s"%len(ssteps))
     sleep_days = defaultdict(list)
     for step in ssteps:
         sleep_days[divmod(step.get("time"), DAY)[0]].append([step['time'], step['end_time']])
 
-    data = []
+    sleep_data = []
     for _, v in sleep_days.iteritems():
         avg_start = sum(map(lambda x: x[0], v)) / len(v)
         avg_end = sum(map(lambda x: x[1], v)) / len(v)
 
         step = (avg_end - avg_start) / 2
         x = avg_start + step
-        data.append([get_point_x(x), y, step * 1000, step * 1000])
+        sleep_data.append([get_point_x(x), y, step * 1000, step * 1000])
 
     result = {"color": "blue",
-              "data": data,
+              "data": sleep_data,
               "points": {
                   "show": True,
                   "radius": 2,
