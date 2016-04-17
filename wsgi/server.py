@@ -16,12 +16,12 @@ from werkzeug.utils import redirect
 
 from wsgi.db import HumanStorage
 from wsgi.properties import want_coefficient_max, DAY
-from wsgi.rr_people import S_WORK, S_SUSPEND
+from wsgi.rr_people import S_WORK, S_SUSPEND, S_STOP
 from wsgi.rr_people.ae import AuthorsStorage
 from wsgi.rr_people.he import HumanConfiguration, HumanOrchestra
 from wsgi.rr_people.posting import POST_GENERATOR_OBJECTS
 from wsgi.rr_people.posting.copy_gen import SubredditsRelationsStore
-from wsgi.rr_people.posting.posts import PS_BAD, PS_AT_QUEUE
+from wsgi.rr_people.posting.posts import PS_BAD, PS_AT_QUEUE, PS_READY
 from wsgi.rr_people.posting.posts_generator import PostsGenerator
 from wsgi.rr_people.queue import ProductionQueue
 from wsgi.wake_up import WakeUp, WakeUpStorage
@@ -354,14 +354,14 @@ posts_generator = PostsGenerator()
 @app.route("/posts")
 @login_required
 def posts():
-    generators_for_subs = posts_generator.states_handler.get_posts_generator_states()
-    posts_generator.states_handler.get_posts_generator_states()
-    qc_s = {}
-    for sub in generators_for_subs.keys():
-        queued_post = posts_generator.posts_storage.get_posts_for_sub(sub)
-        qc_s[sub] = queued_post
+    subs = db.get_all_humans_subs()
+    qp_s = {}
+    subs_states = {}
+    for sub in subs:
+        qp_s[sub] = posts_generator.posts_storage.get_posts_for_sub(sub, state=PS_READY)
+        subs_states[sub] = posts_generator.states_handler.get_posts_generator_state(sub) or S_STOP
 
-    return render_template("posts.html", **{"subs": generators_for_subs, "qc_s": qc_s})
+    return render_template("posts.html", **{"subs": subs_states, "qp_s": qp_s})
 
 
 @app.route("/actions")

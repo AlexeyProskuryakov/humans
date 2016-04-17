@@ -2,10 +2,6 @@
 {% block body %}
 
 {% block content %}
-<script>
-
-
-</script>
 <div class="container-fluid">
     <div class="row">
         <div class="col-md-2">
@@ -59,7 +55,7 @@
                             <div class="accordion-inner">
                                 <table class="table table-stripped table-hover table-condensed">
                                     <tbody>
-                                    {% for post in qc_s[s] %}
+                                    {% for post in qp_s[s] %}
                                     <tr id="{{post.url_hash}}">
                                         <td>
                                             <a href="{{post.url}}">{{post.title}}</a>
@@ -88,54 +84,6 @@
             {% endfor %}
         </div>
     </div>
-
-    <!--<div class="row">-->
-    <!--<div class="col-md-6 col-md-offset-3">-->
-
-    <!--{% for s, posts in qc_s.items() %}-->
-    <!--{%if posts %}-->
-    <!--<div>-->
-    <!--<div class="accordion" id="info-accordion">-->
-    <!--<div class="accordion-group">-->
-    <!--<div class="accordion-heading">-->
-    <!--<a class="accordion-toggle" data-toggle="collapse" data-parent="#info-accordion"-->
-    <!--href="#{{s}}">-->
-    <!--<h3>В очереди: {{s}}</h3>-->
-    <!--</a>-->
-    <!--</div>-->
-    <!--<div id="{{s}}" class="accordion-body collapse">-->
-    <!--<div class="accordion-inner">-->
-    <!--<table class="table table-stripped table-hover table-condensed">-->
-    <!--<tbody>-->
-    <!--{% for post in posts %}-->
-    <!--<tr id="{{post.url_hash}}">-->
-    <!--<td>-->
-    <!--<a href="{{post.url}}">{{post.title}}</a>-->
-    <!--</td>-->
-    <!--<td>-->
-    <!--{{post.for_sub}}-->
-    <!--</td>-->
-    <!--<td>-->
-    <!--<button class="btn btn-danger"-->
-    <!--onclick="delete_post('{{s}}','{{post.url_hash}}');">-->
-    <!--Нахуй-->
-    <!--</button>-->
-    <!--</td>-->
-    <!--</tr>-->
-
-    <!--{% endfor %}-->
-    <!--</tbody>-->
-    <!--</table>-->
-    <!--</div>-->
-    <!--</div>-->
-    <!--</div>-->
-    <!--</div>-->
-    <!--</div>-->
-    <!--{%endif%}-->
-    <!--{% endfor %}-->
-
-    <!--</div>-->
-    <!--</div>-->
 </div>
 
 <script src="{{ url_for('static', filename='js/generators.js') }}"></script>
