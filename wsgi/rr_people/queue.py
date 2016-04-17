@@ -1,3 +1,4 @@
+import json
 import logging
 
 import redis
@@ -14,7 +15,7 @@ POST_ID = lambda x: "post_id_%s" % x
 
 NEED_COMMENT = "need_comment"
 
-
+QUEUE_FORCE_ACTIONS = lambda x:"fa_queue_%s"%x
 
 class ProductionQueue():
     def __init__(self, name="?", clear=False):
@@ -37,8 +38,8 @@ class ProductionQueue():
         for el in pubsub.listen():
             yield el
 
-    def put_comment_hash(self, sbrdt, post_fn, text_id):
-        key = serialize(post_fn, text_id)
+    def put_comment_hash(self, sbrdt, post_fn, comment_id):
+        key = serialize(post_fn, comment_id)
         log.debug("redis: push to %s \nthis:%s" % (sbrdt, key))
         self.redis.rpush(QUEUE_CF(sbrdt), key)
 
@@ -61,3 +62,12 @@ class ProductionQueue():
     def show_all_posts_hashes(self, sbrdt):
         result = self.redis.lrange(QUEUE_PG(sbrdt), 0, -1)
         return result
+
+    def put_force_action(self, human_name, action_data):
+        serialized_data = json.dumps(action_data)
+        self.redis.rpush(QUEUE_FORCE_ACTIONS(human_name), serialized_data)
+
+    def pop_force_action(self, human_name):
+        serialised_data = self.redis.lpop(QUEUE_FORCE_ACTIONS(human_name))
+        if serialised_data:
+            return json.loads(serialised_data)

@@ -18,9 +18,6 @@ HUMAN_STATE = lambda x: "h_state_%s" % x
 log = logging.getLogger("states")
 
 
-# todo и переписать все взаимодействие с редисом
-
-
 class StatesHandler(object):
     def __init__(self, name="?", clear=False, max_connections=redis_max_connections):
         self.redis = redis.StrictRedis(host=states_redis_address,

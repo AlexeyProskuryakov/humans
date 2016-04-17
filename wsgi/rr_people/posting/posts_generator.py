@@ -33,7 +33,7 @@ class PostsGeneratorsStorage(DBHandler):
 
 class PostsGenerator(object):
     def __init__(self):
-        self.states_handler = StatesHandler(name="pg queue")
+        self.states_handler = StatesHandler(name="post generator")
         self.generators_storage = PostsGeneratorsStorage(name="pg gens")
         self.posts_storage = PostsStorage(name="pg posts")
         self.sub_gens = {}
@@ -80,42 +80,33 @@ class PostsGenerator(object):
             return
 
         def set_state(state, ex=None):
-            if get_state() == S_SUSPEND:
+            if self.states_handler.get_posts_generator_state(subrreddit) == S_SUSPEND:
                 return False
             else:
                 self.states_handler.set_posts_generator_state(subrreddit, state, ex=ex)
                 return True
 
-        def get_state():
-            return self.states_handler.get_posts_generator_state(subrreddit)
-
         def f():
-            while 1:
                 try:
-                    if not set_state(S_WORK):
-                        time.sleep(10)
-                        continue
+                    if set_state(S_WORK):
+                        start = time.time()
+                        log.info("Will start generate posts in [%s]" % (subrreddit))
+                        counter = 0
+                        for _ in self.generate_posts(subrreddit):
+                            counter += 1
+                            if not set_state("%s %s generated"%(S_WORK, counter)):
+                                break
 
-                    start = time.time()
-                    log.info("Will start find posts in [%s]" % (subrreddit))
-                    counter = 0
-                    for post in self.generate_posts(subrreddit):
-                        counter += 1
-                        self.posts_storage.add_generated_post(post, subrreddit)
-                        if not set_state("%s generate: [%s]" % (S_WORK, counter)):
-                            break
+                        end = time.time()
+                        log.info("Was generate [%s] posts in [%s] at %s seconds..." % (counter, subrreddit, end - start))
+                    else:
+                        log.info("Generators for [%s] is suspend")
 
-                    end = time.time()
-                    sleep_time = random.randint(DEFAULT_SLEEP_TIME_AFTER_GENERATE_DATA / 5,
-                                                DEFAULT_SLEEP_TIME_AFTER_GENERATE_DATA)
-
-                    log.info("Was generate [%s] posts in [%s] at %s seconds... \nWill trying next after %s" % (
-                        counter, subrreddit, end - start, sleep_time))
-
-                    break
                 except Exception as e:
                     log.error("Was error at generating for sub: %s" % subrreddit)
                     log.exception(e)
+                finally:
+                    set_state(S_SUSPEND)
 
         ps = Process(name="[%s] posts generator" % subrreddit, target=f)
         ps.start()

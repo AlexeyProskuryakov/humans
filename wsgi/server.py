@@ -17,12 +17,13 @@ from werkzeug.utils import redirect
 from wsgi.db import HumanStorage
 from wsgi.properties import want_coefficient_max, DAY
 from wsgi.rr_people import S_WORK, S_SUSPEND
-from wsgi.rr_people.ae import AuthorsStorage, time_hash
+from wsgi.rr_people.ae import AuthorsStorage
 from wsgi.rr_people.he import HumanConfiguration, HumanOrchestra
 from wsgi.rr_people.posting import POST_GENERATOR_OBJECTS
 from wsgi.rr_people.posting.copy_gen import SubredditsRelationsStore
 from wsgi.rr_people.posting.posts import PS_BAD, PS_AT_QUEUE
 from wsgi.rr_people.posting.posts_generator import PostsGenerator
+from wsgi.rr_people.queue import ProductionQueue
 from wsgi.wake_up import WakeUp, WakeUpStorage
 
 __author__ = '4ikist'
@@ -503,9 +504,11 @@ def prepare_for_posting():
     data = json.loads(request.data)
     sub = data.get("sub")
     if sub:
+        queue = ProductionQueue(name="for preparing posting")
         for post in posts_generator.posts_storage.get_posts_for_sub(sub):
-            posts_generator.states_handler.put_post_hash(sub, post)
+            queue.put_post_hash(sub, post.url_hash)
             posts_generator.posts_storage.set_post_state(post.url_hash, PS_AT_QUEUE)
+        del queue
         return jsonify(**{"ok": True})
 
     return jsonify(**{"ok": False, "error": "sub is not exists"})

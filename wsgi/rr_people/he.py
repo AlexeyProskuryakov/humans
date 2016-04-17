@@ -47,7 +47,6 @@ def net_tryings(fn):
 
     return wrapped
 
-
 @net_tryings
 def check_any_login(login):
     statuses = set()
@@ -504,12 +503,97 @@ class Kapellmeister(Process):
             self.states_handler.set_human_state(self.human_name, new_state)
             return True
 
+    def get_force_action(self):
+        action = self.queue.pop_force_action(self.human_name)
+        return action
+
+    def _do_force_action(self, action_config):
+        completed = False
+        action = action_config.get("action")
+
+        if action == A_COMMENT:
+            if self.human.can_do(A_COMMENT):
+                sub = action_config.get("sub")
+                post_fullname = action_config.get("post_fullname")
+                comment_id = action_config.get("comment_id")
+                self.set_state(WORK_STATE("force comment at %s" % (sub)))
+                self.human.do_comment_post(post_fullname, sub, comment_id)
+                completed = True
+        if action == A_POST:
+            if self.human.can_do(A_POST):
+                sub = action_config.get("sub")
+                url_hash = action_config.get("url_hash")
+                post = self.posts_storage.get_post(url_hash)
+                self.set_state(WORK_STATE("force post at %s" % (sub)))
+                self.human.post(post.for_sub or sub, post.url, post.title)
+                completed = True
+
+        return completed
+
+    def _do_action(self, subs, step, _start):
+        action = self.ae.get_action(step)
+        if action == A_SLEEP:
+            if not self.set_state(S_SLEEP):
+                return
+            time.sleep(MINUTE)
+
+        elif action == A_COMMENT:
+            if self.human.can_do(A_COMMENT):
+                sub_name = random.choice(subs)
+                comment = self.queue.pop_comment_hash(sub_name)
+                if comment:
+                    pfn, ct = comment
+                    log.info("will comment [%s] [%s]" % (pfn, ct))
+                    self.set_state(WORK_STATE("comment"))
+                    self.human.do_comment_post(pfn, sub_name, ct)
+                else:
+                    log.info("will send need comment for sub [%s]" % sub_name)
+                    self.set_state(WORK_STATE("need comment"))
+                    self.queue.need_comment(sub_name)
+
+            else:
+                log.info("will live random can not comment")
+                self.human.live_random(max_actions=random.randint(10, 20))
+
+        elif action == A_POST:
+            if self.human.can_do(A_POST):
+                sub_name = random.choice(subs)
+                url_hash = self.queue.pop_post_hash(sub_name)
+                if url_hash:
+                    post = self.posts_storage.get_post(url_hash)
+                    if post:
+                        log.info("will post %s" % post)
+                        self.set_state(WORK_STATE("posting"))
+                        self.human.post(post.for_sub or sub_name, post.url, post.title)
+                        self.posts_storage.set_post_state(url_hash, PS_POSTED)
+                    else:
+                        self.set_state(WORK_STATE("no post at url hash %s" % url_hash))
+                        log.error("[%s] can not find post at sub [%s] for url hash: [%s] :(" % (
+                            self.human_name, sub_name, url_hash))
+                else:
+                    self.set_state(WORK_STATE("[%s] no posts at [%s] in queue :( " % (self.human_name, sub_name)))
+                    log.error("[%s] no posts at [%s] in queue :( " % (self.human_name, sub_name))
+        else:
+            self.set_state(WORK_STATE("live random"))
+            self.human.live_random(max_actions=random.randint(10, 20))
+
+        _diff = time.time() - _start
+        step += _diff
+        if step > WEEK:
+            step = step - WEEK
+
+        log.info("[%s] step is end. Action was: [%s], time spent: %s, next step: %s" % (
+            self.human_name, action, _diff, step))
+
+        return step
+
     def run(self):
         log.info("start kappellmeister for [%s]" % self.human_name)
         t_start = time_hash(datetime.utcnow())
         step = t_start
         last_token_refresh_time = t_start
         subs = self.main_storage.get_human_subs(self.human_name)
+        prev_force_action = None
         while 1:
             _start = time.time()
 
@@ -525,59 +609,20 @@ class Kapellmeister(Process):
                 self.human.refresh_token()
                 last_token_refresh_time = step
 
-            action = self.ae.get_action(step)
-            if action == A_SLEEP:
-                if not self.set_state(S_SLEEP):
-                    return
-                time.sleep(MINUTE)
-
-            elif action == A_COMMENT:
-                if self.human.can_do(A_COMMENT):
-                    sub_name = random.choice(subs)
-                    comment = self.queue.pop_comment_hash(sub_name)
-                    if comment:
-                        pfn, ct = comment
-                        log.info("will comment [%s] [%s]" % (pfn, ct))
-                        self.set_state(WORK_STATE("comment"))
-                        self.human.do_comment_post(pfn, sub_name, ct)
-                    else:
-                        log.info("will send need comment for sub [%s]" % sub_name)
-                        self.set_state(WORK_STATE("need comment"))
-                        self.queue.need_comment(sub_name)
-
+            force_action = prev_force_action or self.get_force_action()
+            completed = False
+            if force_action:
+                log.info("[%s] have force action %s" % (self.human_name, force_action))
+                if self._do_force_action(force_action):
+                    log.info("[%s] complete force action" % self.human_name)
+                    prev_force_action = None
+                    completed = True
                 else:
-                    log.info("will live random can not comment")
-                    self.human.live_random(max_actions=random.randint(10, 20))
+                    log.info("[%s] not complete force action" % self.human_name)
+                    prev_force_action = force_action
 
-            elif action == A_POST:
-                if self.human.can_do(A_POST):
-                    sub_name = random.choice(subs)
-                    url_hash = self.queue.pop_post_hash(sub_name)
-                    if url_hash:
-                        post = self.posts_storage.get_post(url_hash)
-                        if post:
-                            log.info("will post %s" % post)
-                            self.set_state(WORK_STATE("posting"))
-                            self.human.post(post.for_sub or sub_name, post.url, post.title)
-                            self.posts_storage.set_post_state(url_hash, PS_POSTED)
-                        else:
-                            self.set_state(WORK_STATE("no post at url hash %s" % url_hash))
-                            log.error("[%s] can not find post at sub [%s] for url hash: [%s] :(" % (
-                                self.human_name, sub_name, url_hash))
-                    else:
-                        self.set_state(WORK_STATE("[%s] no posts at [%s] in queue :( " % (self.human_name, sub_name)))
-                        log.error("[%s] no posts at [%s] in queue :( " % (self.human_name, sub_name))
-            else:
-                self.set_state(WORK_STATE("live random"))
-                self.human.live_random(max_actions=random.randint(10, 20))
-
-            _diff = time.time() - _start
-            step += _diff
-            if step > WEEK:
-                step = step - WEEK
-
-            log.info("[%s] step is end. Action was: [%s], time spent: %s, next step: %s" % (
-                self.human_name, action, _diff, step))
+            if not force_action or not completed:
+                step = self._do_action(subs, step, _start)
 
 
 class HumanOrchestra():
@@ -625,37 +670,3 @@ class HumanOrchestra():
 
                 Process(name="config updater", target=f).start()
 
-
-if __name__ == '__main__':
-    name = "Shlak2k15"
-    # db = HumanStorage()
-    c = Consumer(name)
-    # c.post("test", "http://praw.readthedocs.org/en/stable/", "PRAW docs...")
-    check_any_login(name)
-    kplmstr = Kapellmeister(name, None)
-    kplmstr.set_state(S_SUSPEND)
-    #
-    # from wsgi.rr_people.reader import CommentSearcher
-    #
-    # rdr = CommentSearcher(db)
-    # rdr.start_retrieve_comments("videos")
-    # rdr.start_retrieve_comments("funny")
-    #
-    # #
-    # # from wsgi.rr_people.ae import ActivityEngine
-    # #
-    # # ae = ActivityEngine()
-    # #
-    # # ae.set_authors_by_group_name(name)
-    # #
-    # # kplmstr = Kapellmeister(name, db, ae)
-    # # kplmstr.start()
-    # #
-    # # kplmstr.join()
-    #
-    # c = Consumer(db, name)
-    # queue = CommentQueue()
-    # comment = queue.get("videos")
-    # if comment:
-    #     fn, txt = comment
-    #     c.do_comment_post(fn, "videos", txt)

@@ -58,7 +58,7 @@ class PostsStorage(DBHandler):
             self.posts.create_index("state")
 
     def set_post_state(self, url_hash, state):
-        self.posts.update_one({"url_hash": url_hash}, {"$set": {"state": state}}, upsert=True)
+        self.posts.update_one({"url_hash": url_hash}, {"$set": {"state": state}})
 
     def get_post_state(self, url_hash):
         found = self.posts.find_one({"url_hash": url_hash}, projection={"state": 1})
@@ -72,14 +72,10 @@ class PostsStorage(DBHandler):
 
     def add_generated_post(self, post, sub):
         if isinstance(post, PostSource):
-            self.posts.update_one({"url_hash": post.url_hash}, {"$set": dict({"sub": sub}, **post.to_dict())}, upsert=True)
+            self.posts.update_one({"url_hash": post.url_hash}, {"$set": dict({"sub": sub, "state":PS_READY}, **post.to_dict())}, upsert=True)
 
     def get_posts_for_sub(self, sub, state=PS_READY):
         return map(lambda x: PostSource.from_dict(x), self.posts.find({"sub": sub, "state": PS_READY}))
-
-    def get_all_posts(self, q=None):
-        _q = q or {}
-        return map(lambda x: PostSource.from_dict(x), self.posts.find(_q))
 
     def remove_posts_of_sub(self, subname):
         result = self.posts.delete_many({"sub":subname})

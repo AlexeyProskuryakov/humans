@@ -5,6 +5,7 @@ import time
 from datetime import datetime
 
 from pymongo import MongoClient
+from pymongo.errors import CollectionInvalid
 
 from wsgi.properties import mongo_uri, db_name, TIME_TO_WAIT_NEW_COPIES
 
@@ -24,14 +25,15 @@ class HumanStorage(DBHandler):
     def __init__(self, name="?"):
         super(HumanStorage, self).__init__(name=name)
         db = self.db
-        self.users = db.get_collection("users")
-        if not self.users:
-            self.users = db.create_collection()
+
+        try:
+            self.users = db.create_collection("users")
             self.users.create_index([("name", 1)], unique=True)
             self.users.create_index([("user_id", 1)], unique=True)
+        except CollectionInvalid as e:
+            self.users = db.get_collection("users")
 
-        self.human_log = db.get_collection("human_log")
-        if not self.human_log:
+        try:
             self.human_log = db.create_collection(
                     "human_log",
                     capped=True,
@@ -41,10 +43,14 @@ class HumanStorage(DBHandler):
             self.human_log.create_index([("time", 1)], expireAfterSeconds=3600 * 24)
             self.human_log.create_index([("action", 1)])
 
-        self.human_config = db.get_collection("human_config")
-        if not self.human_config:
+        except CollectionInvalid as e:
+            self.human_log = db.get_collection("human_log")
+
+        try:
             self.human_config = db.create_collection("human_config")
             self.human_config.create_index([("user", 1)], unique=True)
+        except CollectionInvalid as e:
+            self.human_config = db.get_collection("human_config")
 
 
     def update_human_access_credentials_info(self, user, info):
@@ -181,11 +187,6 @@ class HumanStorage(DBHandler):
             if crupt == found.get("pwd"):
                 return found.get("user_id")
 
-
 if __name__ == '__main__':
-    hs = HumanStorage(delete_posts=False, expire_low_copies_posts=5)
-    # hs.set_post_low_copies("foo")
-    # time.sleep(5)
-    while 1:
-        print hs.is_can_see_post("foo")
-        time.sleep(5)
+    hs = HumanStorage()
+    hs.save_log_human_row("Shlak2k15","test", {"info":"test"})

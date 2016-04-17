@@ -10,6 +10,7 @@ from wsgi.db import DBHandler
 from wsgi.rr_people import RedditHandler, cmp_by_created_utc, USER_AGENTS, normalize, tokens_equals, DEFAULT_USER_AGENT
 from wsgi.rr_people.posting.generator import Generator
 from wsgi.rr_people.posting.posts import PostSource, PostsStorage, PS_READY
+from wsgi.rr_people.states import StatesHandler
 
 COPY = "copy"
 
@@ -18,6 +19,7 @@ log = logging.getLogger("copy")
 MIN_RATING = 2
 MAX_RATING = 50
 MIN_WORDS_IN_TITLE = 3
+
 
 class SubredditsRelationsStore(DBHandler):
     def __init__(self, name="?"):
@@ -80,9 +82,9 @@ def prepare_url(url):
 class CopyPostGenerator(RedditHandler, Generator):
     def __init__(self):
         super(CopyPostGenerator, self).__init__()
-        self.sub_store = SubredditsRelationsStore()
+        self.sub_store = SubredditsRelationsStore(name="copy_pg for sub relations store")
         self.user_agent = DEFAULT_USER_AGENT
-        self.post_storage = PostsStorage()
+        self.post_storage = PostsStorage(name="copy_pg for posts store")
 
     def found_copy_in_sub(self):
         pass
@@ -141,27 +143,6 @@ class CopyPostGenerator(RedditHandler, Generator):
                     else:
                         continue
                 if title and is_valid_title(title):
-                    self.post_storage.set_post_state(url_hash, PS_READY)
-                    yield PostSource(post.url, title.strip(), for_sub=random.choice(related_subs))
-
-
-def __clear_posts():
-    from wsgi.rr_people.queue import ProductionQueue
-
-    pq = ProductionQueue()
-    subs = pq.get_posts_generator_states()
-    for s, _ in subs.iteritems():
-        posts = []
-        log.info("\n\nwill show posts fo sub: %s\n-----------------------------" % (s))
-        while 1:
-            post = pq.pop_post_hash(s)
-            if not post:
-                break
-            if is_valid_title(post.title):
-                log.info(post)
-                posts.append(post)
-
-        log.info("-----------------------------")
-        for post in posts:
-            pq.put_post_hash(s, post)
-
+                    post = PostSource(post.url, title.strip(), for_sub=random.choice(related_subs))
+                    self.post_storage.add_generated_post(post, subreddit)
+                    yield post
