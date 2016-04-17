@@ -459,7 +459,10 @@ class Consumer(RedditHandler):
                 return
 
     def post(self, sub_name, url, title):
+        time_to_write = int(len(title) / random.randint(2, 4))
         subreddit = self.get_subreddit(sub_name)
+        log.info("will post and write post... on %s seconds" % time_to_write)
+        time.sleep(time_to_write)
         result = subreddit.submit(save=True, title=title, url=url)
         log.info("was post at [%s]; title: [%s]; url: [%s] \n with result: %s" % (sub_name, title, url, result))
         return result
