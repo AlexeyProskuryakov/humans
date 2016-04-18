@@ -17,6 +17,7 @@ NEED_COMMENT = "need_comment"
 
 QUEUE_FORCE_ACTIONS = lambda x:"fa_queue_%s"%x
 
+
 class ProductionQueue():
     def __init__(self, name="?", clear=False):
         self.redis = redis.StrictRedis(host=queue_redis_address,

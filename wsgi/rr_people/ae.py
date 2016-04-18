@@ -55,6 +55,7 @@ __doc__ = """
 
     """
 
+
 def hash_string(time_hash):
     if not isinstance(time_hash, int):
         return None
@@ -95,7 +96,7 @@ def weighted_choice_king(action_weights):
         total += w
         if random.random() * total < w:
             winner = i
-    return winner
+    return winner or A_SLEEP
 
 
 class AuthorsStorage(DBHandler):
@@ -105,7 +106,7 @@ class AuthorsStorage(DBHandler):
         self.authors = self.db.get_collection("ae_authors")
         if not self.authors:
             self.authors = self.db.create_collection(
-                    "ae_authors",
+                "ae_authors",
             )
 
             self.authors.create_index([("author", pymongo.ASCENDING)])
@@ -295,7 +296,8 @@ class AuthorsStorage(DBHandler):
             self.author_groups.update_one({"name": group_name}, {'$set': {"authors": authors}})
             self.authors.update_many({"author": {"$in": found.get("authors")}}, {"$unset": {"used", ""}})
 
-        self.authors.update_many({"author": {"$in": authors}, "used":{"$ne":group_name}}, {"$set": {"used": group_name}})
+        self.authors.update_many({"author": {"$in": authors}, "used": {"$ne": group_name}},
+                                 {"$set": {"used": group_name}})
 
     def get_sleep_steps(self, group):
         return list(self.authors.find({"used": group, "action_type": A_SLEEP}))
@@ -436,7 +438,7 @@ class ActionGenerator(object):
     def set_group_name(self, group_name):
         self.group_name = group_name
 
-    def get_action(self, for_time, step=MINUTE):
+    def get_action(self, for_time, step=5 * MINUTE):
         if not self.group_name:
             log.error("For action generator group name is not exists")
             return None
@@ -561,12 +563,12 @@ def copy_data(from_uri, from_db_name, to_uri, to_db_name, drop_dest=False):
         dest_as.authors.drop()
         dest_as.author_groups.drop()
 
-    for group in src_as.authors.aggregate([{"$match": {"used": {"$exists": True}}}, {"$group": {"_id": "$used", "authors":{"$addToSet":"$author"}}}]):
-        src_authors = list(src_as.authors.find({"used":group.get("_id")}))
+    for group in src_as.authors.aggregate([{"$match": {"used": {"$exists": True}}},
+                                           {"$group": {"_id": "$used", "authors": {"$addToSet": "$author"}}}]):
+        src_authors = list(src_as.authors.find({"used": group.get("_id")}))
         dest_as.authors.insert_many(src_authors)
-        log.info("was insert %s authors rows for group %s"%(len(src_authors), group.get("_id")))
+        log.info("was insert %s authors rows for group %s" % (len(src_authors), group.get("_id")))
         dest_as.set_group(group.get("authors"), group.get("_id"))
-
 
 
 if __name__ == '__main__':
