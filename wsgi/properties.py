@@ -116,6 +116,13 @@ want_coefficient_max = 100
 ImgrClientID = 'd7e9f9350ebe5a8'
 ImgrClientSecret = '945c124e48fd9ca208788c70028d7e8d8c7dc7c1'
 
+# youtube props
+YOUTUBE_DEVELOPER_KEY = "AIzaSyCYF4GPkVpdYjZ5RpDaSMcbpRpfkavnUzc"
+YOUTUBE_API_SERVICE_NAME = "youtube"
+YOUTUBE_API_VERSION = "v3"
+
+force_post_manager_sleep_iteration_time = 3600 #время через которое он будет сканировать ютуб
+
 test_mode = os.environ.get("RR_TEST", "false").strip().lower() in ("true", "1", "yes")
 print "TEST? ", test_mode
 

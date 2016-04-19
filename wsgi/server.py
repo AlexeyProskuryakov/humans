@@ -367,7 +367,7 @@ def posts():
 @app.route("/actions")
 @login_required
 def actions():
-    h_info = db.get_humans_info()
+    h_info = db.get_humans_info(projection={"user":True})
     humans = map(lambda x: x['user'], h_info)
     return render_template("actions.html", **{"humans": humans})
 
@@ -506,7 +506,7 @@ def prepare_for_posting():
     if sub:
         queue = ProductionQueue(name="for preparing posting")
         for post in posts_generator.posts_storage.get_posts_for_sub(sub):
-            queue.put_post_hash(sub, post.url_hash)
+            queue.put_post(sub, post.url_hash)
             posts_generator.posts_storage.set_post_state(post.url_hash, PS_AT_QUEUE)
         del queue
         return jsonify(**{"ok": True})

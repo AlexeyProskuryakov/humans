@@ -4,16 +4,16 @@ import time
 import traceback
 from collections import defaultdict
 
-
 import requests
 from praw import Reddit
-from praw.objects import MoreComments
+from praw.objects import MoreComments, Submission
 
 from wsgi import properties
 from wsgi.db import HumanStorage
 from wsgi.properties import WEEK
 from wsgi.rr_people import RedditHandler, USER_AGENTS, A_CONSUME, A_VOTE, A_COMMENT, A_POST, A_SUBSCRIBE, normalize, \
     A_FRIEND, re_url
+from wsgi.rr_people.posting.posts import PostsStorage, PS_POSTED, PS_ERROR
 from wsgi.rr_people.reader import CommentsStorage
 
 log = logging.getLogger("consumer")
@@ -80,6 +80,7 @@ class Consumer(RedditHandler):
         super(Consumer, self).__init__()
         self.db = HumanStorage(name="consumer %s" % login)
         self.comment_storage = CommentsStorage(name="consumer %s" % login)
+        self.posts_storage = PostsStorage(name="consumer %s" % login)
 
         human_configuration = self.db.get_human_config(login)
         login_credentials = self.db.get_human_access_credentials(login)
@@ -403,14 +404,31 @@ class Consumer(RedditHandler):
                 self._last_post_ids[random_sub] = i
                 return
 
-    def do_post(self, sub_name, url, title):
-        time_to_write = int(len(title) / random.randint(2, 4))
-        subreddit = self.get_subreddit(sub_name)
-        log.info("will post and write post... on %s seconds" % time_to_write)
+    def do_post(self, url_hash, forced=False):
+        post_data = self.posts_storage.get_post(url_hash)
+        if not post_data:
+            log.warn("no normal posts for %s" % url_hash)
+            return
+        post, sub = post_data
+        sub = post.for_sub or sub
+
+        subreddit = self.get_subreddit(sub)
+
+        time_to_write = int(len(post.title) / random.randint(2, 4))
+        log.info("will posting and write post on %s seconds" % time_to_write)
         time.sleep(time_to_write)
-        result = subreddit.submit(save=True, title=title, url=url)
-        log.info("was post at [%s]; title: [%s]; url: [%s] \n with result: %s" % (sub_name, title, url, result))
-        return result
+
+        result = subreddit.submit(save=True, title=post.title, url=post.url)
+
+        log.info("was post at [%s]; title: [%s]; url: [%s]" % (sub, post.title, post.url))
+        if isinstance(result, Submission):
+            self.register_step(A_POST, {"fullname": result.fullname, "sub": sub, 'title': post.title, 'url': post.url})
+            self.posts_storage.set_post_state(url_hash, PS_POSTED)
+            log.info("OK! result: %s" % (result))
+        else:
+            self.posts_storage.set_post_state(url_hash, PS_ERROR)
+            log.info("NOT OK :( result: %s" % (result))
+
 
 
 class FakeConsumer(Consumer):
@@ -420,8 +438,12 @@ class FakeConsumer(Consumer):
     def refresh_token(self):
         log.info("REFRESH TOKEN")
 
-    def do_post(self, sub_name, url, title):
-        log.info("DO POST AT: %s  WITH URL: %s AND TITLE: %s" % (sub_name, url, title))
+    def do_post(self, url_hash):
+        result = self.posts_storage.get_post(url_hash)
+        if not result:
+            log.warn("no normal posts for for %s"%url_hash)
+        post, sub = result
+        log.info("DO POST AT: %s  WITH URL: %s AND TITLE: %s" % (post.for_sub or sub, post.url, post.title))
 
     def do_comment_post(self, post_fullname, subreddit_name, comment_id):
         text = self.comment_storage.get_text(comment_id)

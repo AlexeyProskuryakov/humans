@@ -76,7 +76,6 @@ class Kapellmeister(Process):
     def __init__(self, name, human_class=Consumer):
         super(Kapellmeister, self).__init__()
         self.main_storage = HumanStorage(name="main storage for [%s]" % name)
-        self.posts_storage = PostsStorage(name="posts storage for [%s]" % name)
         self.human_name = name
         self.ae = ActionGenerator(group_name=name)
         self.human = human_class(login=name)
@@ -116,14 +115,9 @@ class Kapellmeister(Process):
             if self.human.can_do(A_POST):
                 sub = action_config.get("sub")
                 url_hash = action_config.get("url_hash")
-                post = self.posts_storage.get_post(url_hash)
-                if post:
-                    self.set_state(WORK_STATE("force post at %s" % (sub)))
-                    self.human.do_post(post.for_sub or sub, post.url, post.title)
-                else:
-                    self.set_state(WORK_STATE("force post failed because post [%s] not found" % url_hash))
+                self.set_state(WORK_STATE("force post at %s" % (sub)))
+                self.human.do_post(url_hash)
                 completed = True
-
         return completed
 
     def _do_action(self, action, subs, step, _start):
@@ -148,18 +142,10 @@ class Kapellmeister(Process):
         elif action == A_POST:
             if self.human.can_do(A_POST):
                 sub_name = random.choice(subs)
-                url_hash = self.queue.pop_post_hash(sub_name)
+                url_hash = self.queue.pop_post(sub_name)
                 if url_hash:
-                    post = self.posts_storage.get_post(url_hash)
-                    if post:
-                        log.info("will post %s" % post)
-                        self.set_state(WORK_STATE("posting"))
-                        self.human.do_post(post.for_sub or sub_name, post.url, post.title)
-                        self.posts_storage.set_post_state(url_hash, PS_POSTED)
-                    else:
-                        self.set_state(WORK_STATE("no post at url hash %s" % url_hash))
-                        log.error("[%s] can not find post at sub [%s] for url hash: [%s] :(" % (
-                            self.human_name, sub_name, url_hash))
+                    self.set_state(WORK_STATE("posting"))
+                    self.human.do_post(url_hash)
                 else:
                     self.set_state(WORK_STATE("[%s] no posts at [%s] in queue :( " % (self.human_name, sub_name)))
                     log.error("[%s] no posts at [%s] in queue :( " % (self.human_name, sub_name))

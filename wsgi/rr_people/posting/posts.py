@@ -6,6 +6,8 @@ PS_READY = "ready"
 PS_POSTED = "posted"
 PS_BAD = "bad"
 PS_AT_QUEUE = "at_queue"
+PS_ERROR = "error"
+
 
 class PostSource(object):
     @staticmethod
@@ -57,6 +59,29 @@ class PostsStorage(DBHandler):
             self.posts.create_index("sub")
             self.posts.create_index("state")
 
+    #     self.forced_posts = self.db.get_collection("forced_posts")
+    #     if not self.forced_posts:
+    #         self.forced_posts = self.db.create_collection("forced_posts")
+    #         self.forced_posts.create_index("id", unique=True)
+    #         self.forced_posts.create_index("channel_id")
+    #         self.forced_posts.create_index("state")
+    #
+    # def get_forced_post(self, post_id):
+    #     found = self.forced_posts.find_one({"id":post_id})
+    #     return found
+    #
+    # def get_forced_posts_at_channel(self, channel_id):
+    #     result = self.forced_posts.find({"channel_id":channel_id})
+    #     return list(result)
+    #
+    # def add_force_post(self, post_data):
+    #     post_data['state'] = PS_READY
+    #     self.forced_posts.insert_one(post_data)
+    #
+    # def set_force_post_state(self, post_id, state):
+    #     self.forced_posts.update_one({"id":post_id}, {"$set":{"state":state}})
+
+    #posts
     def set_post_state(self, url_hash, state):
         self.posts.update_one({"url_hash": url_hash}, {"$set": {"state": state}})
 
@@ -66,20 +91,26 @@ class PostsStorage(DBHandler):
             return found.get("state")
 
     def get_post(self, url_hash):
-        found = self.posts.find_one({"url_hash":url_hash})
+        found = self.posts.find_one({"url_hash": url_hash, 'state': {'$ne': PS_BAD}})
         if found:
-            return PostSource.from_dict(found)
+            return PostSource.from_dict(found), sub
 
     def add_generated_post(self, post, sub):
         if isinstance(post, PostSource):
-            self.posts.update_one({"url_hash": post.url_hash}, {"$set": dict({"sub": sub, "state":PS_READY}, **post.to_dict())}, upsert=True)
+            found = self.get_post(post.url_hash)
+            if not found:
+                data = post.to_dict()
+                data['state'] = PS_READY
+                data['sub'] = sub
+                self.posts.insert_one(data)
 
     def get_posts_for_sub(self, sub, state=PS_READY):
-        return map(lambda x: PostSource.from_dict(x), self.posts.find({"sub": sub, "state": PS_READY}))
+        return map(lambda x: PostSource.from_dict(x), self.posts.find({"sub": sub, "state": state}))
 
     def remove_posts_of_sub(self, subname):
-        result = self.posts.delete_many({"sub":subname})
+        result = self.posts.delete_many({"sub": subname})
         return result
+
 
 if __name__ == '__main__':
     ps = PostSource("http://foo.bar.baz?k=100500&w=qwerty&tt=ttrtt", "Foo{bar}Baz", "someSub", 100500600)

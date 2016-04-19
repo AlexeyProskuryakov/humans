@@ -81,11 +81,8 @@ class HumanStorage(DBHandler):
             return dict(result)
         return None
 
-    def set_human_channel_id(self, name, channel_id):
-        self.human_config.update_one({"user": name}, {"$set": {"channel_id": channel_id}})
-
-    def get_humans_info(self):
-        found = self.human_config.find({})
+    def get_humans_info(self, q=None, projection=None):
+        found = self.human_config.find(q or {}, projection=projection or {})
         result = list(found)
         return result
 
@@ -93,13 +90,20 @@ class HumanStorage(DBHandler):
         self.human_config.update_one({"user": name}, {"$set": {"subs": subreddits}})
 
     def get_human_subs(self, name):
-        found = self.human_config.find_one({"user": name})
+        found = self.human_config.find_one({"user": name}, projection={"subs":True})
         if found:
             return found.get("subs", [])
         return []
 
+    def set_human_channel_id(self, name, channel_id):
+        self.human_config.update_one({"user":name}, {'$set':{'channel_id':channel_id}})
+
+    def get_all_channel_ids(self):
+        data = self.human_config.find({}, projection={"channel_id":True, "user":True})
+        return list(data)
+
     def get_all_humans_subs(self):
-        cfg = self.human_config.find({})
+        cfg = self.human_config.find({}, projection={"subs":True})
         subs = []
         for el in cfg:
             subs.extend(el.get("subs", []))
@@ -121,17 +125,17 @@ class HumanStorage(DBHandler):
             return result
 
     def get_human_internal_state(self, name):
-        found = self.human_config.find_one({"user": name})
+        found = self.human_config.find_one({"user": name}, projection={"ss":True, "frds":True})
         if found:
             return {"ss": set(found.get("ss", [])),  # subscribed subreddits
-                    "frds": set(found.get("friends", [])),  # friends
+                    "frds": set(found.get("frds", [])),  # friends
                     }
 
     def set_human_live_configuration(self, name, configuration):
         self.human_config.update_one({'user': name}, {"$set": {"live_config": configuration.data}})
 
     def get_human_live_configuration(self, name):
-        found = self.human_config.find_one({"user": name})
+        found = self.human_config.find_one({"user": name}, projection={"live_config":True})
         if found:
             live_config = found.get("live_config")
             return live_config

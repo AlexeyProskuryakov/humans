@@ -53,10 +53,10 @@ class ProductionQueue():
         result = self.redis.lrange(QUEUE_CF(sbrdt), 0, -1)
         return dict(map(lambda x: deserialize(x), result))
 
-    def put_post_hash(self, sbrdt, post_hash):
+    def put_post(self, sbrdt, post_hash):
         self.redis.rpush(QUEUE_PG(sbrdt), post_hash)
 
-    def pop_post_hash(self, sbrdt):
+    def pop_post(self, sbrdt):
         result = self.redis.lpop(QUEUE_PG(sbrdt))
         return result
 
