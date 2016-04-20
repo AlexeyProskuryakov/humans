@@ -23,7 +23,7 @@ from wsgi.rr_people.posting import POST_GENERATOR_OBJECTS
 from wsgi.rr_people.posting.copy_gen import SubredditsRelationsStore
 from wsgi.rr_people.posting.posts import PS_BAD, PS_AT_QUEUE, PS_READY
 from wsgi.rr_people.posting.posts_generator import PostsGenerator
-from wsgi.rr_people.queue import ProductionQueue
+from wsgi.rr_people.queue import CommentQueue, PostQueue
 from wsgi.wake_up import WakeUp, WakeUpStorage
 
 __author__ = '4ikist'
@@ -504,7 +504,7 @@ def prepare_for_posting():
     data = json.loads(request.data)
     sub = data.get("sub")
     if sub:
-        queue = ProductionQueue(name="for preparing posting")
+        queue = PostQueue(name="for preparing posting")
         for post in posts_generator.posts_storage.get_posts_for_sub(sub):
             queue.put_post(sub, post.url_hash)
             posts_generator.posts_storage.set_post_state(post.url_hash, PS_AT_QUEUE)

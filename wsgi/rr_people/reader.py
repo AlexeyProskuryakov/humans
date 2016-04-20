@@ -15,7 +15,7 @@ from wsgi.properties import DEFAULT_SLEEP_TIME_AFTER_GENERATE_DATA, min_copy_cou
     states_redis_port, states_redis_password
 from wsgi.rr_people import RedditHandler, cmp_by_created_utc, post_to_dict
 from wsgi.rr_people import re_url, normalize, S_WORK, S_SLEEP, re_crying_chars
-from wsgi.rr_people.queue import ProductionQueue
+from wsgi.rr_people.queue import CommentQueue
 from wsgi.rr_people.states import StatesHandler
 
 log = logging.getLogger("reader")
@@ -185,7 +185,7 @@ class CommentSearcher(RedditHandler):
         """
         super(CommentSearcher, self).__init__(user_agent)
         self.db = CommentsStorage(name="comment searcher")
-        self.comment_queue = ProductionQueue(name="comment searcher")
+        self.comment_queue = CommentQueue(name="comment searcher")
         self.states_handler = StatesHandler(name="comment searcher")
         self.subs = {}
 

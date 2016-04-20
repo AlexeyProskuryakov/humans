@@ -20,7 +20,7 @@ from wsgi.rr_people import USER_AGENTS, \
 from wsgi.rr_people.ae import ActionGenerator, time_hash
 from wsgi.rr_people.consumer import Consumer, HumanConfiguration, FakeConsumer
 from wsgi.rr_people.posting.posts import PostsStorage, PS_POSTED
-from wsgi.rr_people.queue import ProductionQueue
+from wsgi.rr_people.queue import CommentQueue, PostQueue
 from wsgi.rr_people.states import StatesHandler
 
 log = logging.getLogger("he")
@@ -80,7 +80,8 @@ class Kapellmeister(Process):
         self.ae = ActionGenerator(group_name=name)
         self.human = human_class(login=name)
         self.states_handler = StatesHandler(name="kplmtr of [%s]" % name)
-        self.queue = ProductionQueue(name="klmtr of [%s]" % name)
+        self.comment_queue = CommentQueue(name="klmtr of [%s]" % name)
+        self.post_queue = PostQueue(name="klmtr of [%s]" % name)
         self.lock = Lock()
         log.info("Human kapellmeister inited.")
 
@@ -104,10 +105,6 @@ class Kapellmeister(Process):
             self.states_handler.set_human_state(self.human_name, new_state)
             return True
 
-    def get_force_action(self):
-        action = self.queue.pop_force_action(self.human_name)
-        return action
-
     def _do_force_action(self, action_config):
         completed = False
         action = action_config.get("action")
@@ -124,7 +121,7 @@ class Kapellmeister(Process):
         if action == A_COMMENT:
             if self.human.can_do(A_COMMENT):
                 sub_name = random.choice(subs)
-                comment = self.queue.pop_comment_hash(sub_name)
+                comment = self.comment_queue.pop_comment_hash(sub_name)
                 if comment:
                     pfn, ct = comment
                     log.info("will comment [%s] [%s]" % (pfn, ct))
@@ -133,7 +130,7 @@ class Kapellmeister(Process):
                 else:
                     log.info("will send need comment for sub [%s]" % sub_name)
                     self.set_state(WORK_STATE("need comment"))
-                    self.queue.need_comment(sub_name)
+                    self.comment_queue.need_comment(sub_name)
 
             else:
                 log.info("will live random can not comment")
@@ -142,7 +139,7 @@ class Kapellmeister(Process):
         elif action == A_POST:
             if self.human.can_do(A_POST):
                 sub_name = random.choice(subs)
-                url_hash = self.queue.pop_post(sub_name)
+                url_hash = self.post_queue.pop_post(sub_name)
                 if url_hash:
                     self.set_state(WORK_STATE("posting"))
                     self.human.do_post(url_hash)
@@ -186,7 +183,7 @@ class Kapellmeister(Process):
 
             action = self.ae.get_action(step)
             if action != A_SLEEP:
-                force_action = prev_force_action or self.get_force_action()
+                force_action = prev_force_action or self.post_queue.pop_force_action(self.human_name)
                 completed = False
                 if force_action:
                     log.info("[%s] have force action %s" % (self.human_name, force_action))

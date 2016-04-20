@@ -12,7 +12,7 @@ __author__ = 'alesha'
 def module_path():
     if hasattr(sys, "frozen"):
         return os.path.dirname(
-                sys.executable
+            sys.executable
         )
     return os.path.dirname(__file__)
 
@@ -59,13 +59,17 @@ comments_mongo_uri = "mongodb://milena:sederfes100500@ds015760.mlab.com:15760/hu
 comments_db_name = "humans_comments"
 expire_low_copies_posts = 3600 * 24 * 7
 
-queue_redis_address = "pub-redis-11997.us-east-1-3.7.ec2.redislabs.com"
-queue_redis_port = 11997
-queue_redis_password = "sederfes100500"
+comment_redis_address = "pub-redis-11997.us-east-1-3.7.ec2.redislabs.com"
+comment_redis_port = 11997
+comment_redis_password = "sederfes100500"
 
 states_redis_address = "pub-redis-17140.us-east-1.1.azure.garantiadata.com"
 states_redis_port = 17140
 states_redis_password = "sederfes100500"
+
+posts_redis_address = "pub-redis-11691.us-east-1-4.2.ec2.garantiadata.com"
+posts_redis_port = 11691
+posts_redis_password = "sederfes100500"
 
 redis_max_connections = 2
 
@@ -121,7 +125,7 @@ YOUTUBE_DEVELOPER_KEY = "AIzaSyCYF4GPkVpdYjZ5RpDaSMcbpRpfkavnUzc"
 YOUTUBE_API_SERVICE_NAME = "youtube"
 YOUTUBE_API_VERSION = "v3"
 
-force_post_manager_sleep_iteration_time = 3600 #время через которое он будет сканировать ютуб
+force_post_manager_sleep_iteration_time = 3600  # время через которое он будет сканировать ютуб
 
 test_mode = os.environ.get("RR_TEST", "false").strip().lower() in ("true", "1", "yes")
 print "TEST? ", test_mode

@@ -3,8 +3,9 @@ import logging
 
 import redis
 
-from wsgi.properties import queue_redis_address, queue_redis_password, queue_redis_port
-from wsgi.rr_people import deserialize, S_STOP, serialize
+from wsgi.properties import comment_redis_address, comment_redis_password, comment_redis_port, posts_redis_address, \
+    posts_redis_port, posts_redis_password
+from wsgi.rr_people import deserialize, serialize
 
 log = logging.getLogger("pq")
 
@@ -15,20 +16,27 @@ POST_ID = lambda x: "post_id_%s" % x
 
 NEED_COMMENT = "need_comment"
 
-QUEUE_FORCE_ACTIONS = lambda x:"fa_queue_%s"%x
+QUEUE_FORCE_ACTIONS = lambda x: "fa_queue_%s" % x
 
 
-class ProductionQueue():
-    def __init__(self, name="?", clear=False):
-        self.redis = redis.StrictRedis(host=queue_redis_address,
-                                       port=queue_redis_port,
-                                       password=queue_redis_password,
-                                       db=0
+
+
+class Queue(object):
+    def __init__(self, name="?", clear=False, host=None, port=None, pwd=None, db=None):
+        self.redis = redis.StrictRedis(host=host or comment_redis_address,
+                                       port=port or comment_redis_port,
+                                       password=pwd or comment_redis_password,
+                                       db=db or 0
                                        )
         if clear:
             self.redis.flushdb()
 
         log.info("Production Queue inited for [%s]" % name)
+
+
+class CommentQueue(Queue):
+    def __init__(self, name="?", clear=False, host=None, port=None, pwd=None, db=None):
+        super(CommentQueue, self).__init__("comment queue %s" % name, clear, host, port, pwd, db)
 
     def need_comment(self, sbrdt):
         self.redis.publish(NEED_COMMENT, sbrdt)
@@ -52,6 +60,11 @@ class ProductionQueue():
     def get_all_comments(self, sbrdt):
         result = self.redis.lrange(QUEUE_CF(sbrdt), 0, -1)
         return dict(map(lambda x: deserialize(x), result))
+
+
+class PostQueue(Queue):
+    def __init__(self, name="?", clear=False, host=None, port=None, pwd=None, db=None):
+        super(PostQueue, self).__init__("post queue %s"%name, clear, posts_redis_address, posts_redis_port, posts_redis_password, db)
 
     def put_post(self, sbrdt, post_hash):
         self.redis.rpush(QUEUE_PG(sbrdt), post_hash)

@@ -541,12 +541,12 @@ def create():
     a_s = AuthorsStorage()
     a_s.authors.delete_many({})
 
-    from wsgi.rr_people.reader import CommentSearcher, ProductionQueue
+    from wsgi.rr_people.reader import CommentSearcher, CommentQueue
     from wsgi.db import HumanStorage
 
     db = HumanStorage()
     cs = CommentSearcher(db, add_authors=True)
-    cq = ProductionQueue()
+    cq = CommentQueue()
 
     sbrdt = "videos"
     for post, comment in cs.find_comment(sbrdt):
