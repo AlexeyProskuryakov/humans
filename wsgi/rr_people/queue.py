@@ -16,10 +16,6 @@ POST_ID = lambda x: "post_id_%s" % x
 
 NEED_COMMENT = "need_comment"
 
-QUEUE_FORCE_ACTIONS = lambda x: "fa_queue_%s" % x
-
-
-
 
 class Queue(object):
     def __init__(self, name="?", clear=False, host=None, port=None, pwd=None, db=None):
@@ -36,7 +32,11 @@ class Queue(object):
 
 class CommentQueue(Queue):
     def __init__(self, name="?", clear=False, host=None, port=None, pwd=None, db=None):
-        super(CommentQueue, self).__init__("comment queue %s" % name, clear, host, port, pwd, db)
+        super(CommentQueue, self).__init__("comment queue %s" % name, clear,
+                                           comment_redis_address,
+                                           comment_redis_port,
+                                           comment_redis_password,
+                                           0)
 
     def need_comment(self, sbrdt):
         self.redis.publish(NEED_COMMENT, sbrdt)
@@ -64,7 +64,11 @@ class CommentQueue(Queue):
 
 class PostQueue(Queue):
     def __init__(self, name="?", clear=False, host=None, port=None, pwd=None, db=None):
-        super(PostQueue, self).__init__("post queue %s"%name, clear, posts_redis_address, posts_redis_port, posts_redis_password, db)
+        super(PostQueue, self).__init__("post queue %s" % name, clear,
+                                        posts_redis_address,
+                                        posts_redis_port,
+                                        posts_redis_password,
+                                        0)
 
     def put_post(self, sbrdt, post_hash):
         self.redis.rpush(QUEUE_PG(sbrdt), post_hash)
@@ -76,12 +80,3 @@ class PostQueue(Queue):
     def show_all_posts_hashes(self, sbrdt):
         result = self.redis.lrange(QUEUE_PG(sbrdt), 0, -1)
         return result
-
-    def put_force_action(self, human_name, action_data):
-        serialized_data = json.dumps(action_data)
-        self.redis.rpush(QUEUE_FORCE_ACTIONS(human_name), serialized_data)
-
-    def pop_force_action(self, human_name):
-        serialised_data = self.redis.lpop(QUEUE_FORCE_ACTIONS(human_name))
-        if serialised_data:
-            return json.loads(serialised_data)

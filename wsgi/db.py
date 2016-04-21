@@ -95,8 +95,8 @@ class HumanStorage(DBHandler):
             return found.get("subs", [])
         return []
 
-    def set_human_channel_id(self, name, channel_id):
-        self.human_config.update_one({"user":name}, {'$set':{'channel_id':channel_id}})
+    def set_human_channel_id(self, name, channel_id, subs_to_post=None):
+        self.human_config.update_one({"user":name}, {'$set':{'channel_id':channel_id, 'subs_to_post':subs_to_post}})
 
     def get_all_channel_ids(self):
         data = self.human_config.find({}, projection={"channel_id":True, "user":True})

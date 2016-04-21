@@ -14,6 +14,7 @@ from wsgi.properties import WEEK
 from wsgi.rr_people import RedditHandler, USER_AGENTS, A_CONSUME, A_VOTE, A_COMMENT, A_POST, A_SUBSCRIBE, normalize, \
     A_FRIEND, re_url
 from wsgi.rr_people.posting.posts import PostsStorage, PS_POSTED, PS_ERROR
+from wsgi.rr_people.posts_managing import PostHandler
 from wsgi.rr_people.reader import CommentsStorage
 
 log = logging.getLogger("consumer")
@@ -80,7 +81,7 @@ class Consumer(RedditHandler):
         super(Consumer, self).__init__()
         self.db = HumanStorage(name="consumer %s" % login)
         self.comment_storage = CommentsStorage(name="consumer %s" % login)
-        self.posts_storage = PostsStorage(name="consumer %s" % login)
+        self.posts_handler = PostHandler("consumer %s"%login)
 
         human_configuration = self.db.get_human_config(login)
         login_credentials = self.db.get_human_access_credentials(login)
@@ -120,7 +121,7 @@ class Consumer(RedditHandler):
 
     def init_engine(self, login_credentials):
         self.user_agent = login_credentials.get("user_agent", random.choice(USER_AGENTS))
-        self.user_name = login_credentials["user"]
+        self.name = login_credentials["user"]
 
         r = Reddit(self.user_agent)
 
@@ -130,13 +131,13 @@ class Consumer(RedditHandler):
         r.login(login_credentials["user"], login_credentials["pwd"], disable_warning=True)
 
         self.access_information = login_credentials.get("info")
-        self.login_credentials = {"user": self.user_name, "pwd": login_credentials["pwd"]}
+        self.login_credentials = {"user": self.name, "pwd": login_credentials["pwd"]}
         self.reddit = r
         self.refresh_token()
 
     def refresh_token(self):
         self.access_information = self.reddit.refresh_access_information(self.access_information['refresh_token'])
-        self.db.update_human_access_credentials_info(self.user_name, self.access_information)
+        self.db.update_human_access_credentials_info(self.name, self.access_information)
         self.reddit.login(self.login_credentials["user"], self.login_credentials["pwd"], disable_warning=True)
 
     def incr_counter(self, name):
@@ -173,7 +174,7 @@ class Consumer(RedditHandler):
                                        A_COMMENT: commenting,
                                        A_POST: posting
                                        }
-        log.info("MY [%s] WORK CYCLE: %s" % (self.user_name, self.action_function_params))
+        log.info("MY [%s] WORK CYCLE: %s" % (self.name, self.action_function_params))
         return self.action_function_params
 
     def can_do(self, action):
@@ -206,9 +207,9 @@ class Consumer(RedditHandler):
         if step_type == A_FRIEND:
             self.last_friend_add = time.time()
 
-        self.db.save_log_human_row(self.user_name, step_type, info or {})
+        self.db.save_log_human_row(self.name, step_type, info or {})
         self.persist_state()
-        log.info("step by [%s] |%s|: %s", self.user_name, step_type, info)
+        log.info("step by [%s] |%s|: %s", self.name, step_type, info)
 
         if info and info.get("fullname"):
             self._used.add(info.get("fullname"))
@@ -224,7 +225,7 @@ class Consumer(RedditHandler):
         return friend_name not in self.friends and time.time() - self.last_friend_add > random.randint(WEEK / 5, WEEK)
 
     def persist_state(self):
-        self.db.update_human_internal_state(self.user_name, state=self.state)
+        self.db.update_human_internal_state(self.name, state=self.state)
 
     def do_see_post(self, post):
         """
@@ -275,7 +276,7 @@ class Consumer(RedditHandler):
                             self.friends.add(c_author.name)
                             self.register_step(A_FRIEND, info={"friend": c_author.name, "from": "comment"})
                             log.info("%s was add friend from comment %s because want coefficient is: %s",
-                                     (self.user_name, comment.fullname, self.configuration.comment_friend))
+                                     (self.name, comment.fullname, self.configuration.comment_friend))
                             self.wait(self.configuration.max_wait_time / 10)
                         except Exception as e:
                             log.exception(e)
@@ -288,7 +289,7 @@ class Consumer(RedditHandler):
                     for url in urls:
                         try:
                             res = requests.get(url, headers={"User-Agent": self.user_agent})
-                            log.info("%s was consume comment url: %s" % (self.user_name, res.url))
+                            log.info("%s was consume comment url: %s" % (self.name, res.url))
                         except Exception as e:
                             pass
                     if urls:
@@ -313,14 +314,14 @@ class Consumer(RedditHandler):
                 self.friends.add(post.author.name)
                 self.register_step(A_FRIEND, info={"fullname": post.author.name, "from": "post"})
                 log.info("%s was add friend from post %s because want coefficient is: %s" % (
-                    self.user_name, post.fullname, self.configuration.author_friend))
+                    self.name, post.fullname, self.configuration.author_friend))
                 self.wait(self.configuration.max_wait_time / 5)
             except Exception as e:
                 log.exception(e)
 
     def set_configuration(self, configuration):
         self.configuration = configuration
-        log.info("For %s configuration is setted: %s" % (self.user_name, configuration.data))
+        log.info("For %s configuration is setted: %s" % (self.name, configuration.data))
 
     def wait(self, max_wait_time):
         if max_wait_time > 1:
@@ -351,12 +352,12 @@ class Consumer(RedditHandler):
                 try:
                     comment_text = self.comment_storage.get_text(comment_id)
                     text_hash = hash(normalize(comment_text))
-                    if self.comment_storage.can_comment_post(self.user_name,
+                    if self.comment_storage.can_comment_post(self.name,
                                                              post_fullname=_post.fullname,
                                                              hash=text_hash):
                         response = _post.add_comment(comment_text)
                         self.comment_storage.set_post_commented(_post.fullname,
-                                                                by=self.user_name,
+                                                                by=self.name,
                                                                 hash=text_hash)
                         self.register_step(A_COMMENT, info={"fullname": post_fullname, "sub": subreddit_name,
                                                             "response": response.__dict__})
@@ -377,9 +378,9 @@ class Consumer(RedditHandler):
             return list(f())
 
         counter = 0
-        subs = self.db.get_human_subs(self.user_name)
+        subs = self.db.get_human_subs(self.name)
         if not subs:
-            log.error("For %s not any subs at config :(", self.user_name)
+            log.error("For %s not any subs at config :(", self.name)
             return
 
         random_sub = random.choice(subs)
@@ -404,8 +405,8 @@ class Consumer(RedditHandler):
                 self._last_post_ids[random_sub] = i
                 return
 
-    def do_post(self, url_hash, forced=False):
-        post_data = self.posts_storage.get_post(url_hash)
+    def do_post(self):
+        post_data = self.posts_handler.get_post(self.name)
         if not post_data:
             log.warn("no normal posts for %s" % url_hash)
             return
@@ -423,10 +424,10 @@ class Consumer(RedditHandler):
         log.info("was post at [%s]; title: [%s]; url: [%s]" % (sub, post.title, post.url))
         if isinstance(result, Submission):
             self.register_step(A_POST, {"fullname": result.fullname, "sub": sub, 'title': post.title, 'url': post.url})
-            self.posts_storage.set_post_state(url_hash, PS_POSTED)
+            self.posts_handler.set_post_state(post_data.url_hash, PS_POSTED)
             log.info("OK! result: %s" % (result))
         else:
-            self.posts_storage.set_post_state(url_hash, PS_ERROR)
+            self.posts_handler.set_post_state(post_data.url_hash, PS_ERROR)
             log.info("NOT OK :( result: %s" % (result))
 
 

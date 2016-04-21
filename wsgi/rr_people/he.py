@@ -81,7 +81,6 @@ class Kapellmeister(Process):
         self.human = human_class(login=name)
         self.states_handler = StatesHandler(name="kplmtr of [%s]" % name)
         self.comment_queue = CommentQueue(name="klmtr of [%s]" % name)
-        self.post_queue = PostQueue(name="klmtr of [%s]" % name)
         self.lock = Lock()
         log.info("Human kapellmeister inited.")
 
@@ -105,17 +104,6 @@ class Kapellmeister(Process):
             self.states_handler.set_human_state(self.human_name, new_state)
             return True
 
-    def _do_force_action(self, action_config):
-        completed = False
-        action = action_config.get("action")
-        if action == A_POST:
-            if self.human.can_do(A_POST):
-                sub = action_config.get("sub")
-                url_hash = action_config.get("url_hash")
-                self.set_state(WORK_STATE("force post at %s" % (sub)))
-                self.human.do_post(url_hash)
-                completed = True
-        return completed
 
     def _do_action(self, action, subs, step, _start):
         if action == A_COMMENT:
@@ -138,14 +126,8 @@ class Kapellmeister(Process):
 
         elif action == A_POST:
             if self.human.can_do(A_POST):
-                sub_name = random.choice(subs)
-                url_hash = self.post_queue.pop_post(sub_name)
-                if url_hash:
-                    self.set_state(WORK_STATE("posting"))
-                    self.human.do_post(url_hash)
-                else:
-                    self.set_state(WORK_STATE("[%s] no posts at [%s] in queue :( " % (self.human_name, sub_name)))
-                    log.error("[%s] no posts at [%s] in queue :( " % (self.human_name, sub_name))
+                self.set_state(WORK_STATE("posting"))
+                self.human.do_post()
         else:
             self.set_state(WORK_STATE("live random"))
             self.human.do_live_random(max_actions=random.randint(10, 20))
@@ -166,7 +148,7 @@ class Kapellmeister(Process):
         step = t_start
         last_token_refresh_time = t_start
         subs = self.main_storage.get_human_subs(self.human_name)
-        prev_force_action = None
+
         while 1:
             _start = time.time()
 
@@ -183,20 +165,7 @@ class Kapellmeister(Process):
 
             action = self.ae.get_action(step)
             if action != A_SLEEP:
-                force_action = prev_force_action or self.post_queue.pop_force_action(self.human_name)
-                completed = False
-                if force_action:
-                    log.info("[%s] have force action %s" % (self.human_name, force_action))
-                    if self._do_force_action(force_action):
-                        log.info("[%s] complete force action" % self.human_name)
-                        prev_force_action = None
-                        completed = True
-                    else:
-                        log.info("[%s] not complete force action" % self.human_name)
-                        prev_force_action = force_action
-
-                if not force_action or not completed:
-                    step = self._do_action(action, subs, step, _start)
+                step = self._do_action(action, subs, step, _start)
             else:
                 if not self.set_state(S_SLEEP):
                     return
