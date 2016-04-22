@@ -81,7 +81,7 @@ class Consumer(RedditHandler):
         super(Consumer, self).__init__()
         self.db = HumanStorage(name="consumer %s" % login)
         self.comment_storage = CommentsStorage(name="consumer %s" % login)
-        self.posts_handler = PostHandler("consumer %s"%login)
+        self.posts_handler = PostHandler("consumer %s" % login)
 
         human_configuration = self.db.get_human_config(login)
         login_credentials = self.db.get_human_access_credentials(login)
@@ -406,14 +406,12 @@ class Consumer(RedditHandler):
                 return
 
     def do_post(self):
-        post_data = self.posts_handler.get_post(self.name)
-        if not post_data:
-            log.warn("no normal posts for %s" % url_hash)
+        post = self.posts_handler.get_post(self.name)
+        if not post:
+            log.warn("no posts for me [%s] :(" % self.name)
             return
-        post, sub = post_data
-        sub = post.for_sub or sub
 
-        subreddit = self.get_subreddit(sub)
+        subreddit = self.get_subreddit(post.for_sub)
 
         time_to_write = int(len(post.title) / random.randint(2, 4))
         log.info("will posting and write post on %s seconds" % time_to_write)
@@ -421,15 +419,15 @@ class Consumer(RedditHandler):
 
         result = subreddit.submit(save=True, title=post.title, url=post.url)
 
-        log.info("was post at [%s]; title: [%s]; url: [%s]" % (sub, post.title, post.url))
+        log.info("was post at [%s]; title: [%s]; url: [%s]" % (post.for_sub, post.title, post.url))
         if isinstance(result, Submission):
-            self.register_step(A_POST, {"fullname": result.fullname, "sub": sub, 'title': post.title, 'url': post.url})
-            self.posts_handler.set_post_state(post_data.url_hash, PS_POSTED)
+            self.register_step(A_POST,
+                               {"fullname": result.fullname, "sub": post.for_sub, 'title': post.title, 'url': post.url})
+            self.posts_handler.set_post_state(post.url_hash, PS_POSTED)
             log.info("OK! result: %s" % (result))
         else:
-            self.posts_handler.set_post_state(post_data.url_hash, PS_ERROR)
+            self.posts_handler.set_post_state(post.url_hash, PS_ERROR)
             log.info("NOT OK :( result: %s" % (result))
-
 
 
 class FakeConsumer(Consumer):
@@ -442,7 +440,7 @@ class FakeConsumer(Consumer):
     def do_post(self, url_hash):
         result = self.posts_storage.get_post(url_hash)
         if not result:
-            log.warn("no normal posts for for %s"%url_hash)
+            log.warn("no normal posts for for %s" % url_hash)
         post, sub = result
         log.info("DO POST AT: %s  WITH URL: %s AND TITLE: %s" % (post.for_sub or sub, post.url, post.title))
 

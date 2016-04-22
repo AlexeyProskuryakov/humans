@@ -506,7 +506,7 @@ def prepare_for_posting():
     if sub:
         queue = PostQueue(name="for preparing posting")
         for post in posts_generator.posts_storage.get_posts_for_sub(sub):
-            queue.put_post(sub, post.url_hash)
+            # queue.put_post(sub, post.url_hash) todo here must be another mechanism
             posts_generator.posts_storage.set_post_state(post.url_hash, PS_AT_QUEUE)
         del queue
         return jsonify(**{"ok": True})

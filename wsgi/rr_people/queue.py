@@ -70,13 +70,13 @@ class PostQueue(Queue):
                                         posts_redis_password,
                                         0)
 
-    def put_post(self, sbrdt, post_hash):
-        self.redis.rpush(QUEUE_PG(sbrdt), post_hash)
+    def put_post(self, human_name, url_hash):
+        self.redis.rpush(QUEUE_PG(human_name), url_hash)
 
-    def pop_post(self, sbrdt):
-        result = self.redis.lpop(QUEUE_PG(sbrdt))
+    def pop_post(self, human_name):
+        result = self.redis.lpop(QUEUE_PG(human_name))
         return result
 
-    def show_all_posts_hashes(self, sbrdt):
-        result = self.redis.lrange(QUEUE_PG(sbrdt), 0, -1)
+    def show_all_posts_hashes(self, human_name):
+        result = self.redis.lrange(QUEUE_PG(human_name), 0, -1)
         return result
