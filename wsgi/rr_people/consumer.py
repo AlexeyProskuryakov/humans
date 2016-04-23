@@ -13,8 +13,8 @@ from wsgi.db import HumanStorage
 from wsgi.properties import WEEK
 from wsgi.rr_people import RedditHandler, USER_AGENTS, A_CONSUME, A_VOTE, A_COMMENT, A_POST, A_SUBSCRIBE, normalize, \
     A_FRIEND, re_url
-from wsgi.rr_people.posting.posts import PostsStorage, PS_POSTED, PS_ERROR
-from wsgi.rr_people.posts_managing import PostHandler
+from wsgi.rr_people.posting.posts import PS_POSTED, PS_ERROR
+from wsgi.rr_people.posting.posts_managing import PostHandler
 from wsgi.rr_people.reader import CommentsStorage
 
 log = logging.getLogger("consumer")
