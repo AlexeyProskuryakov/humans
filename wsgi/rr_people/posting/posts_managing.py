@@ -1,29 +1,17 @@
 import logging
 import random
-
-from multiprocessing.process import Process
+from multiprocessing import Process
 
 import time
 
-import re
-
-
-
 from wsgi.db import HumanStorage
-
-
+from wsgi.properties import force_post_manager_sleep_iteration_time
 from wsgi.rr_people.posting.posts import PostsStorage, PostSource
 from wsgi.rr_people.posting.posts_balancer import PostBalancer
+from wsgi.rr_people.posting.youtube_posts import YoutubeChannelsHandler
 from wsgi.rr_people.queue import PostQueue
 
-from wsgi.properties import YOUTUBE_DEVELOPER_KEY, YOUTUBE_API_VERSION, YOUTUBE_API_SERVICE_NAME, \
-    force_post_manager_sleep_iteration_time
-
-from apiclient.discovery import build
-from apiclient.errors import HttpError
-
 log = logging.getLogger("force_action_handler")
-
 
 
 class PostHandler(object):
@@ -87,84 +75,9 @@ class YoutubePostSupplier(Process):
                     log.info("For [%s] found [%s] new posts:\n%s" % (
                         human_data.get("user"), len(new_posts), '\n'.join([str(post) for post in new_posts])))
                     for post in new_posts:
-                        subs = human_data.get("subs_to_post") or human_data.get("subs")
-                        sub = random.choice(subs)
-                        self.post_handler.add_new_post(human_data.get("user"), post, sub, channel, important=True)
+                        self.post_handler.add_new_post(human_data.get("user"),
+                                                       post,
+                                                       post.for_sub,
+                                                       channel,
+                                                       important=True)
             time.sleep(force_post_manager_sleep_iteration_time)
-
-
-YOUTUBE_URL = lambda x: "https://www.youtube.com/watch?v=%s" % x
-
-y_url_re = re.compile("((y2u|youtu)\.be\/|youtube\.com\/watch\?v\=)(?P<id>[a-zA-Z0-9]+)")
-
-
-class YoutubeChannelsHandler(object):
-    def __init__(self, ps=None):
-        self.youtube = build(YOUTUBE_API_SERVICE_NAME, YOUTUBE_API_VERSION,
-                             developerKey=YOUTUBE_DEVELOPER_KEY)
-        self.posts_storage = ps or PostsStorage(name="youtube posts supplier")
-
-    def _form_posts_on_videos_info(self, items):
-        result = []
-        for video_info in items:
-            id = video_info.get("id", {}).get("videoId")
-            title = video_info.get("snippet", {}).get("title") or video_info.get("snippet", {}).get("description")
-            if id:
-                url = YOUTUBE_URL(id)
-                result.append(PostSource(url=url, title=title))
-            else:
-                log.warn("video: \n%s\nis have not id :( " % video_info)
-        return result
-
-    def _get_new_videos(self, posts):
-        result = []
-        for post in posts:
-            if self.posts_storage.get_post_state(post.url_hash):
-                break
-            result.append(post)
-        return result
-
-    def get_new_channel_videos(self, channel_id):
-        items = []
-        q = {"channelId": channel_id,
-             "part": "snippet",
-             "maxResults": 50,
-             "order": "date"}
-        while 1:
-            search_result = self.youtube.search().list(**q).execute()
-            prep_videos = self._form_posts_on_videos_info(search_result.get("items"))
-            new_videos = self._get_new_videos(prep_videos)
-            items.extend(new_videos)
-            if len(new_videos) < len(prep_videos):
-                break
-
-            total_results = search_result.get("pageInfo").get("totalResults")
-            if len(items) == total_results or not search_result.get("nextPageToken"):
-                break
-            else:
-                q['pageToken'] = search_result.get("nextPageToken")
-
-        return items
-
-    def get_video_id(self, post_url):
-        found = y_url_re.findall(post_url)
-        if found:
-            found = found[0]
-            return found[-1]
-
-    def get_channel_id(self, post_url):
-        video_id = self.get_video_id(post_url)
-        if not video_id: return
-        video_response = self.youtube.videos().list(
-            id=video_id,
-            part='snippet'
-        ).execute()
-        for item in video_response.get('items'):
-            snippet = item.get("snippet")
-            return snippet.get("channelId")
-
-
-if __name__ == '__main__':
-    yps = YoutubeChannelsHandler()
-    # videos = yps.get_channel_videos("UC1J8hBTK7oKIfgCMvN7Fwag")
-    print yps.get_channel_id("https://youtu.be/QtxlCsVKkvY?t=1")

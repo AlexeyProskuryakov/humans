@@ -76,7 +76,7 @@ class PostsStorage(DBHandler):
         if found:
             return PostSource.from_dict(found), found.get('sub')
 
-    def add_generated_post(self, post, sub, important=False):
+    def add_generated_post(self, post, sub, important=False, channel_id=None):
         if isinstance(post, PostSource):
             found = self.get_post(post.url_hash)
             if not found:
