@@ -20,15 +20,16 @@ class PostSource(object):
         ps = PostSource(data.get("url"),
                         data.get("title"),
                         data.get("for_sub"),
-                        data.get("at_time"))
+                        data.get("at_time"),
+                        data.get("url_hash"))
         return ps
 
-    def __init__(self, url=None, title=None, for_sub=None, at_time=None):
+    def __init__(self, url=None, title=None, for_sub=None, at_time=None, url_hash=None):
         self.url = url
         self.title = title
         self.for_sub = for_sub
         self.at_time = at_time
-        self.url_hash = hash(url)
+        self.url_hash = url_hash or hash(url)
 
     def serialize(self):
         return json.dumps(self.__dict__)

@@ -21,7 +21,7 @@ class PostHandler(object):
         self.youtube = YoutubeChannelsHandler(self.posts_storage)
         self.balancer = PostBalancer()
 
-    def add_new_post(self, human_name, post_source, sub, channel_id, important=False):
+    def add_new_post(self, human_name, post_source, sub, channel_id=None, important=False):
         if isinstance(post_source, PostSource):
             self.posts_storage.add_generated_post(post_source, sub, important=important)
             self.balancer.add_post(post_source.url_hash, channel_id, important=important, human_name=human_name)
