@@ -9,13 +9,12 @@ from praw import Reddit
 from praw.objects import MoreComments, Submission
 
 from wsgi import properties
-from wsgi.db import HumanStorage
+from wsgi.db import HumanStorage, CommentsStorage
 from wsgi.properties import WEEK
 from wsgi.rr_people import RedditHandler, USER_AGENTS, A_CONSUME, A_VOTE, A_COMMENT, A_POST, A_SUBSCRIBE, normalize, \
     A_FRIEND, re_url
 from wsgi.rr_people.posting.posts import PS_POSTED, PS_ERROR
 from wsgi.rr_people.posting.posts_managing import PostHandler
-from wsgi.rr_people.reader import CommentsStorage
 
 log = logging.getLogger("consumer")
 
@@ -437,12 +436,8 @@ class FakeConsumer(Consumer):
     def refresh_token(self):
         log.info("REFRESH TOKEN")
 
-    def do_post(self, url_hash):
-        result = self.posts_storage.get_post(url_hash)
-        if not result:
-            log.warn("no normal posts for for %s" % url_hash)
-        post, sub = result
-        log.info("DO POST AT: %s  WITH URL: %s AND TITLE: %s" % (post.for_sub or sub, post.url, post.title))
+    def do_post(self):
+        log.info("DO POSTING...")
 
     def do_comment_post(self, post_fullname, subreddit_name, comment_id):
         text = self.comment_storage.get_text(comment_id)

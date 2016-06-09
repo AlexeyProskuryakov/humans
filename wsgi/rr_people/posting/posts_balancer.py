@@ -9,6 +9,7 @@ from wsgi.db import DBHandler, HumanStorage
 from wsgi.rr_people import Singleton
 from wsgi.rr_people.posting.posts import PS_AT_QUEUE, PostsStorage
 from wsgi.rr_people.queue import PostQueue
+from wsgi.rr_people.states.processes import ProcessDirector
 
 MAX_BATCH_SIZE = 10
 
@@ -105,6 +106,8 @@ class PostBalancerEngine(Process):
 
         self.out_queue = out_queue
 
+        self.pd = ProcessDirector("balancer")
+
         log.info("post balancer inited")
 
     def _load_human_sub_mapping(self):
@@ -141,6 +144,10 @@ class PostBalancerEngine(Process):
         self.batch_storage.init_new_batch(human_name, url_hash, channel_id)
 
     def run(self):
+        if not self.pd.start_aspect("post_balancer", self.pid):
+            log.info("another balancer worked")
+            return
+
         log.info("post balancer started")
         while 1:
             try:

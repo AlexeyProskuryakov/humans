@@ -1,8 +1,6 @@
 import logging
-import random
-from multiprocessing import Process
-
 import time
+from multiprocessing import Process
 
 from wsgi.db import HumanStorage
 from wsgi.properties import force_post_manager_sleep_iteration_time

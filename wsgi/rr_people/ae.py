@@ -538,6 +538,7 @@ def group_and_visualise_gen(for_time=DAY * 2):
 
 
 def create():
+    #todo rewrite this code to undepend of reader
     a_s = AuthorsStorage()
     a_s.authors.delete_many({})
 

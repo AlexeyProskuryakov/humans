@@ -7,7 +7,7 @@ from datetime import datetime
 from pymongo import MongoClient
 from pymongo.errors import CollectionInvalid
 
-from wsgi.properties import mongo_uri, db_name, TIME_TO_WAIT_NEW_COPIES
+from wsgi.properties import mongo_uri, db_name, TIME_TO_WAIT_NEW_COPIES, comments_mongo_uri, comments_db_name
 
 __author__ = 'alesha'
 
@@ -35,9 +35,9 @@ class HumanStorage(DBHandler):
 
         try:
             self.human_log = db.create_collection(
-                    "human_log",
-                    capped=True,
-                    size=1024 * 1024 * 50,
+                "human_log",
+                capped=True,
+                size=1024 * 1024 * 50,
             )
             self.human_log.create_index([("human_name", 1)])
             self.human_log.create_index([("time", 1)], expireAfterSeconds=3600 * 24)
@@ -52,7 +52,6 @@ class HumanStorage(DBHandler):
         except CollectionInvalid as e:
             self.human_config = db.get_collection("human_config")
 
-
     def update_human_access_credentials_info(self, user, info):
         if isinstance(info.get("scope"), set):
             info['scope'] = list(info['scope'])
@@ -62,12 +61,12 @@ class HumanStorage(DBHandler):
         found = self.human_config.find_one({"user": user})
         if not found:
             self.human_config.insert_one(
-                    {"client_id": client_id,
-                     "client_secret": client_secret,
-                     "redirect_uri": redirect_uri,
-                     "user": user,
-                     "pwd": pwd
-                     })
+                {"client_id": client_id,
+                 "client_secret": client_secret,
+                 "redirect_uri": redirect_uri,
+                 "user": user,
+                 "pwd": pwd
+                 })
         else:
             self.human_config.update_one({"user": user}, {"$set": {"client_id": client_id,
                                                                    "client_secret": client_secret,
@@ -90,17 +89,16 @@ class HumanStorage(DBHandler):
         self.human_config.update_one({"user": name}, {"$set": {"subs": subreddits}})
 
     def get_human_subs(self, name):
-        found = self.human_config.find_one({"user": name}, projection={"subs":True})
+        found = self.human_config.find_one({"user": name}, projection={"subs": True})
         if found:
             return found.get("subs", [])
         return []
 
     def set_human_channel_id(self, name, channel_id, subs_to_post=None):
-        self.human_config.update_one({"user":name}, {'$set':{'channel_id':channel_id, 'subs_to_post':subs_to_post}})
-
+        self.human_config.update_one({"user": name}, {'$set': {'channel_id': channel_id, 'subs_to_post': subs_to_post}})
 
     def get_all_humans_subs(self):
-        cfg = self.human_config.find({}, projection={"subs":True})
+        cfg = self.human_config.find({}, projection={"subs": True})
         subs = []
         for el in cfg:
             subs.extend(el.get("subs", []))
@@ -122,7 +120,7 @@ class HumanStorage(DBHandler):
             return result
 
     def get_human_internal_state(self, name):
-        found = self.human_config.find_one({"user": name}, projection={"ss":True, "frds":True})
+        found = self.human_config.find_one({"user": name}, projection={"ss": True, "frds": True})
         if found:
             return {"ss": set(found.get("ss", [])),  # subscribed subreddits
                     "frds": set(found.get("frds", [])),  # friends
@@ -132,7 +130,7 @@ class HumanStorage(DBHandler):
         self.human_config.update_one({'user': name}, {"$set": {"live_config": configuration.data}})
 
     def get_human_live_configuration(self, name):
-        found = self.human_config.find_one({"user": name}, projection={"live_config":True})
+        found = self.human_config.find_one({"user": name}, projection={"live_config": True})
         if found:
             live_config = found.get("live_config")
             return live_config
@@ -140,14 +138,13 @@ class HumanStorage(DBHandler):
     def get_human_config(self, name):
         return self.human_config.find_one({"user": name})
 
-
     #################HUMAN LOG
     def save_log_human_row(self, human_name, action_name, info):
         self.human_log.insert_one(
-                {"human_name": human_name,
-                 "action": action_name,
-                 "time": datetime.utcnow(),
-                 "info": info})
+            {"human_name": human_name,
+             "action": action_name,
+             "time": datetime.utcnow(),
+             "info": info})
 
     def get_log_of_human(self, human_name, limit=None):
         res = self.human_log.find({"human_name": human_name}).sort("time", -1)
@@ -188,6 +185,67 @@ class HumanStorage(DBHandler):
             if crupt == found.get("pwd"):
                 return found.get("user_id")
 
+
+class CommentsStorage(DBHandler):
+    def __init__(self, name="?"):
+        super(CommentsStorage, self).__init__(name=name, uri=comments_mongo_uri, db_name=comments_db_name)
+        self.comments = self.db.get_collection("comments")
+        if not self.comments:
+            self.comments = self.db.create_collection(
+                "comments",
+                capped=True,
+                size=1024 * 1024 * 256,
+            )
+            self.comments.drop_indexes()
+
+            self.comments.create_index([("fullname", 1)], unique=True)
+            self.comments.create_index([("commented", 1)], sparse=True)
+            self.comments.create_index([("ready_for_comment", 1)], sparse=True)
+            self.comments.create_index([("text_hash", 1)], sparse=True)
+
+    def set_post_commented(self, post_fullname, by, hash):
+        found = self.comments.find_one({"fullname": post_fullname, "commented": {"$exists": False}})
+        if not found:
+            to_add = {"fullname": post_fullname, "commented": True, "time": time.time(), "text_hash": hash, "by": by}
+            self.comments.insert_one(to_add)
+        else:
+            to_set = {"commented": True, "text_hash": hash, "by": by, "time": time.time()}
+
+            self.comments.update_one({"fullname": post_fullname}, {"$set": to_set, "$unset": {"comment_body": 1}}, )
+
+    def can_comment_post(self, who, post_fullname, hash):
+        q = {"by": who, "commented": True, "$or": [{"fullname": post_fullname}, {"text_hash": hash}]}
+        found = self.comments.find_one(q)
+        return found is None
+
+    def set_post_ready_for_comment(self, post_fullname, comment_text):
+        found = self.comments.find_one({"fullname": post_fullname})
+        if found and found.get("commented"):
+            return
+        elif found:
+            return self.comments.update_one(found,
+                                            {"$set": {"ready_for_comment": True, "comment_body": comment_text}})
+        else:
+            return self.comments.insert_one(
+                {"fullname": post_fullname, "ready_for_comment": True, "comment_body": comment_text})
+
+    def get_text(self, comment_id):
+        self.comments.find({"_id": comment_id})
+
+    def get_posts_ready_for_comment(self):
+        return list(self.comments.find({"ready_for_comment": True, "commented": {"$exists": False}}))
+
+    def get_post(self, post_fullname):
+        found = self.comments.find_one({"fullname": post_fullname})
+        return found
+
+    def get_posts_commented(self, by=None):
+        q = {"commented": True}
+        if by:
+            q["by"] = by
+        return list(self.comments.find(q))
+
+
 if __name__ == '__main__':
     hs = HumanStorage()
-    hs.save_log_human_row("Shlak2k15","test", {"info":"test"})
+    hs.save_log_human_row("Shlak2k15", "test", {"info": "test"})

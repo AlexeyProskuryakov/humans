@@ -18,10 +18,8 @@ from wsgi.rr_people import USER_AGENTS, \
     S_WORK, S_BAN, S_SLEEP, S_SUSPEND, \
     Singleton, S_STOP
 from wsgi.rr_people.ae import ActionGenerator, time_hash
-from wsgi.rr_people.consumer import Consumer, HumanConfiguration, FakeConsumer
-from wsgi.rr_people.posting.posts import PostsStorage, PS_POSTED
-from wsgi.rr_people.queue import CommentQueue, PostQueue
-from wsgi.rr_people.states import StatesHandler
+from wsgi.rr_people.consumer import Consumer, HumanConfiguration
+from wsgi.rr_people.queue import CommentQueue
 
 log = logging.getLogger("he")
 
