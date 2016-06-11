@@ -43,7 +43,7 @@ def net_tryings(fn):
 
 
 @net_tryings
-def check_any_login(login):
+def check_to_ban(login):
     statuses = set()
     errors = set()
     for i in range(3):
@@ -88,7 +88,7 @@ class Kapellmeister(Process):
             self.human.set_configuration(human_config)
 
     def human_check(self):
-        ok = check_any_login(self.human_name)
+        ok = check_to_ban(self.human_name)
         if not ok:
             self.states_handler.set_human_state(self.human_name, S_BAN)
         return ok
@@ -177,7 +177,6 @@ class HumanOrchestra():
         self.__humans = {}
         self.lock = Lock()
         self.db = HumanStorage(name="human orchestra")
-        self.states = StatesHandler(name="human orchestra")
         Thread(target=self.start_humans, name="Orchestra Human Starter").start()
 
     def start_humans(self):
