@@ -17,7 +17,7 @@ POST_ID = lambda x: "post_id_%s" % x
 NEED_COMMENT = "need_comment"
 
 
-class Queue(object):
+class RedisHandler(object):
     def __init__(self, name="?", clear=False, host=None, port=None, pwd=None, db=None):
         self.redis = redis.StrictRedis(host=host or comment_redis_address,
                                        port=port or comment_redis_port,
@@ -30,13 +30,13 @@ class Queue(object):
         log.info("Production Queue inited for [%s]" % name)
 
 
-class CommentQueue(Queue):
+class CommentRedisHandler(RedisHandler):
     def __init__(self, name="?", clear=False, host=None, port=None, pwd=None, db=None):
-        super(CommentQueue, self).__init__("comment queue %s" % name, clear,
-                                           comment_redis_address,
-                                           comment_redis_port,
-                                           comment_redis_password,
-                                           0)
+        super(CommentRedisHandler, self).__init__("comment queue %s" % name, clear,
+                                                  comment_redis_address,
+                                                  comment_redis_port,
+                                                  comment_redis_password,
+                                                  0)
 
     def need_comment(self, sbrdt):
         self.redis.publish(NEED_COMMENT, sbrdt)
@@ -62,13 +62,13 @@ class CommentQueue(Queue):
         return dict(map(lambda x: deserialize(x), result))
 
 
-class PostQueue(Queue):
+class PostRedisHandler(RedisHandler):
     def __init__(self, name="?", clear=False, host=None, port=None, pwd=None, db=None):
-        super(PostQueue, self).__init__("post queue %s" % name, clear,
-                                        posts_redis_address,
-                                        posts_redis_port,
-                                        posts_redis_password,
-                                        0)
+        super(PostRedisHandler, self).__init__("post queue %s" % name, clear,
+                                               posts_redis_address,
+                                               posts_redis_port,
+                                               posts_redis_password,
+                                               0)
 
     def put_post(self, human_name, url_hash):
         self.redis.rpush(QUEUE_PG(human_name), url_hash)

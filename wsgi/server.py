@@ -24,7 +24,7 @@ from wsgi.rr_people.posting.copy_gen import SubredditsRelationsStore
 from wsgi.rr_people.posting.posts import PS_BAD, PS_AT_QUEUE, PS_READY
 from wsgi.rr_people.posting.posts_generator import PostsGenerator
 from wsgi.rr_people.posting.posts_managing import PostHandler
-from wsgi.rr_people.queue import CommentQueue, PostQueue
+from wsgi.rr_people.queue import CommentRedisHandler, PostRedisHandler
 from wsgi.wake_up import WakeUp, WakeUpStorage
 
 __author__ = '4ikist'

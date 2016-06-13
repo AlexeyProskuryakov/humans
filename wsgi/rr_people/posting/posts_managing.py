@@ -7,14 +7,14 @@ from wsgi.properties import force_post_manager_sleep_iteration_time
 from wsgi.rr_people.posting.posts import PostsStorage, PostSource
 from wsgi.rr_people.posting.posts_balancer import PostBalancer
 from wsgi.rr_people.posting.youtube_posts import YoutubeChannelsHandler
-from wsgi.rr_people.queue import PostQueue
+from wsgi.rr_people.queue import PostRedisHandler
 
 log = logging.getLogger("force_action_handler")
 
 
 class PostHandler(object):
     def __init__(self, name="?", pq=None, ps=None):
-        self.queue = pq or PostQueue("ph %s" % name)
+        self.queue = pq or PostRedisHandler("ph %s" % name)
         self.posts_storage = ps or PostsStorage("ph %s" % name)
         self.youtube = YoutubeChannelsHandler(self.posts_storage)
         self.balancer = PostBalancer()
@@ -57,7 +57,7 @@ class YoutubePostSupplier(Process):
 
     def __init__(self, pq=None, ps=None, ms=None):
         super(YoutubePostSupplier, self).__init__()
-        self.queue = pq or PostQueue("fpm")
+        self.queue = pq or PostRedisHandler("fpm")
         self.posts_storage = ps or PostsStorage("fpm")
         self.main_storage = ms or HumanStorage("fpm")
         self.post_handler = PostHandler(self.queue, self.posts_storage)

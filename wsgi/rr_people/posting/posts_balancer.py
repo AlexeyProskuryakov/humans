@@ -8,7 +8,8 @@ import time
 from wsgi.db import DBHandler, HumanStorage
 from wsgi.rr_people import Singleton
 from wsgi.rr_people.posting.posts import PS_AT_QUEUE, PostsStorage
-from wsgi.rr_people.queue import PostQueue
+from wsgi.rr_people.queue import PostRedisHandler
+from wsgi.rr_people.states.persisted_queue import RedisQueue
 from wsgi.rr_people.states.processes import ProcessDirector
 
 MAX_BATCH_SIZE = 10
@@ -175,9 +176,9 @@ class BalancerTask(object):
         return "%s" % self.__dict__
 
 
-pq = PostQueue("balancer")
+pq = PostRedisHandler("balancer")
 ps = PostsStorage("balancer")
-balancer_queue = Queue()
+balancer_queue = RedisQueue(name="balancer", deserialize=lambda x: BalancerTask(**x))
 
 balancer = PostBalancerEngine(pq, ps, balancer_queue)
 balancer.daemon = True
