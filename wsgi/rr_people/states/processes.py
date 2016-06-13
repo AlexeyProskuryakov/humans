@@ -28,7 +28,7 @@ class ProcessDirector(object):
         self.mutex = Lock()
         log.info("Inited")
 
-    def start_aspect(self, aspect, pid):
+    def can_start_aspect(self, aspect, pid):
         """
         starting or returning False if aspect already started
         :param aspect:
@@ -52,7 +52,7 @@ class ProcessDirector(object):
             else:
                 return {"state": "started", "started": True}
 
-    def stop_aspect(self, aspect):
+    def stop_aspect_signal(self, aspect):
         return self.redis.delete(PREFIX(aspect))
 
     def get_states(self):

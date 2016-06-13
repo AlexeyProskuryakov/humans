@@ -144,7 +144,7 @@ class PostBalancerEngine(Process):
         self.batch_storage.init_new_batch(human_name, url_hash, channel_id)
 
     def run(self):
-        if not self.pd.start_aspect("post_balancer", self.pid):
+        if not self.pd.can_start_aspect("post_balancer", self.pid):
             log.info("another balancer worked")
             return
 

@@ -20,6 +20,7 @@ from wsgi.rr_people import USER_AGENTS, \
 from wsgi.rr_people.ae import ActionGenerator, time_hash
 from wsgi.rr_people.consumer import Consumer, HumanConfiguration
 from wsgi.rr_people.queue import CommentQueue
+from wsgi.rr_people.states.entity_states import StatesHandler
 
 log = logging.getLogger("he")
 
@@ -177,7 +178,9 @@ class HumanOrchestra():
         self.__humans = {}
         self.lock = Lock()
         self.db = HumanStorage(name="human orchestra")
+        self.states = StatesHandler(name="human orchestra")
         Thread(target=self.start_humans, name="Orchestra Human Starter").start()
+
 
     def start_humans(self):
         log.info("Will auto start humans")
