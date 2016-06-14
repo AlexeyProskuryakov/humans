@@ -21,6 +21,7 @@ from wsgi.rr_people.ae import ActionGenerator, time_hash
 from wsgi.rr_people.consumer import Consumer, HumanConfiguration
 from wsgi.rr_people.queue import CommentRedisQueue
 from wsgi.rr_people.states.entity_states import StatesHandler
+from wsgi.rr_people.states.processes import ProcessDirector
 
 log = logging.getLogger("he")
 
@@ -70,8 +71,11 @@ def check_to_ban(login):
 
 WORK_STATE = lambda x: "%s: %s" % (S_WORK, x)
 
+HE_ASPECT = lambda x: "he_%s" % x
+
 
 class Kapellmeister(Process):
+    # todo нужно обвязать очередью через редиску все сигналы для изменения внутреннего состояния
     def __init__(self, name, human_class=Consumer):
         super(Kapellmeister, self).__init__()
         self.main_storage = HumanStorage(name="main storage for [%s]" % name)
@@ -80,6 +84,9 @@ class Kapellmeister(Process):
         self.human = human_class(login=name)
         self.states_handler = StatesHandler(name="kplmtr of [%s]" % name)
         self.comment_queue = CommentRedisQueue(name="klmtr of [%s]" % name)
+
+        self.process_director = ProcessDirector(name="kplmtr of [%s] " % name)
+
         self.lock = Lock()
         log.info("Human kapellmeister inited.")
 
@@ -102,7 +109,6 @@ class Kapellmeister(Process):
         else:
             self.states_handler.set_human_state(self.human_name, new_state)
             return True
-
 
     def _do_action(self, action, subs, step, _start):
         if action == A_COMMENT:
@@ -142,6 +148,10 @@ class Kapellmeister(Process):
         return step
 
     def run(self):
+        if not self.process_director.can_start_aspect(HE_ASPECT(self.human_name), self.pid).get("started"):
+            log.info("another kappelmeister worked...")
+            return
+
         log.info("start kappellmeister for [%s]" % self.human_name)
         t_start = time_hash(datetime.utcnow())
         step = t_start
@@ -180,7 +190,6 @@ class HumanOrchestra():
         self.db = HumanStorage(name="human orchestra")
         self.states = StatesHandler(name="human orchestra")
         Thread(target=self.start_humans, name="Orchestra Human Starter").start()
-
 
     def start_humans(self):
         log.info("Will auto start humans")
