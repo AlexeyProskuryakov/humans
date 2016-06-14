@@ -7,10 +7,9 @@ from praw.objects import MoreComments
 from requests import get
 
 from wsgi.db import DBHandler
-from wsgi.rr_people import RedditHandler, cmp_by_created_utc, USER_AGENTS, normalize, tokens_equals, DEFAULT_USER_AGENT
+from wsgi.rr_people import RedditHandler, cmp_by_created_utc, normalize, tokens_equals, DEFAULT_USER_AGENT
 from wsgi.rr_people.posting.generator import Generator
-from wsgi.rr_people.posting.posts import PostSource, PostsStorage, PS_READY
-from wsgi.rr_people.states import StatesHandler
+from wsgi.rr_people.posting.posts import PostSource, PostsStorage
 
 COPY = "copy"
 

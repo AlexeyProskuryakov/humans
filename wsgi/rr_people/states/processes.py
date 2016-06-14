@@ -17,8 +17,8 @@ PREFIX_GET_DATA = lambda x: x.replace("PD_", "") if isinstance(x, (str, unicode)
 class ProcessDirector(object):
     def __init__(self, name="?", clear=False, max_connections=2):
         self.redis = redis.StrictRedis(host=states_redis_address,
-                                       port=states_redis_password,
-                                       password=states_redis_port,
+                                       port=states_redis_port,
+                                       password=states_redis_password,
                                        db=0,
                                        max_connections=max_connections
                                        )
@@ -75,4 +75,3 @@ class ProcessDirector(object):
         else:
             result["work"] = False
         return result
-

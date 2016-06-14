@@ -24,7 +24,7 @@ from wsgi.rr_people.posting.copy_gen import SubredditsRelationsStore
 from wsgi.rr_people.posting.posts import PS_BAD, PS_AT_QUEUE, PS_READY
 from wsgi.rr_people.posting.posts_generator import PostsGenerator
 from wsgi.rr_people.posting.posts_managing import PostHandler
-from wsgi.rr_people.queue import CommentRedisHandler, PostRedisHandler
+from wsgi.rr_people.queue import CommentRedisQueue, PostRedisQueue
 from wsgi.wake_up import WakeUp, WakeUpStorage
 
 __author__ = '4ikist'
@@ -291,7 +291,6 @@ def humans():
     humans_info = db.get_humans_info()
     for human in humans_info:
         human['state'] = human_orchestra.states.get_human_state(human['user'])
-    # worked_humans = map(lambda x: x.get("name"), db.get_humans_with_state(S_WORK))
 
     return render_template("humans_management.html",
                            **{"humans": humans_info})

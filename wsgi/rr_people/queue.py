@@ -30,13 +30,13 @@ class RedisHandler(object):
         log.info("Production Queue inited for [%s]" % name)
 
 
-class CommentRedisHandler(RedisHandler):
+class CommentRedisQueue(RedisHandler):
     def __init__(self, name="?", clear=False, host=None, port=None, pwd=None, db=None):
-        super(CommentRedisHandler, self).__init__("comment queue %s" % name, clear,
-                                                  comment_redis_address,
-                                                  comment_redis_port,
-                                                  comment_redis_password,
-                                                  0)
+        super(CommentRedisQueue, self).__init__("comment queue %s" % name, clear,
+                                                comment_redis_address,
+                                                comment_redis_port,
+                                                comment_redis_password,
+                                                0)
 
     def need_comment(self, sbrdt):
         self.redis.publish(NEED_COMMENT, sbrdt)
@@ -62,13 +62,13 @@ class CommentRedisHandler(RedisHandler):
         return dict(map(lambda x: deserialize(x), result))
 
 
-class PostRedisHandler(RedisHandler):
+class PostRedisQueue(RedisHandler):
     def __init__(self, name="?", clear=False, host=None, port=None, pwd=None, db=None):
-        super(PostRedisHandler, self).__init__("post queue %s" % name, clear,
-                                               posts_redis_address,
-                                               posts_redis_port,
-                                               posts_redis_password,
-                                               0)
+        super(PostRedisQueue, self).__init__("post queue %s" % name, clear,
+                                             posts_redis_address,
+                                             posts_redis_port,
+                                             posts_redis_password,
+                                             0)
 
     def put_post(self, human_name, url_hash):
         self.redis.rpush(QUEUE_PG(human_name), url_hash)

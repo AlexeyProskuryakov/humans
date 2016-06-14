@@ -8,7 +8,7 @@ from wsgi.properties import DEFAULT_SLEEP_TIME_AFTER_GENERATE_DATA
 from wsgi.rr_people import S_WORK, S_SUSPEND
 from wsgi.rr_people.posting import POST_GENERATOR_OBJECTS
 from wsgi.rr_people.posting.posts import PostsStorage
-from wsgi.rr_people.states import StatesHandler
+from wsgi.rr_people.states.entity_states import StatesHandler
 
 log = logging.getLogger("post_generator")
 
@@ -72,7 +72,7 @@ class PostsGenerator(object):
 
     def terminate_generate_posts(self, sub_name):
         if sub_name in self.sub_process:
-            log.info("will terminate generating posts for [%s]"%sub_name)
+            log.info("will terminate generating posts for [%s]" % sub_name)
             self.sub_process[sub_name].terminate()
 
     def start_generate_posts(self, subrreddit):
@@ -87,26 +87,26 @@ class PostsGenerator(object):
                 return True
 
         def f():
-                try:
-                    if set_state(S_WORK):
-                        start = time.time()
-                        log.info("Will start generate posts in [%s]" % (subrreddit))
-                        counter = 0
-                        for _ in self.generate_posts(subrreddit):
-                            counter += 1
-                            if not set_state("%s %s generated"%(S_WORK, counter)):
-                                break
+            try:
+                if set_state(S_WORK):
+                    start = time.time()
+                    log.info("Will start generate posts in [%s]" % (subrreddit))
+                    counter = 0
+                    for _ in self.generate_posts(subrreddit):
+                        counter += 1
+                        if not set_state("%s %s generated" % (S_WORK, counter)):
+                            break
 
-                        end = time.time()
-                        log.info("Was generate [%s] posts in [%s] at %s seconds..." % (counter, subrreddit, end - start))
-                    else:
-                        log.info("Generators for [%s] is suspend")
+                    end = time.time()
+                    log.info("Was generate [%s] posts in [%s] at %s seconds..." % (counter, subrreddit, end - start))
+                else:
+                    log.info("Generators for [%s] is suspend")
 
-                except Exception as e:
-                    log.error("Was error at generating for sub: %s" % subrreddit)
-                    log.exception(e)
-                finally:
-                    set_state(S_SUSPEND)
+            except Exception as e:
+                log.error("Was error at generating for sub: %s" % subrreddit)
+                log.exception(e)
+            finally:
+                set_state(S_SUSPEND)
 
         ps = Process(name="[%s] posts generator" % subrreddit, target=f)
         ps.start()

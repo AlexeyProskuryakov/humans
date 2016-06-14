@@ -8,7 +8,7 @@ import time
 from wsgi.db import DBHandler, HumanStorage
 from wsgi.rr_people import Singleton
 from wsgi.rr_people.posting.posts import PS_AT_QUEUE, PostsStorage
-from wsgi.rr_people.queue import PostRedisHandler
+from wsgi.rr_people.queue import PostRedisQueue
 from wsgi.rr_people.states.persisted_queue import RedisQueue
 from wsgi.rr_people.states.processes import ProcessDirector
 
@@ -19,7 +19,7 @@ log = logging.getLogger("balancer")
 
 class BatchStorage(DBHandler):
     def __init__(self, name="?", ):
-        super(BatchStorage, self).__init__("bulk storage %s" % name)
+        super(BatchStorage, self).__init__("batch storage %s" % name)
         self.batches = self.db.get_collection("humans_posts_batches")
         if not self.batches:
             self.batches = self.db.create_collection("humans_posts_batches")
@@ -95,19 +95,19 @@ class PostBatch():
 class PostBalancerEngine(Process):
     __metaclass__ = Singleton
 
-    def __init__(self, pq, ps, out_queue):
+    def __init__(self, post_queue, post_storage, out_queue):
         super(PostBalancerEngine, self).__init__()
-        self.batch_storage = BatchStorage("balancer")
-        self.human_storage = HumanStorage("balancer")
+        self.batch_storage = BatchStorage("balancer bs")
+        self.human_storage = HumanStorage("balancer hs")
 
-        self.queue = pq
-        self.posts_storage = ps
+        self.post_queue = post_queue
+        self.posts_storage = post_storage
 
         self.sub_humans = self._load_human_sub_mapping()
 
         self.out_queue = out_queue
 
-        self.pd = ProcessDirector("balancer")
+        self.process_director = ProcessDirector("balancer")
 
         log.info("post balancer inited")
 
@@ -124,7 +124,7 @@ class PostBalancerEngine(Process):
 
     def _flush_batch_to_queue(self, batch):
         for url_hash in batch.data:
-            self.queue.put_post(batch.human_name, url_hash)
+            self.post_queue.put_post(batch.human_name, url_hash)
         self.posts_storage.set_posts_states(batch.data, PS_AT_QUEUE)
         batch.delete()
 
@@ -145,7 +145,7 @@ class PostBalancerEngine(Process):
         self.batch_storage.init_new_batch(human_name, url_hash, channel_id)
 
     def run(self):
-        if not self.pd.can_start_aspect("post_balancer", self.pid):
+        if not self.process_director.can_start_aspect("post_balancer", self.pid):
             log.info("another balancer worked")
             return
 
@@ -176,11 +176,11 @@ class BalancerTask(object):
         return "%s" % self.__dict__
 
 
-pq = PostRedisHandler("balancer")
-ps = PostsStorage("balancer")
-balancer_queue = RedisQueue(name="balancer", deserialize=lambda x: BalancerTask(**x))
+post_queue = PostRedisQueue("balancer")
+post_storage = PostsStorage("balancer ps")
+balancer_queue = RedisQueue(name="balancer", deserialize=lambda x: BalancerTask(**x), topic="balancer_queue")
 
-balancer = PostBalancerEngine(pq, ps, balancer_queue)
+balancer = PostBalancerEngine(post_queue, post_storage, balancer_queue)
 balancer.daemon = True
 balancer.start()
 

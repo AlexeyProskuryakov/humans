@@ -19,7 +19,7 @@ from wsgi.rr_people import USER_AGENTS, \
     Singleton, S_STOP
 from wsgi.rr_people.ae import ActionGenerator, time_hash
 from wsgi.rr_people.consumer import Consumer, HumanConfiguration
-from wsgi.rr_people.queue import CommentRedisHandler
+from wsgi.rr_people.queue import CommentRedisQueue
 from wsgi.rr_people.states.entity_states import StatesHandler
 
 log = logging.getLogger("he")
@@ -79,7 +79,7 @@ class Kapellmeister(Process):
         self.ae = ActionGenerator(group_name=name)
         self.human = human_class(login=name)
         self.states_handler = StatesHandler(name="kplmtr of [%s]" % name)
-        self.comment_queue = CommentRedisHandler(name="klmtr of [%s]" % name)
+        self.comment_queue = CommentRedisQueue(name="klmtr of [%s]" % name)
         self.lock = Lock()
         log.info("Human kapellmeister inited.")
 

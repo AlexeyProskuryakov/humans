@@ -9,13 +9,13 @@ log = logging.getLogger("redis_queue")
 class RedisQueue(RedisHandler):
     '''
     topic - is topic in redis pub sub
-    result_class - is some class which will be call __dict__ at
+    implement serialise and deserialise
     '''
 
     def __init__(self, name="?",
                  topic="queue", serialize=lambda x: x.__dict__, deserialize=lambda x: x,
-                 clear=False, host=None, port=None, pwd=None, db=None):
-        super(RedisQueue, self).__init__(name, clear,
+                 host=None, port=None, pwd=None, db=None):
+        super(RedisQueue, self).__init__(name, False,
                                          host or states_redis_address,
                                          port or states_redis_port,
                                          pwd or states_redis_password,
@@ -41,6 +41,6 @@ class RedisQueue(RedisHandler):
 
 
 if __name__ == '__main__':
-    q = RedisQueue(serialize=lambda x:x)
+    q = RedisQueue(serialize=lambda x: x)
     q.put("my name is alesha")
     print q.get()
