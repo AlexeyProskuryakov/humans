@@ -146,7 +146,7 @@ class PostBalancerEngine(Process):
         self.batch_storage.init_new_batch(human_name, url_hash, channel_id)
 
     def run(self):
-        if not self.process_director.can_start_aspect("post_balancer", self.pid):
+        if not self.process_director.can_start_aspect("post_balancer", self.pid).get("started"):
             log.info("another balancer worked")
             return
 
@@ -156,12 +156,12 @@ class PostBalancerEngine(Process):
                 task = self.out_queue.get()
                 if not isinstance(task, BalancerTask):
                     raise Exception("task is not task :( ")
-                log.info("here i have task %s" % task)
             except Exception as e:
                 log.exception(e)
                 time.sleep(1)
                 continue
 
+            log.info("here i have task %s" % task)
             self.add_post(**task.__dict__)
 
 
@@ -220,4 +220,4 @@ if __name__ == '__main__':
 
     for i in range(101):
         pb.add_post("http://www.test.url.hash-%s.ru" % i, "channel_%s" % (i % 10), important=True, human_name="test")
-        time.sleep(1)
+        time.sleep(5)

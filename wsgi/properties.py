@@ -67,8 +67,8 @@ states_redis_address = "pub-redis-17140.us-east-1.1.azure.garantiadata.com"
 states_redis_port = 17140
 states_redis_password = "sederfes100500"
 
-posts_redis_address = "pub-redis-11691.us-east-1-4.2.ec2.garantiadata.com"
-posts_redis_port = 11691
+posts_redis_address = "pub-redis-17040.us-east-1-4.3.ec2.garantiadata.com"
+posts_redis_port = 17040
 posts_redis_password = "sederfes100500"
 
 redis_max_connections = 2
@@ -131,6 +131,7 @@ test_mode = os.environ.get("RR_TEST", "false").strip().lower() in ("true", "1", 
 print "TEST? ", test_mode
 
 logger.info(
-    "Reddit People MANAGEMENT SYSTEM STARTED... \nEnv:%s" % "\n".join(["%s:\t%s" % (k, v) for k, v in os.environ.iteritems()]))
+    "Reddit People MANAGEMENT SYSTEM STARTED... \nEnv:%s" % "\n".join(
+        ["%s:\t%s" % (k, v) for k, v in os.environ.iteritems()]))
 
 WORKED_PIDS_QUERY = "python"

@@ -40,7 +40,8 @@ class ProcessDirector(object):
             result = self.redis.setnx(PREFIX(aspect), pid)
             if not result:
                 aspect_pid = int(self.redis.get(PREFIX(aspect)))
-                log.info("setnx result is None... aspect pid is: %s" % aspect_pid)
+                log.info("setnx result is None... stored aspect pid is: %s" % aspect_pid)
+
                 if aspect_pid in get_worked_pids():
                     return {"state": "already work", "by": aspect_pid, "started": False}
                 else:
