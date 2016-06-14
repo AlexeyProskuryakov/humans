@@ -1,3 +1,4 @@
+import json
 import logging
 import random
 from collections import defaultdict
@@ -178,17 +179,45 @@ class BalancerTask(object):
 
 post_queue = PostRedisQueue("balancer")
 post_storage = PostsStorage("balancer ps")
-balancer_queue = RedisQueue(name="balancer", deserialize=lambda x: BalancerTask(**x), topic="balancer_queue")
 
-balancer = PostBalancerEngine(post_queue, post_storage, balancer_queue)
-balancer.daemon = True
-balancer.start()
+
+def deserialise(data):
+    kwargs = json.loads(data)
+    return BalancerTask(**kwargs)
+
+
+def serialise(object):
+    return json.dumps(object.__dict__)
+
+
+balancer_queue = RedisQueue(name="balancer",
+                            serialize=serialise,
+                            deserialize=deserialise,
+                            topic="balancer_queue")
+
+_balancer = PostBalancerEngine(post_queue, post_storage, balancer_queue)
+_balancer.daemon = True
+_balancer.start()
 
 
 class PostBalancer(object):
+    '''
+    This class only add posts and after you can see them in post queue @PostRedisQueue class.
+
+    '''
+
     def __init__(self):
         self.queue = balancer_queue
 
     def add_post(self, url_hash, channel_id, important=False, human_name=None, sub=None):
         task = BalancerTask(url_hash, channel_id, important, human_name, sub)
         self.queue.put(task)
+
+
+if __name__ == '__main__':
+    pb = PostBalancer()
+    import time
+
+    for i in range(101):
+        pb.add_post("http://www.test.url.hash-%s.ru" % i, "channel_%s" % (i % 10), important=True, human_name="test")
+        time.sleep(1)

@@ -41,12 +41,6 @@ class CommentRedisQueue(RedisHandler):
     def need_comment(self, sbrdt):
         self.redis.publish(NEED_COMMENT, sbrdt)
 
-    def get_who_needs_comments(self):
-        pubsub = self.redis.pubsub(ignore_subscribe_messages=True)
-        pubsub.subscribe(NEED_COMMENT)
-        for el in pubsub.listen():
-            yield el
-
     def put_comment_hash(self, sbrdt, post_fn, comment_id):
         key = serialize(post_fn, comment_id)
         log.debug("redis: push to %s \nthis:%s" % (sbrdt, key))
