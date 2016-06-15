@@ -135,8 +135,9 @@ class HumanStorage(DBHandler):
             live_config = found.get("live_config")
             return live_config
 
-    def get_human_config(self, name):
-        return self.human_config.find_one({"user": name})
+    def get_human_config(self, name, projection=None):
+        proj = projection or {"_id": False}
+        return self.human_config.find_one({"user": name}, projection=proj)
 
     #################HUMAN LOG
     def save_log_human_row(self, human_name, action_name, info):

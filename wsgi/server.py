@@ -311,7 +311,6 @@ def humans_info(name):
 
         config = HumanConfiguration(request.form)
         db.set_human_live_configuration(name, config)
-        human_orchestra.toggle_human_config(name)
 
     human_log = db.get_log_of_human(name, 100)
     stat = db.get_log_of_human_statistics(name)

@@ -18,9 +18,10 @@ from wsgi.rr_people import USER_AGENTS, \
     S_WORK, S_BAN, S_SLEEP, S_SUSPEND, \
     Singleton, S_STOP
 from wsgi.rr_people.ae import ActionGenerator, time_hash
-from wsgi.rr_people.consumer import Consumer, HumanConfiguration
+from wsgi.rr_people.human import Human, HumanConfiguration
 from wsgi.rr_people.queue import CommentRedisQueue
 from wsgi.rr_people.states.entity_states import StatesHandler
+from wsgi.rr_people.states.persisted_queue import RedisQueue
 from wsgi.rr_people.states.processes import ProcessDirector
 
 log = logging.getLogger("he")
@@ -75,8 +76,7 @@ HE_ASPECT = lambda x: "he_%s" % x
 
 
 class Kapellmeister(Process):
-    # todo нужно обвязать очередью через редиску все сигналы для изменения внутреннего состояния
-    def __init__(self, name, human_class=Consumer):
+    def __init__(self, name, human_class=Human):
         super(Kapellmeister, self).__init__()
         self.main_storage = HumanStorage(name="main storage for [%s]" % name)
         self.human_name = name
@@ -90,18 +90,14 @@ class Kapellmeister(Process):
         self.lock = Lock()
         log.info("Human kapellmeister inited.")
 
-    def set_config(self, data):
-        with self.lock:
-            human_config = HumanConfiguration(data)
-            self.human.set_configuration(human_config)
 
-    def human_check(self):
+    def _human_check(self):
         ok = check_to_ban(self.human_name)
         if not ok:
             self.states_handler.set_human_state(self.human_name, S_BAN)
         return ok
 
-    def set_state(self, new_state):
+    def _set_state(self, new_state):
         state = self.states_handler.get_human_state(self.human_name)
         if state == S_SUSPEND:
             log.info("%s is suspended will stop" % self.human_name)
@@ -111,31 +107,26 @@ class Kapellmeister(Process):
             return True
 
     def _do_action(self, action, subs, step, _start):
-        if action == A_COMMENT:
-            if self.human.can_do(A_COMMENT):
-                sub_name = random.choice(subs)
-                comment = self.comment_queue.pop_comment_hash(sub_name)
-                if comment:
-                    pfn, ct = comment
-                    log.info("will comment [%s] [%s]" % (pfn, ct))
-                    self.set_state(WORK_STATE("comment"))
-                    self.human.do_comment_post(pfn, sub_name, ct)
-                else:
-                    log.info("will send need comment for sub [%s]" % sub_name)
-                    self.set_state(WORK_STATE("need comment"))
-                    self.comment_queue.need_comment(sub_name)
-
+        if action == A_COMMENT and self.human.can_do(A_COMMENT):
+            sub_name = random.choice(subs)
+            comment = self.comment_queue.pop_comment_hash(sub_name)
+            if comment:
+                pfn, ct = comment
+                log.info("will comment [%s] [%s]" % (pfn, ct))
+                self._set_state(WORK_STATE("comment"))
+                self.human.do_comment_post(pfn, sub_name, ct)
             else:
-                log.info("will live random can not comment")
-                self.human.do_live_random(max_actions=random.randint(10, 20))
+                log.info("will send need comment for sub [%s]" % sub_name)
+                self._set_state(WORK_STATE("need comment"))
+                self.comment_queue.need_comment(sub_name)
 
-        elif action == A_POST:
-            if self.human.can_do(A_POST):
-                self.set_state(WORK_STATE("posting"))
-                self.human.do_post()
+        elif action == A_POST and self.human.can_do(A_POST):
+            self._set_state(WORK_STATE("posting"))
+            self.human.do_post()
+
         else:
-            self.set_state(WORK_STATE("live random"))
-            self.human.do_live_random(max_actions=random.randint(10, 20))
+            self._set_state(WORK_STATE("live random"))
+            self.human.do_live_random(max_actions=random.randint(10, 20), posts_limit=random.randint(50, 100))
 
         _diff = int(time.time() - _start)
         step += _diff
@@ -149,7 +140,7 @@ class Kapellmeister(Process):
 
     def run(self):
         if not self.process_director.can_start_aspect(HE_ASPECT(self.human_name), self.pid).get("started"):
-            log.info("another kappelmeister worked...")
+            log.info("another kappelmeister for [%s] worked..." % self.human_name)
             return
 
         log.info("start kappellmeister for [%s]" % self.human_name)
@@ -161,11 +152,11 @@ class Kapellmeister(Process):
         while 1:
             _start = time.time()
 
-            if not self.set_state(S_WORK):
+            if not self._set_state(S_WORK):
                 return
 
             if step - last_token_refresh_time > HOUR - 100:
-                if not self.human_check():
+                if not self._human_check():
                     log.info("%s is not checked..." % self.human_name)
                     return
                 log.info("will refresh token")
@@ -176,14 +167,14 @@ class Kapellmeister(Process):
             if action != A_SLEEP:
                 step = self._do_action(action, subs, step, _start)
             else:
-                if not self.set_state(S_SLEEP):
+                if not self._set_state(S_SLEEP):
                     return
                 time.sleep(MINUTE)
 
 
 class HumanOrchestra():
     __metaclass__ = Singleton
-
+    #todo refactor methods and implement humans state for view 
     def __init__(self):
         self.__humans = {}
         self.lock = Lock()
@@ -213,14 +204,3 @@ class HumanOrchestra():
                 except Exception as e:
                     log.info("Error at starting human %s", human_name, )
                     log.exception(e)
-
-    def toggle_human_config(self, human_name):
-        with self.lock:
-            if human_name in self.__humans:
-                def f():
-                    db = HumanStorage(name="toggle human config")
-                    human_config = db.get_human_live_configuration(human_name)
-                    self.__humans[human_name].set_config(human_config)
-                    del db
-
-                Process(name="config updater", target=f).start()

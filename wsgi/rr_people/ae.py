@@ -9,7 +9,6 @@ from random import choice
 
 import praw
 import pymongo
-from pymongo.mongo_client import MongoClient
 
 from wsgi.db import DBHandler
 from wsgi.properties import \
@@ -538,23 +537,24 @@ def group_and_visualise_gen(for_time=DAY * 2):
 
 
 def create():
-    #todo rewrite this code to undepend of reader
-    a_s = AuthorsStorage()
-    a_s.authors.delete_many({})
-
-    from wsgi.rr_people.reader import CommentSearcher, CommentQueue
-    from wsgi.db import HumanStorage
-
-    db = HumanStorage()
-    cs = CommentSearcher(db, add_authors=True)
-    cq = CommentQueue()
-
-    sbrdt = "videos"
-    for post, comment in cs.find_comment(sbrdt):
-        cq.put_comment_hash(sbrdt, post, comment)
-
-    agdf = ActionGeneratorDataFormer()
-    agdf.fill_consume_and_sleep()
+    # todo rewrite this code to undepend of reader
+    # a_s = AuthorsStorage()
+    # a_s.authors.delete_many({})
+    #
+    # from wsgi.rr_people.reader import CommentSearcher, CommentQueue
+    # from wsgi.db import HumanStorage
+    #
+    # db = HumanStorage()
+    # cs = CommentSearcher(db, add_authors=True)
+    # cq = CommentQueue()
+    #
+    # sbrdt = "videos"
+    # for post, comment in cs.find_comment(sbrdt):
+    #     cq.put_comment_hash(sbrdt, post, comment)
+    #
+    # agdf = ActionGeneratorDataFormer()
+    # agdf.fill_consume_and_sleep()
+    pass
 
 
 def copy_data(from_uri, from_db_name, to_uri, to_db_name, drop_dest=False):

@@ -1,5 +1,5 @@
 from wsgi.rr_people import A_POST
-from wsgi.rr_people.consumer import FakeConsumer
+from wsgi.rr_people.human import FakeHuman
 from wsgi.rr_people.he import Kapellmeister
 from wsgi.rr_people.posting.posts import PostsStorage, PostSource
 from wsgi.rr_people.queue import CommentRedisQueue

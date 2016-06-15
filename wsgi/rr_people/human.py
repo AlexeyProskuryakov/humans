@@ -75,18 +75,20 @@ class HumanConfiguration(object):
         return self.__dict__
 
 
-class Consumer(RedditHandler):
+class Human(RedditHandler):
     def __init__(self, login):
-        super(Consumer, self).__init__()
+        super(Human, self).__init__()
+        self.login = login
         self.db = HumanStorage(name="consumer %s" % login)
         self.comment_storage = CommentsStorage(name="consumer %s" % login)
         self.posts_handler = PostHandler("consumer %s" % login)
 
-        human_configuration = self.db.get_human_config(login)
         login_credentials = self.db.get_human_access_credentials(login)
         if not login_credentials:
             raise Exception("Can not have login credentials at %s", login)
 
+        human_configuration = self.db.get_human_config(login)
+        self._load_configuration(human_configuration)
         self.subscribed_subreddits = set(human_configuration.get("ss", [])) or set()
         self.friends = set(human_configuration.get("frds", [])) or set()
         self.last_friend_add = human_configuration.get("last_friend_add") or time.time() - WEEK
@@ -94,16 +96,9 @@ class Consumer(RedditHandler):
         self.init_engine(login_credentials)
         self.init_work_cycle()
 
-        live_config = human_configuration.get("live_config")
-        if not live_config:
-            self.configuration = HumanConfiguration()
-            self.db.set_human_live_configuration(login, self.configuration)
-        else:
-            self.configuration = HumanConfiguration(live_config)
-
         self._used = set()
-        self._last_loads = {}
-        self._sub_posts = {}
+        self.cache_last_loads = {}
+        self.cache_sub_posts = {}
         self._last_post_ids = defaultdict(int)
 
         log.info("Write human [%s] inited with credentials \n%s"
@@ -117,6 +112,16 @@ class Consumer(RedditHandler):
                                                self.friends,
                                                self.subscribed_subreddits
                                                ))
+
+    def _load_configuration(self, loaded=None):
+        human_configuration = loaded or self.db.get_human_config(self.login, projection={"live_config": True})
+        live_config = human_configuration.get("live_config")
+        if not live_config:
+            self.configuration = HumanConfiguration()
+            self.db.set_human_live_configuration(self.login, self.configuration)
+        else:
+            self.configuration = HumanConfiguration(live_config)
+        log.info("For [%s] configuration is: %s" % (self.login, self.configuration))
 
     def init_engine(self, login_credentials):
         self.user_agent = login_credentials.get("user_agent", random.choice(USER_AGENTS))
@@ -206,6 +211,7 @@ class Consumer(RedditHandler):
         if step_type == A_FRIEND:
             self.last_friend_add = time.time()
 
+        # todo create and checking this ability for less touching db
         self.db.save_log_human_row(self.name, step_type, info or {})
         self.persist_state()
         log.info("step by [%s] |%s|: %s", self.name, step_type, info)
@@ -235,6 +241,7 @@ class Consumer(RedditHandler):
         :param post:
         :return:
         """
+        self._load_configuration()
         try:
             res = requests.get(post.url, headers={"User-Agent": self.user_agent})
             self.register_step(A_CONSUME,
@@ -318,10 +325,6 @@ class Consumer(RedditHandler):
             except Exception as e:
                 log.exception(e)
 
-    def set_configuration(self, configuration):
-        self.configuration = configuration
-        log.info("For %s configuration is setted: %s" % (self.name, configuration.data))
-
     def wait(self, max_wait_time):
         if max_wait_time > 1:
             wt = random.randint(1, max_wait_time)
@@ -330,6 +333,7 @@ class Consumer(RedditHandler):
         return max_wait_time
 
     def do_comment_post(self, post_fullname, subreddit_name, comment_id):
+        self._load_configuration()
         near_posts = self.get_hot_and_new(subreddit_name)
         for i, _post in enumerate(near_posts):
             if _post.fullname == post_fullname:
@@ -383,15 +387,17 @@ class Consumer(RedditHandler):
             return
 
         random_sub = random.choice(subs)
-        if random_sub not in self._sub_posts or \
-                                time.time() - self._last_loads.get(random_sub,
-                                                                   time.time()) > properties.TIME_TO_RELOAD_SUB_POSTS:
+        if random_sub not in self.cache_sub_posts or \
+                                time.time() - self.cache_last_loads.get(random_sub,
+                                                                        time.time()) > properties.TIME_TO_RELOAD_SUB_POSTS:
+            log.info("%s will load posts for live random in %s" % (self.name, random_sub))
             sbrdt = self.get_subreddit(random_sub)
             posts = get_hot_or_new(sbrdt)
-            self._sub_posts[random_sub] = posts
-            self._last_loads[random_sub] = time.time()
+            self.cache_sub_posts[random_sub] = posts
+            self.cache_last_loads[random_sub] = time.time()
         else:
-            posts = self._sub_posts[random_sub]
+            log.info("%s will use cached posts in %s" % (self.name, random_sub))
+            posts = self.cache_sub_posts[random_sub]
 
         w_k = random.randint(properties.want_coefficient_max / 2, properties.want_coefficient_max)
 
@@ -429,9 +435,9 @@ class Consumer(RedditHandler):
             log.info("NOT OK :( result: %s" % (result))
 
 
-class FakeConsumer(Consumer):
+class FakeHuman(Human):
     def __init__(self, login):
-        super(FakeConsumer, self).__init__(login)
+        super(FakeHuman, self).__init__(login)
 
     def refresh_token(self):
         log.info("REFRESH TOKEN")
