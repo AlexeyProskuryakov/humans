@@ -272,6 +272,8 @@ def human_auth_end():
 human_orchestra = HumanOrchestra()
 
 
+# todo fronted show human state
+
 @app.route("/humans", methods=["POST", "GET"])
 @login_required
 def humans():
@@ -284,13 +286,13 @@ def humans():
         log.info("Add subreddits: \n%s\n to human with name: %s" % ('\n'.join([el for el in subreddits]), human_name))
 
         db.set_human_subs(human_name, list(set(subreddits)))
-        human_orchestra.add_human(human_name)
+        human_orchestra.start_human(human_name)
 
         return redirect(url_for('humans_info', name=human_name))
 
     humans_info = db.get_humans_info()
     for human in humans_info:
-        human['state'] = human_orchestra.states.get_human_state(human['user'])
+        human['state'] = human_orchestra.get_human_state(human['user'])
 
     return render_template("humans_management.html",
                            **{"humans": humans_info})
@@ -301,12 +303,11 @@ def humans():
 def humans_info(name):
     if request.method == "POST":
         if request.form.get("stop"):
-            human_orchestra.states.set_human_state(name, S_SUSPEND)
+            human_orchestra.suspend_human(name)
             return redirect(url_for('humans_info', name=name))
 
         if request.form.get("start"):
-            human_orchestra.states.set_human_state(name, S_WORK)
-            human_orchestra.add_human(name)
+            human_orchestra.start_human(name)
             return redirect(url_for('humans_info', name=name))
 
         config = HumanConfiguration(request.form)
@@ -316,7 +317,7 @@ def humans_info(name):
     stat = db.get_log_of_human_statistics(name)
 
     human_cfg = db.get_human_config(name)
-    state = human_orchestra.states.get_human_state(name)
+    state = human_orchestra.get_human_state(name)
 
     return render_template("humans_info.html", **{"human_name": name,
                                                   "human_stat": stat,
@@ -333,7 +334,7 @@ def humans_info(name):
 @app.route("/humans/<name>/state", methods=["post"])
 @login_required
 def human_state(name):
-    return jsonify(**{"state": human_orchestra.states.get_human_state(name), "human": name})
+    return jsonify(**{"state": human_orchestra.get_human_state(name), "human": name})
 
 
 @app.route("/humans/<name>/config", methods=["POST"])
@@ -366,7 +367,7 @@ def posts():
 @app.route("/actions")
 @login_required
 def actions():
-    h_info = db.get_humans_info(projection={"user":True})
+    h_info = db.get_humans_info(projection={"user": True})
     humans = map(lambda x: x['user'], h_info)
     return render_template("actions.html", **{"humans": humans})
 
@@ -383,7 +384,7 @@ def ae_represent(name):
 
     y = 3
     ssteps = author_storage.get_sleep_steps(name)
-    log.info("get sleep steps ^ %s"%len(ssteps))
+    log.info("get sleep steps ^ %s" % len(ssteps))
     sleep_days = defaultdict(list)
     for step in ssteps:
         sleep_days[divmod(step.get("time"), DAY)[0]].append([step['time'], step['end_time']])
@@ -496,7 +497,9 @@ def del_sub():
 
     return jsonify(**{"ok": False, "error": "sub is not exists"})
 
+
 posts_handler = PostHandler("server")
+
 
 @app.route("/generators/prepare_for_posting", methods=["POST"])
 @login_required

@@ -90,7 +90,6 @@ class Kapellmeister(Process):
         self.lock = Lock()
         log.info("Human kapellmeister inited.")
 
-
     def _human_check(self):
         ok = check_to_ban(self.human_name)
         if not ok:
@@ -159,7 +158,7 @@ class Kapellmeister(Process):
                 if not self._human_check():
                     log.info("%s is not checked..." % self.human_name)
                     return
-                log.info("will refresh token")
+                log.info("will refresh token for [%s]" % self.human_name)
                 self.human.refresh_token()
                 last_token_refresh_time = step
 
@@ -174,33 +173,30 @@ class Kapellmeister(Process):
 
 class HumanOrchestra():
     __metaclass__ = Singleton
-    #todo refactor methods and implement humans state for view 
+
     def __init__(self):
         self.__humans = {}
-        self.lock = Lock()
         self.db = HumanStorage(name="human orchestra")
         self.states = StatesHandler(name="human orchestra")
-        Thread(target=self.start_humans, name="Orchestra Human Starter").start()
+        self.process_director = ProcessDirector(name="human orchestra")
 
-    def start_humans(self):
+        Thread(target=self._auto_start_humans, name="Orchestra Human Starter").start()
+
+    def _auto_start_humans(self):
         log.info("Will auto start humans")
         for human_name, state in self.states.get_all_humans_states().iteritems():
-            if state != S_STOP:
-                self.add_human(human_name)
+            if state != S_SUSPEND:
+                self.start_human(human_name)
 
-    @property
-    def humans(self):
-        with self.lock:
-            return self.__humans
+    def suspend_human(self, human_name):
+        self.states.set_human_state(human_name, S_SUSPEND)
 
-    def add_human(self, human_name):
-        with self.lock:
-            human_kapellmeister = self.__humans.get(human_name)
-            if not human_kapellmeister or not human_kapellmeister.is_alive():
-                try:
-                    kplmtr = Kapellmeister(human_name)
-                    self.__humans[human_name] = kplmtr
-                    kplmtr.start()
-                except Exception as e:
-                    log.info("Error at starting human %s", human_name, )
-                    log.exception(e)
+    def start_human(self, human_name):
+        self.states.set_human_state(human_name, S_WORK)
+        kplmtr = Kapellmeister(human_name)
+        kplmtr.start()
+
+    def get_human_state(self, human_name):
+        human_state = self.states.get_human_state(human_name)
+        process_state = self.process_director.get_state(HE_ASPECT(human_name))
+        return {"human_state": human_state, "process_state": process_state}
