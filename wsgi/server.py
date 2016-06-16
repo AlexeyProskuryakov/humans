@@ -271,9 +271,6 @@ def human_auth_end():
 
 human_orchestra = HumanOrchestra()
 
-
-# todo fronted show human state
-
 @app.route("/humans", methods=["POST", "GET"])
 @login_required
 def humans():

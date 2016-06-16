@@ -4,6 +4,7 @@ from wsgi.db import DBHandler
 
 PS_READY = "ready"
 PS_POSTED = "posted"
+PS_NO_POSTS = "no_posts"
 PS_BAD = "bad"
 PS_AT_QUEUE = "at_queue"
 PS_ERROR = "error"

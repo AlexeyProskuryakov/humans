@@ -13,7 +13,7 @@ from wsgi.db import HumanStorage, CommentsStorage
 from wsgi.properties import WEEK
 from wsgi.rr_people import RedditHandler, USER_AGENTS, A_CONSUME, A_VOTE, A_COMMENT, A_POST, A_SUBSCRIBE, normalize, \
     A_FRIEND, re_url
-from wsgi.rr_people.posting.posts import PS_POSTED, PS_ERROR
+from wsgi.rr_people.posting.posts import PS_POSTED, PS_ERROR, PS_NO_POSTS
 from wsgi.rr_people.posting.posts_managing import PostHandler
 
 log = logging.getLogger("consumer")
@@ -74,6 +74,9 @@ class HumanConfiguration(object):
     def data(self):
         return self.__dict__
 
+    def __repr__(self):
+        return "\n".join(["%s: %s" % (k, v) for k, v in self.data.iteritems()])
+
 
 class Human(RedditHandler):
     def __init__(self, login):
@@ -101,13 +104,13 @@ class Human(RedditHandler):
         self.cache_sub_posts = {}
         self._last_post_ids = defaultdict(int)
 
-        log.info("Write human [%s] inited with credentials \n%s"
+        log.info("Human [%s] inited with credentials \n%s"
                  "\nConfiguration: \n%s"
                  "\nFriends: %s"
                  "\nSubscribed breddits:%s" % (login,
-                                               "\n".join(["%s:\t%s" % (k, v) for k, v in
+                                               "\t\n".join(["%s:\t%s" % (k, v) for k, v in
                                                           login_credentials.get("info", {}).iteritems()]),
-                                               "\n".join(["%s:\t%s" % (k, v) for k, v in
+                                               "\t\n".join(["%s:\t%s" % (k, v) for k, v in
                                                           self.configuration.data.iteritems()]),
                                                self.friends,
                                                self.subscribed_subreddits
@@ -121,7 +124,6 @@ class Human(RedditHandler):
             self.db.set_human_live_configuration(self.login, self.configuration)
         else:
             self.configuration = HumanConfiguration(live_config)
-        log.info("For [%s] configuration is: %s" % (self.login, self.configuration))
 
     def init_engine(self, login_credentials):
         self.user_agent = login_credentials.get("user_agent", random.choice(USER_AGENTS))
@@ -364,6 +366,7 @@ class Human(RedditHandler):
                                                                 hash=text_hash)
                         self.register_step(A_COMMENT, info={"fullname": post_fullname, "sub": subreddit_name,
                                                             "response": response.__dict__})
+                        return A_COMMENT
                 except Exception as e:
                     log.error(e)
 
@@ -414,7 +417,7 @@ class Human(RedditHandler):
         post = self.posts_handler.get_post(self.name)
         if not post:
             log.warn("no posts for me [%s] :(" % self.name)
-            return
+            return PS_NO_POSTS
 
         subreddit = self.get_subreddit(post.for_sub)
 
@@ -430,9 +433,11 @@ class Human(RedditHandler):
                                {"fullname": result.fullname, "sub": post.for_sub, 'title': post.title, 'url': post.url})
             self.posts_handler.set_post_state(post.url_hash, PS_POSTED)
             log.info("OK! result: %s" % (result))
+            return PS_POSTED
         else:
             self.posts_handler.set_post_state(post.url_hash, PS_ERROR)
             log.info("NOT OK :( result: %s" % (result))
+            return PS_ERROR
 
 
 class FakeHuman(Human):

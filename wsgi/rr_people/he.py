@@ -16,9 +16,10 @@ from wsgi.properties import WEEK, HOUR, MINUTE
 from wsgi.rr_people import USER_AGENTS, \
     A_COMMENT, A_POST, A_SLEEP, \
     S_WORK, S_BAN, S_SLEEP, S_SUSPEND, \
-    Singleton, S_STOP
+    Singleton, S_STOP, A_CONSUME, A_VOTE
 from wsgi.rr_people.ae import ActionGenerator, time_hash
 from wsgi.rr_people.human import Human, HumanConfiguration
+from wsgi.rr_people.posting.posts import PS_POSTED
 from wsgi.rr_people.queue import CommentRedisQueue
 from wsgi.rr_people.states.entity_states import StatesHandler
 from wsgi.rr_people.states.persisted_queue import RedisQueue
@@ -88,7 +89,7 @@ class Kapellmeister(Process):
         self.process_director = ProcessDirector(name="kplmtr of [%s] " % name)
 
         self.lock = Lock()
-        log.info("Human kapellmeister inited.")
+        log.info("Human [%s] kapellmeister inited." % name)
 
     def _human_check(self):
         ok = check_to_ban(self.human_name)
@@ -106,6 +107,7 @@ class Kapellmeister(Process):
             return True
 
     def _do_action(self, action, subs, step, _start):
+        produce = True
         if action == A_COMMENT and self.human.can_do(A_COMMENT):
             sub_name = random.choice(subs)
             comment = self.comment_queue.pop_comment_hash(sub_name)
@@ -113,22 +115,31 @@ class Kapellmeister(Process):
                 pfn, ct = comment
                 log.info("will comment [%s] [%s]" % (pfn, ct))
                 self._set_state(WORK_STATE("comment"))
-                self.human.do_comment_post(pfn, sub_name, ct)
+                result = self.human.do_comment_post(pfn, sub_name, ct)
+                if result != A_COMMENT: produce = False
+
             else:
                 log.info("will send need comment for sub [%s]" % sub_name)
                 self._set_state(WORK_STATE("need comment"))
                 self.comment_queue.need_comment(sub_name)
+                produce = False
 
         elif action == A_POST and self.human.can_do(A_POST):
             self._set_state(WORK_STATE("posting"))
-            self.human.do_post()
+            post_result = self.human.do_post()
+            if post_result != PS_POSTED: produce = False
 
-        else:
-            self._set_state(WORK_STATE("live random"))
-            self.human.do_live_random(max_actions=random.randint(10, 20), posts_limit=random.randint(50, 100))
+        if not produce:
+            if self.human.can_do(A_CONSUME):
+                self._set_state(WORK_STATE("live random"))
+                self.human.do_live_random(max_actions=random.randint(5, 20), posts_limit=random.randint(25, 50))
+            else:
+                self._set_state(WORK_STATE("sleeping because can not consume"))
+                self.human.decr_counter(A_CONSUME)
+                time.sleep((random.randint(1, 2) * MINUTE) / random.randint(1, 6))
 
         _diff = int(time.time() - _start)
-        step += _diff
+        step += _diff if _diff > 3 else 3
         if step > WEEK:
             step = step - WEEK
 
@@ -192,10 +203,9 @@ class HumanOrchestra():
         self.states.set_human_state(human_name, S_SUSPEND)
 
     def start_human(self, human_name):
-        if not self.states.is_state(human_name, S_WORK):
-            self.states.set_human_state(human_name, S_WORK)
-            kplmtr = Kapellmeister(human_name)
-            kplmtr.start()
+        self.states.set_human_state(human_name, S_WORK)
+        kplmtr = Kapellmeister(human_name)
+        kplmtr.start()
 
     def get_human_state(self, human_name):
         human_state = self.states.get_human_state(human_name)
