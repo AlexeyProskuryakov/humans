@@ -67,7 +67,7 @@
                         <a href="{{ url_for('humans_info', name=human.user) }}"> {{human.user}}</a>
                     </td>
                     <td class="col-md-2 ">
-                        {{human['state']}}
+                        {{human['state']['human_state']}} [process: {{human['state']['process_state']}}]
                     </td>
                     <td>
                         {% if human.info %}

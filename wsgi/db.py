@@ -81,7 +81,7 @@ class HumanStorage(DBHandler):
         return None
 
     def get_humans_info(self, q=None, projection=None):
-        found = self.human_config.find(q or {}, projection=projection or {})
+        found = self.human_config.find(q or {}, projection=projection or {"_id": False})
         result = list(found)
         return result
 

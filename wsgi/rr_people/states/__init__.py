@@ -78,5 +78,5 @@ def get_worked_pids():
                 yield int(process_info[1])
 
     worked_pids = set(list(get_all_pids()))
-    log.info("worked pids: \n%s"%worked_pids)
+    # log.info("worked pids: \n%s"%worked_pids)
     return worked_pids

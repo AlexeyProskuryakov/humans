@@ -66,6 +66,16 @@ class StatesHandler(object):
             return S_STOP
         return state
 
+    def is_state(self, human_name, state):
+        """
+        Analyse state of human because at some situations state can be WORK_<some another data>
+        :param human_name: name of human
+        :param state: state of human
+        :return: bool
+        """
+        p_state = self.get_human_state(human_name)
+        return state in p_state
+
     def get_all_humans_states(self):
         result = self.redis.hgetall(HUMAN_STATES)
         for k, v in result.iteritems():

@@ -317,12 +317,12 @@ def humans_info(name):
     stat = db.get_log_of_human_statistics(name)
 
     human_cfg = db.get_human_config(name)
-    state = human_orchestra.get_human_state(name)
+    human_state = human_orchestra.get_human_state(name)
 
     return render_template("humans_info.html", **{"human_name": name,
                                                   "human_stat": stat,
                                                   "human_log": human_log,
-                                                  "human_live_state": state,
+                                                  "human_live_state": human_state,
                                                   "subs": human_cfg.get("subs", []),
                                                   "config": human_cfg.get("live_config") or HumanConfiguration().data,
                                                   "ss": human_cfg.get("ss", []),

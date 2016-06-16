@@ -192,9 +192,10 @@ class HumanOrchestra():
         self.states.set_human_state(human_name, S_SUSPEND)
 
     def start_human(self, human_name):
-        self.states.set_human_state(human_name, S_WORK)
-        kplmtr = Kapellmeister(human_name)
-        kplmtr.start()
+        if not self.states.is_state(human_name, S_WORK):
+            self.states.set_human_state(human_name, S_WORK)
+            kplmtr = Kapellmeister(human_name)
+            kplmtr.start()
 
     def get_human_state(self, human_name):
         human_state = self.states.get_human_state(human_name)

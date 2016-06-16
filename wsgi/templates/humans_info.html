@@ -22,7 +22,8 @@
                     </form>
                 </div>
                 <div class="col-md-3">
-                    <a class="btn btn-success btn-big btn-lg" href="{{url_for('humans_info', name=human_name)}}">RELOAD THIS PAGE
+                    <a class="btn btn-success btn-big btn-lg" href="{{url_for('humans_info', name=human_name)}}">RELOAD
+                        THIS PAGE
                     </a>
                 </div>
             </div>
@@ -31,7 +32,8 @@
                     <h2>Параметры жизни чувака: <br>
                         <small><kbd>%</kbd> - параметры предиката для желания. Будет запускаться
                             random(0,<b>{{want_coefficient}}</b>) и если оно больше <kbd>%</kbd> и будет возможность это
-                            сделать, то чувак это сделает.                       </small>
+                            сделать, то чувак это сделает.
+                        </small>
                     </h2>
                     <form action="{{url_for('humans_info', name=human_name)}}" method="post" class="form-horizontal">
                         <div class="form-group">
@@ -93,7 +95,9 @@
             <div class="row">
                 <h2>Information of <big id="human-name">{{human_name}}</big>
                     <br>
-                    <small id="human-live-state">[{{human_live_state}}]</small>
+                    <small id="human-live-state">{{human_live_state['human_state']}} [process:
+                        {{human_live_state['process_state']}}]
+                    </small>
                 </h2>
                 <div class="accordion" id="info-accordion">
                     <div class="accordion-group">
@@ -214,27 +218,7 @@
 
     </div>
 </div>
-<script>
-    function show_human_live_state(){
-        var name = $("#human-name").text();
-        console.log("will send... to "+name);
-        $.ajax({
-            type:"POST",
-            url:"/humans/"+name+"/state",
-            success:function(x){
-                 console.log(x);
-                 if (x.human == name){
-                    $("#human-live-state").text(x.state);
-                 }
-            }
-        })
-    }
-
-    setInterval(function() {
-        show_human_live_state()
-    }, 1000);
-
-</script>
+<script src="{{url_for('static',filename='js/humans-script.js')}}"></script>
 {% endblock %}
 
 {% endblock %}
