@@ -9,10 +9,11 @@ from praw import Reddit
 from praw.objects import MoreComments, Submission
 
 from wsgi import properties
-from wsgi.db import HumanStorage, CommentsStorage
+from wsgi.db import HumanStorage
 from wsgi.properties import WEEK
 from wsgi.rr_people import RedditHandler, USER_AGENTS, A_CONSUME, A_VOTE, A_COMMENT, A_POST, A_SUBSCRIBE, normalize, \
     A_FRIEND, re_url
+from wsgi.rr_people.commenting.connection import CommentsStorage
 from wsgi.rr_people.posting.posts import PS_POSTED, PS_ERROR, PS_NO_POSTS
 from wsgi.rr_people.posting.posts_managing import PostHandler
 
@@ -109,9 +110,9 @@ class Human(RedditHandler):
                  "\nFriends: %s"
                  "\nSubscribed breddits:%s" % (login,
                                                "\t\n".join(["%s:\t%s" % (k, v) for k, v in
-                                                          login_credentials.get("info", {}).iteritems()]),
+                                                            login_credentials.get("info", {}).iteritems()]),
                                                "\t\n".join(["%s:\t%s" % (k, v) for k, v in
-                                                          self.configuration.data.iteritems()]),
+                                                            self.configuration.data.iteritems()]),
                                                self.friends,
                                                self.subscribed_subreddits
                                                ))
@@ -334,10 +335,17 @@ class Human(RedditHandler):
             return wt
         return max_wait_time
 
-    def do_comment_post(self, post_fullname, subreddit_name, comment_id):
+    def do_comment_post(self):
+        pass
+
+    def _comment_post(self, post_fullname, subreddit_name, comment_id):
         self._load_configuration()
+        # todo must tie up commented post with loaded post and check it in cache.
+        # todo if cache is broken?
+        #
         near_posts = self.get_hot_and_new(subreddit_name)
         for i, _post in enumerate(near_posts):
+            # todo if commented post is too old?
             if _post.fullname == post_fullname:
                 see_left, see_right = _get_random_near(near_posts, i, self.configuration.max_posts_near_commented)
                 try:

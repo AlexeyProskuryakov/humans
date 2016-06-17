@@ -150,7 +150,7 @@ class Kapellmeister(Process):
 
     def run(self):
         if not self.process_director.can_start_aspect(HE_ASPECT(self.human_name), self.pid).get("started"):
-            log.info("another kappelmeister for [%s] worked..." % self.human_name)
+            log.warning("another kappelmeister for [%s] worked..." % self.human_name)
             return
 
         log.info("start kappellmeister for [%s]" % self.human_name)

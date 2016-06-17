@@ -7,7 +7,7 @@ from datetime import datetime
 from pymongo import MongoClient
 from pymongo.errors import CollectionInvalid
 
-from wsgi.properties import mongo_uri, db_name, TIME_TO_WAIT_NEW_COPIES, comments_mongo_uri, comments_db_name
+from wsgi.properties import mongo_uri, db_name
 
 __author__ = 'alesha'
 
@@ -185,67 +185,6 @@ class HumanStorage(DBHandler):
             crupt = m.hexdigest()
             if crupt == found.get("pwd"):
                 return found.get("user_id")
-
-
-class CommentsStorage(DBHandler):
-    def __init__(self, name="?"):
-        super(CommentsStorage, self).__init__(name=name, uri=comments_mongo_uri, db_name=comments_db_name)
-        self.comments = self.db.get_collection("comments")
-        if not self.comments:
-            self.comments = self.db.create_collection(
-                "comments",
-                capped=True,
-                size=1024 * 1024 * 256,
-            )
-            self.comments.drop_indexes()
-
-            self.comments.create_index([("fullname", 1)], unique=True)
-            self.comments.create_index([("commented", 1)], sparse=True)
-            self.comments.create_index([("ready_for_comment", 1)], sparse=True)
-            self.comments.create_index([("text_hash", 1)], sparse=True)
-
-    def set_post_commented(self, post_fullname, by, hash):
-        found = self.comments.find_one({"fullname": post_fullname, "commented": {"$exists": False}})
-        if not found:
-            to_add = {"fullname": post_fullname, "commented": True, "time": time.time(), "text_hash": hash, "by": by}
-            self.comments.insert_one(to_add)
-        else:
-            to_set = {"commented": True, "text_hash": hash, "by": by, "time": time.time()}
-
-            self.comments.update_one({"fullname": post_fullname}, {"$set": to_set, "$unset": {"comment_body": 1}}, )
-
-    def can_comment_post(self, who, post_fullname, hash):
-        q = {"by": who, "commented": True, "$or": [{"fullname": post_fullname}, {"text_hash": hash}]}
-        found = self.comments.find_one(q)
-        return found is None
-
-    def set_post_ready_for_comment(self, post_fullname, comment_text):
-        found = self.comments.find_one({"fullname": post_fullname})
-        if found and found.get("commented"):
-            return
-        elif found:
-            return self.comments.update_one(found,
-                                            {"$set": {"ready_for_comment": True, "comment_body": comment_text}})
-        else:
-            return self.comments.insert_one(
-                {"fullname": post_fullname, "ready_for_comment": True, "comment_body": comment_text})
-
-    def get_text(self, comment_id):
-        self.comments.find({"_id": comment_id})
-
-    def get_posts_ready_for_comment(self):
-        return list(self.comments.find({"ready_for_comment": True, "commented": {"$exists": False}}))
-
-    def get_post(self, post_fullname):
-        found = self.comments.find_one({"fullname": post_fullname})
-        return found
-
-    def get_posts_commented(self, by=None):
-        q = {"commented": True}
-        if by:
-            q["by"] = by
-        return list(self.comments.find(q))
-
 
 if __name__ == '__main__':
     hs = HumanStorage()
