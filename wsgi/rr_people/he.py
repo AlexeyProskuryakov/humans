@@ -107,27 +107,16 @@ class Kapellmeister(Process):
             return True
 
     def _do_action(self, action, subs, step, _start):
-        produce = True
+        produce = False
         if action == A_COMMENT and self.human.can_do(A_COMMENT):
-            sub_name = random.choice(subs)
-            comment = self.comment_queue.pop_comment_hash(sub_name)
-            if comment:
-                pfn, ct = comment
-                log.info("will comment [%s] [%s]" % (pfn, ct))
-                self._set_state(WORK_STATE("comment"))
-                result = self.human.do_comment_post(pfn, sub_name, ct)
-                if result != A_COMMENT: produce = False
-
-            else:
-                log.info("will send need comment for sub [%s]" % sub_name)
-                self._set_state(WORK_STATE("need comment"))
-                self.comment_queue.need_comment(sub_name)
-                produce = False
+            self._set_state(WORK_STATE("commenting"))
+            comment_result = self.human.do_comment_post()
+            if comment_result == A_COMMENT: produce = True
 
         elif action == A_POST and self.human.can_do(A_POST):
             self._set_state(WORK_STATE("posting"))
             post_result = self.human.do_post()
-            if post_result != PS_POSTED: produce = False
+            if post_result == A_POST: produce = True
 
         if not produce:
             if self.human.can_do(A_CONSUME):

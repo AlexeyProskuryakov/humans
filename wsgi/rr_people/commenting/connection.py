@@ -14,33 +14,32 @@ CS_READY_FOR_COMMENT = "ready_for_comment"
 
 
 class CommentsStorage(DBHandler):
-    # todo test it
-
     def __init__(self, name="?"):
         super(CommentsStorage, self).__init__(name=name, uri=comments_mongo_uri, db_name=comments_db_name)
         collections_names = self.db.collection_names(include_system_collections=False)
         if "comments" not in collections_names:
             self.comments = self.db.create_collection(
                 "comments",
-                capped=True,
-                size=1024 * 1024 * 256,
+                # capped=True,
+                # size=1024 * 1024 * 256,
             )
             self.comments.drop_indexes()
 
-            self.comments.create_index([("fullname", 1)], unique=True)
+            self.comments.create_index([("fullname", 1)])
             self.comments.create_index([("state", 1)], sparse=True)
-            self.comments.create_index([("text_hash", 1)], sparse=True)
             self.comments.create_index([("sub", 1)], sparse=True)
         else:
             self.comments = self.db.get_collection("comments")
 
-    def set_commented(self, comment_id, by, hash):
+    def _clear(self):
+        self.db.drop_collection("comments")
+
+    def set_commented(self, comment_id, by):
         self.comments.update_one({"_id": comment_id},
                                  {"$set": {"state": CS_COMMENTED,
-                                           "text_hash": hash,
                                            "by": by,
                                            "time": time.time()},
-                                  "$unset": {"_lock": 1}})
+                                  "$unset": {"lock": 1}})
 
     def get_comment_info(self, post_fullname):
         found = self.comments.find_one(
@@ -48,8 +47,30 @@ class CommentsStorage(DBHandler):
              "state": CS_READY_FOR_COMMENT,
              "_lock": {"$exists": False}})
         if found:
-            self.comments.update_one(found, {"$set": {"_lock": 1}})
+            self.comments.update_one(found, {"$set": {"lock": 1}})
             return found
+
+    def set_comment_info_ready(self, post_fullname, sub, comment_text, permalink):
+        self.comments.insert_one(
+            {"fullname": post_fullname,
+             "state": CS_READY_FOR_COMMENT,
+             "sub": sub,
+             "text": comment_text,
+             "post_url": permalink}
+        )
+
+    def get_posts_ready_for_comment(self, sub=None):
+        q = {"state": CS_READY_FOR_COMMENT, "sub": sub}
+        return list(self.comments.find(q))
+
+    def get_posts_commented(self, sub):
+        q = {"state": CS_COMMENTED, "sub": sub}
+        return list(self.comments.find(q).sort({"time": -1}))
+
+    def get_posts(self, posts_fullnames):
+        for el in self.comments.find({"fullname": {"$in": posts_fullnames}},
+                                     projection={"text": True, "fullname": True, "post_url": True}):
+            yield el
 
 
 NEED_COMMENT = "need_comment"
@@ -99,4 +120,3 @@ class CommentHandler(CommentsStorage, CommentRedisQueue):
             if comment_info:
                 return comment_info
         self.need_comment(sub)
-

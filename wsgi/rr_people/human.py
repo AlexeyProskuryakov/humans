@@ -100,7 +100,7 @@ class Human(RedditHandler):
         self.init_engine(login_credentials)
         self.init_work_cycle()
 
-        #todo this cache must be persisted at mongo or another
+        # todo this cache must be persisted at mongo or another
         self._used = set()
         self.cache_last_loads = {}
         self.cache_sub_posts = {}
@@ -443,7 +443,7 @@ class Human(RedditHandler):
                                {"fullname": result.fullname, "sub": post.for_sub, 'title': post.title, 'url': post.url})
             self.posts_handler.set_post_state(post.url_hash, PS_POSTED)
             log.info("OK! result: %s" % (result))
-            return PS_POSTED
+            return A_POST
         else:
             self.posts_handler.set_post_state(post.url_hash, PS_ERROR)
             log.info("NOT OK :( result: %s" % (result))
