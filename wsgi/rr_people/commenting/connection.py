@@ -9,14 +9,17 @@ from wsgi.rr_people.queue import RedisHandler
 
 log = logging.getLogger("comments")
 
+CS_COMMENTED = "commented"
+CS_READY_FOR_COMMENT = "ready_for_comment"
+
 
 class CommentsStorage(DBHandler):
-    #todo end refactoring with reader
+    # todo test it
 
     def __init__(self, name="?"):
         super(CommentsStorage, self).__init__(name=name, uri=comments_mongo_uri, db_name=comments_db_name)
-        self.comments = self.db.get_collection("comments")
-        if not self.comments:
+        collections_names = self.db.collection_names(include_system_collections=False)
+        if "comments" not in collections_names:
             self.comments = self.db.create_collection(
                 "comments",
                 capped=True,
@@ -25,34 +28,29 @@ class CommentsStorage(DBHandler):
             self.comments.drop_indexes()
 
             self.comments.create_index([("fullname", 1)], unique=True)
-            self.comments.create_index([("commented", 1)], sparse=True)
-            self.comments.create_index([("ready_for_comment", 1)], sparse=True)
+            self.comments.create_index([("state", 1)], sparse=True)
             self.comments.create_index([("text_hash", 1)], sparse=True)
-
-    def set_post_commented(self, post_fullname, by, hash):
-        found = self.comments.find_one({"fullname": post_fullname, "commented": {"$exists": False}})
-        if not found:
-            to_add = {"fullname": post_fullname, "commented": True, "time": time.time(), "text_hash": hash, "by": by}
-            self.comments.insert_one(to_add)
+            self.comments.create_index([("sub", 1)], sparse=True)
         else:
-            to_set = {"commented": True, "text_hash": hash, "by": by, "time": time.time()}
+            self.comments = self.db.get_collection("comments")
 
-            self.comments.update_one({"fullname": post_fullname}, {"$set": to_set, "$unset": {"comment_body": 1}}, )
+    def set_commented(self, comment_id, by, hash):
+        self.comments.update_one({"_id": comment_id},
+                                 {"$set": {"state": CS_COMMENTED,
+                                           "text_hash": hash,
+                                           "by": by,
+                                           "time": time.time()},
+                                  "$unset": {"_lock": 1}})
 
-    def can_comment_post(self, who, post_fullname, hash):
-        q = {"by": who, "commented": True, "$or": [{"fullname": post_fullname}, {"text_hash": hash}]}
-        found = self.comments.find_one(q)
-        return found is None
+    def get_comment_info(self, post_fullname):
+        found = self.comments.find_one(
+            {"fullname": post_fullname,
+             "state": CS_READY_FOR_COMMENT,
+             "_lock": {"$exists": False}})
+        if found:
+            self.comments.update_one(found, {"$set": {"_lock": 1}})
+            return found
 
-    def get_text(self, comment_id):
-        self.comments.find({"_id": comment_id})
-
-    def get_posts_ready_for_comment(self):
-        return list(self.comments.find({"ready_for_comment": True, "commented": {"$exists": False}}))
-
-    def get_post(self, post_fullname):
-        found = self.comments.find_one({"fullname": post_fullname})
-        return found
 
 NEED_COMMENT = "need_comment"
 QUEUE_CF = lambda x: "cf_queue_%s" % x
@@ -68,6 +66,7 @@ class CommentRedisQueue(RedisHandler):
 
 
     """
+
     def __init__(self, name="?", clear=False, host=None, port=None, pwd=None, db=None):
         super(CommentRedisQueue, self).__init__("comment queue %s" % name, clear,
                                                 comment_redis_address,
@@ -87,4 +86,17 @@ class CommentRedisQueue(RedisHandler):
         result = self.redis.lrange(QUEUE_CF(sbrdt), 0, -1)
         return list(result)
 
+
+class CommentHandler(CommentsStorage, CommentRedisQueue):
+    def __init__(self, name="?"):
+        CommentsStorage.__init__(self, "comment handler %s" % name).__init__()
+        CommentRedisQueue.__init__(self, "handler")
+
+    def get_comment(self, sub):
+        post_fn = self.pop_comment(sub)
+        if post_fn:
+            comment_info = self.get_comment_info(post_fn)
+            if comment_info:
+                return comment_info
+        self.need_comment(sub)
 

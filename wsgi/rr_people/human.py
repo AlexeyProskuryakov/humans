@@ -100,6 +100,7 @@ class Human(RedditHandler):
         self.init_engine(login_credentials)
         self.init_work_cycle()
 
+        #todo this cache must be persisted at mongo or another
         self._used = set()
         self.cache_last_loads = {}
         self.cache_sub_posts = {}
@@ -216,7 +217,7 @@ class Human(RedditHandler):
 
         # todo create and checking this ability for less touching db
         self.db.save_log_human_row(self.name, step_type, info or {})
-        self.persist_state()
+        self.update_state()
         log.info("step by [%s] |%s|: %s", self.name, step_type, info)
 
         if info and info.get("fullname"):
@@ -232,7 +233,7 @@ class Human(RedditHandler):
     def can_friendship_create(self, friend_name):
         return friend_name not in self.friends and time.time() - self.last_friend_add > random.randint(WEEK / 5, WEEK)
 
-    def persist_state(self):
+    def update_state(self):
         self.db.update_human_internal_state(self.name, state=self.state)
 
     def do_see_post(self, post):
@@ -336,6 +337,7 @@ class Human(RedditHandler):
         return max_wait_time
 
     def do_comment_post(self):
+
         pass
 
     def _comment_post(self, post_fullname, subreddit_name, comment_id):
@@ -369,9 +371,9 @@ class Human(RedditHandler):
                                                              post_fullname=_post.fullname,
                                                              hash=text_hash):
                         response = _post.add_comment(comment_text)
-                        self.comment_storage.set_post_commented(_post.fullname,
-                                                                by=self.name,
-                                                                hash=text_hash)
+                        self.comment_storage.set_commented(_post.fullname,
+                                                           by=self.name,
+                                                           hash=text_hash)
                         self.register_step(A_COMMENT, info={"fullname": post_fullname, "sub": subreddit_name,
                                                             "response": response.__dict__})
                         return A_COMMENT
