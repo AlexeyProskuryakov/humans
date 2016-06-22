@@ -106,7 +106,7 @@ class Kapellmeister(Process):
             self.states_handler.set_human_state(self.human_name, new_state)
             return True
 
-    def _do_action(self, action, subs, step, _start):
+    def _do_action(self, action, step, _start):
         produce = False
         if action == A_COMMENT and self.human.can_do(A_COMMENT):
             self._set_state(WORK_STATE("commenting"))
@@ -146,7 +146,6 @@ class Kapellmeister(Process):
         t_start = time_hash(datetime.utcnow())
         step = t_start
         last_token_refresh_time = t_start
-        subs = self.main_storage.get_human_subs(self.human_name)
 
         while 1:
             _start = time.time()
@@ -164,7 +163,7 @@ class Kapellmeister(Process):
 
             action = self.ae.get_action(step)
             if action != A_SLEEP:
-                step = self._do_action(action, subs, step, _start)
+                step = self._do_action(action, step, _start)
             else:
                 if not self._set_state(S_SLEEP):
                     return

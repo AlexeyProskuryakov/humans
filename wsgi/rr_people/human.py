@@ -12,8 +12,8 @@ from wsgi import properties
 from wsgi.db import HumanStorage
 from wsgi.properties import WEEK
 from wsgi.rr_people import RedditHandler, USER_AGENTS, A_CONSUME, A_VOTE, A_COMMENT, A_POST, A_SUBSCRIBE, normalize, \
-    A_FRIEND, re_url
-from wsgi.rr_people.commenting.connection import CommentsStorage
+    A_FRIEND, re_url, cmp_by_created_utc
+from wsgi.rr_people.commenting.connection import CommentsStorage, CommentHandler
 from wsgi.rr_people.posting.posts import PS_POSTED, PS_ERROR, PS_NO_POSTS
 from wsgi.rr_people.posting.posts_managing import PostHandler
 
@@ -84,7 +84,7 @@ class Human(RedditHandler):
         super(Human, self).__init__()
         self.login = login
         self.db = HumanStorage(name="consumer %s" % login)
-        self.comment_storage = CommentsStorage(name="consumer %s" % login)
+        self.comments_handler = CommentHandler(name="consumer %s" % login)
         self.posts_handler = PostHandler("consumer %s" % login)
 
         login_credentials = self.db.get_human_access_credentials(login)
@@ -337,54 +337,64 @@ class Human(RedditHandler):
         return max_wait_time
 
     def do_comment_post(self):
+        sub = random.choice(self.db.get_human_subs(self.login))
+        post_fullname = self.comments_handler.pop_comment_post_fullname(sub)
+        if not post_fullname:
+            self.comments_handler.need_comment(sub)
+        else:
+            result = self._humanised_comment_post(sub, post_fullname)
+            return result
 
-        pass
-
-    def _comment_post(self, post_fullname, subreddit_name, comment_id):
+    def _humanised_comment_post(self, sub, post_fullname):
         self._load_configuration()
-        # todo must tie up commented post with loaded post and check it in cache.
-        # todo if cache is broken?
-        #
-        near_posts = self.get_hot_and_new(subreddit_name)
-        for i, _post in enumerate(near_posts):
-            # todo if commented post is too old?
+        all_posts = self.get_hot_and_new(sub, sort=cmp_by_created_utc)
+        # check if post fullname is too old
+        all_posts_fns = set(map(lambda x: x.fullname, all_posts))
+        if post_fullname not in all_posts_fns:
+            log.warning(
+                "post fullname [%s] for comment is too old and not present at hot or new. i will skip this spoiled comment")
+            post = self.reddit.get_submission(post_fullname, comment_limit=None)
+            if post:
+                return self._comment_post(post, post_fullname, sub)
+            else:
+                return
+
+        for i, _post in enumerate(all_posts):
             if _post.fullname == post_fullname:
-                see_left, see_right = _get_random_near(near_posts, i, self.configuration.max_posts_near_commented)
-                try:
-                    for p_ind in see_left:
-                        self.do_see_post(p_ind)
-                except Exception as e:
-                    log.error(e)
+                see_left, see_right = _get_random_near(all_posts, i, self.configuration.max_posts_near_commented)
+                self._see_near_posts(see_left)
+                self._see_comments(_post)
+                result = self._comment_post(_post, post_fullname, sub)
+                self._see_near_posts(see_right)
+                return result
 
-                try:
-                    for comment in filter(lambda comment: isinstance(comment, MoreComments), _post.comments):
-                        comment.comments()
-                        if random.randint(0, 10) > 6:
-                            break
-                except Exception as e:
-                    log.error(e)
+    def _see_comments(self, _post):
+        try:
+            for comment in filter(lambda comment: isinstance(comment, MoreComments), _post.comments):
+                comment.comments()
+                if random.randint(0, 10) > 6:
+                    break
+        except Exception as e:
+            log.error(e)
 
-                try:
-                    comment_text = self.comment_storage.get_text(comment_id)
-                    text_hash = hash(normalize(comment_text))
-                    if self.comment_storage.can_comment_post(self.name,
-                                                             post_fullname=_post.fullname,
-                                                             hash=text_hash):
-                        response = _post.add_comment(comment_text)
-                        self.comment_storage.set_commented(_post.fullname,
-                                                           by=self.name,
-                                                           hash=text_hash)
-                        self.register_step(A_COMMENT, info={"fullname": post_fullname, "sub": subreddit_name,
-                                                            "response": response.__dict__})
-                        return A_COMMENT
-                except Exception as e:
-                    log.error(e)
+    def _comment_post(self, _post, post_fullname, sub):
+        try:
+            comment_info = self.comments_handler.get_comment_info(post_fullname)
+            response = _post.add_comment(comment_info.get("text"))
+            self.comments_handler.set_commented(comment_info['_id'], by=self.name)
+            self.register_step(A_COMMENT, info={"fullname": post_fullname,
+                                                "sub": sub,
+                                                "comment_result": response.__dict__})
+            return A_COMMENT
+        except Exception as e:
+            log.error(e)
 
-                try:
-                    for p_ind in see_right:
-                        self.do_see_post(p_ind)
-                except Exception as e:
-                    log.error(e)
+    def _see_near_posts(self, posts):
+        try:
+            for p_ind in posts:
+                self.do_see_post(p_ind)
+        except Exception as e:
+            log.error(e)
 
     def do_live_random(self, max_actions=100, posts_limit=500):
 
@@ -460,10 +470,11 @@ class FakeHuman(Human):
     def do_post(self):
         log.info("DO POSTING...")
 
-    def do_comment_post(self, post_fullname, subreddit_name, comment_id):
-        text = self.comment_storage.get_text(comment_id)
-        log.info("DO COMMENT POST AT: %s POST: %s COMMENT_ID: %s\nCOMMENT_TEXT: %s" % (
-            subreddit_name, post_fullname, comment_id, text))
+    def do_comment_post(self):
+        return super(FakeHuman, self).do_comment_post()
+
+    def _humanised_comment_post(self, sub, post_fullname):
+        pass
 
     def do_see_post(self, post):
         log.info("DO SEE POST %s" % post)

@@ -2,6 +2,7 @@
 import logging
 import time
 from threading import Thread
+from multiprocessing import RLock
 
 from wsgi.db import DBHandler
 from wsgi.properties import comment_redis_address, comment_redis_password, comment_redis_port, TIME_TO_COMMENT_SPOILED
@@ -37,12 +38,14 @@ class CommentsStorage(DBHandler):
         self.remover = Thread(target=self._remove_old)
         self.remover.start()
 
+        self.mutex = RLock()
+
     def __del__(self):
         self.remover_stop = True
 
     def _remove_old(self):
         while 1:
-            if self.remover_stop:break
+            if self.remover_stop: break
             time.sleep(60)
             log.info("will remove old comments")
             result = self.comments.delete_many({"time": {"$lte": time.time() - TIME_TO_COMMENT_SPOILED}})
@@ -63,13 +66,14 @@ class CommentsStorage(DBHandler):
                                   "$unset": {"_lock": 1}})
 
     def get_comment_info(self, post_fullname):
-        found = self.comments.find_one(
-            {"fullname": post_fullname,
-             "state": CS_READY_FOR_COMMENT,
-             "_lock": {"$exists": False}})
-        if found:
-            self.comments.update_one(found, {"$set": {"_lock": 1}})
-            return found
+        with self.mutex:
+            found = self.comments.find_one(
+                {"fullname": post_fullname,
+                 "state": CS_READY_FOR_COMMENT,
+                 "_lock": {"$exists": False}})
+            if found:
+                self.comments.update_one(found, {"$set": {"_lock": 1}})
+                return found
 
     def set_comment_info_ready(self, post_fullname, sub, comment_text, permalink):
         self.comments.insert_one(
@@ -119,7 +123,7 @@ class CommentRedisQueue(RedisHandler):
     def need_comment(self, sbrdt):
         self.redis.publish(NEED_COMMENT, sbrdt)
 
-    def pop_comment(self, sbrdt):
+    def pop_comment_post_fullname(self, sbrdt):
         result = self.redis.lpop(QUEUE_CF(sbrdt))
         log.debug("redis: get by %s\nthis: %s" % (sbrdt, result))
         return result
@@ -134,10 +138,3 @@ class CommentHandler(CommentsStorage, CommentRedisQueue):
         CommentsStorage.__init__(self, "comment handler %s" % name).__init__()
         CommentRedisQueue.__init__(self, "handler")
 
-    def get_comment(self, sub):
-        post_fn = self.pop_comment(sub)
-        if post_fn:
-            comment_info = self.get_comment_info(post_fn)
-            if comment_info:
-                return comment_info
-        self.need_comment(sub)

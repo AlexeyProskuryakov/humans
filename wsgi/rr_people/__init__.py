@@ -3,6 +3,7 @@ import random
 import re
 
 import praw
+import time
 from praw.objects import MoreComments
 from stemming.porter2 import stem
 
@@ -58,12 +59,37 @@ log = logging.getLogger("man")
 
 WORDS_HASH = "words_hash"
 
+POSTS_TTL = 60 * 5
+
+
+class _RedditPostsCache():
+    __metaclass__ = Singleton
+
+    def __init__(self):
+        self._posts_cache = {}
+        self._posts_cache_timings = {}
+
+    def get_posts(self, sub):
+        if sub in self._posts_cache:
+            if (self._posts_cache_timings.get(sub) - time.time()) < POSTS_TTL:
+                return self._posts_cache[sub]
+            else:
+                del self._posts_cache[sub]
+                del self._posts_cache_timings[sub]
+                return None
+        else:
+            return None
+
+    def set_posts(self, sub, posts):
+        self._posts_cache[sub] = posts
+        self._posts_cache_timings[sub] = time.time()
+
 
 class RedditHandler(object):
     def __init__(self, user_agent=None):
         self.reddit = praw.Reddit(user_agent=user_agent or random.choice(USER_AGENTS))
         self.subreddits_cache = {}
-        self.posts_comments_cache = {}
+        self.posts_cache = _RedditPostsCache()
 
     def get_subreddit(self, name):
         if name not in self.subreddits_cache:
@@ -75,33 +101,26 @@ class RedditHandler(object):
 
     def get_hot_and_new(self, subreddit_name, sort=None, limit=properties.DEFAULT_LIMIT):
         try:
-            subreddit = self.get_subreddit(subreddit_name)
-            hot = list(subreddit.get_hot(limit=limit))
-            log.info("%s hot loaded limit: %s, result: %s" % (subreddit_name, limit, len(hot)))
-            new = list(subreddit.get_new(limit=limit))
-            log.info("%s new loaded limit: %s, result: %s" % (subreddit_name, limit, len(new)))
-            result_dict = dict(map(lambda x: (x.fullname, x), hot), **dict(map(lambda x: (x.fullname, x), new)))
+            result = self.posts_cache.get_posts(subreddit_name)
+            if not result:
+                subreddit = self.get_subreddit(subreddit_name)
+                hot = list(subreddit.get_hot(limit=limit))
+                log.info("[%s] hot loaded limit: %s, result: %s" % (subreddit_name, limit, len(hot)))
+                new = list(subreddit.get_new(limit=limit))
+                log.info("[%s] new loaded limit: %s, result: %s" % (subreddit_name, limit, len(new)))
+                result_dict = dict(map(lambda x: (x.fullname, x), hot), **dict(map(lambda x: (x.fullname, x), new)))
+                log.info("[%s] all with intersection: %s" % (subreddit_name, len(result_dict)))
 
-            log.info("Will search for dest posts candidates at %s posts in %s" % (len(result_dict), subreddit_name))
-            result = result_dict.values()
+                result = result_dict.values()
+                self.posts_cache.set_posts(subreddit_name, result)
+
             if sort:
                 result.sort(cmp=sort)
+
             return result
         except Exception as e:
             log.exception(e)
             return []
-
-    def get_all_comments(self, post):
-        if post.fullname in self.posts_comments_cache:
-            return self.posts_comments_cache[post.fullname]
-
-        comments = list(self.comments_sequence(post.comments))
-        self.posts_comments_cache[post.fullname] = comments
-        return comments
-
-    def clear_cache(self, post):
-        if post.fullname in self.posts_comments_cache:
-            del self.posts_comments_cache[post.fullname]
 
     def comments_sequence(self, comments):
         sequence = list(comments)
@@ -176,9 +195,9 @@ serialize = lambda pfn, ct: "%s%s%s" % (pfn, CQ_SEP, ct)
 def cmp_by_created_utc(x, y):
     return int(x.created_utc - y.created_utc)
 
+
 def cmp_by_comments_count(x, y):
     return x.num_comments - y.num_comments
-
 
 
 def post_to_dict(post):
