@@ -1,9 +1,10 @@
 # coding=utf-8
 import logging
 import time
+from threading import Thread
 
 from wsgi.db import DBHandler
-from wsgi.properties import comment_redis_address, comment_redis_password, comment_redis_port
+from wsgi.properties import comment_redis_address, comment_redis_password, comment_redis_port, TIME_TO_COMMENT_SPOILED
 from wsgi.properties import comments_mongo_uri, comments_db_name
 from wsgi.rr_people.queue import RedisHandler
 
@@ -12,16 +13,17 @@ log = logging.getLogger("comments")
 CS_COMMENTED = "commented"
 CS_READY_FOR_COMMENT = "ready_for_comment"
 
+_comments = "comments"
+
 
 class CommentsStorage(DBHandler):
-    def __init__(self, name="?"):
+    def __init__(self, name="?", clear=False):
         super(CommentsStorage, self).__init__(name=name, uri=comments_mongo_uri, db_name=comments_db_name)
         collections_names = self.db.collection_names(include_system_collections=False)
-        if "comments" not in collections_names:
+        if _comments not in collections_names or clear:
+            self._clear()
             self.comments = self.db.create_collection(
-                "comments",
-                # capped=True,
-                # size=1024 * 1024 * 256,
+                _comments,
             )
             self.comments.drop_indexes()
 
@@ -29,17 +31,36 @@ class CommentsStorage(DBHandler):
             self.comments.create_index([("state", 1)], sparse=True)
             self.comments.create_index([("sub", 1)], sparse=True)
         else:
-            self.comments = self.db.get_collection("comments")
+            self.comments = self.db.get_collection(_comments)
+
+        self.remover_stop = False
+        self.remover = Thread(target=self._remove_old)
+        self.remover.start()
+
+    def __del__(self):
+        self.remover_stop = True
+
+    def _remove_old(self):
+        while 1:
+            if self.remover_stop:break
+            time.sleep(60)
+            log.info("will remove old comments")
+            result = self.comments.delete_many({"time": {"$lte": time.time() - TIME_TO_COMMENT_SPOILED}})
+            log.info("old comments removed %s, ok? %s" % (result.deleted_count, result.acknowledged))
 
     def _clear(self):
-        self.db.drop_collection("comments")
+        try:
+            result = self.db.drop_collection(_comments)
+            log.info("clearing result: %s", result)
+        except Exception as e:
+            log.exception(e)
 
     def set_commented(self, comment_id, by):
         self.comments.update_one({"_id": comment_id},
                                  {"$set": {"state": CS_COMMENTED,
                                            "by": by,
                                            "time": time.time()},
-                                  "$unset": {"lock": 1}})
+                                  "$unset": {"_lock": 1}})
 
     def get_comment_info(self, post_fullname):
         found = self.comments.find_one(
@@ -47,7 +68,7 @@ class CommentsStorage(DBHandler):
              "state": CS_READY_FOR_COMMENT,
              "_lock": {"$exists": False}})
         if found:
-            self.comments.update_one(found, {"$set": {"lock": 1}})
+            self.comments.update_one(found, {"$set": {"_lock": 1}})
             return found
 
     def set_comment_info_ready(self, post_fullname, sub, comment_text, permalink):
@@ -65,7 +86,7 @@ class CommentsStorage(DBHandler):
 
     def get_posts_commented(self, sub):
         q = {"state": CS_COMMENTED, "sub": sub}
-        return list(self.comments.find(q).sort({"time": -1}))
+        return list(self.comments.find(q).sort([("time", -1)]))
 
     def get_posts(self, posts_fullnames):
         for el in self.comments.find({"fullname": {"$in": posts_fullnames}},

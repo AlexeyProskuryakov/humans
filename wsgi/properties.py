@@ -57,7 +57,7 @@ ae_db_name = "ae"
 
 comments_mongo_uri = "mongodb://milena:sederfes100500@ds015760.mlab.com:15760/humans_comments"
 comments_db_name = "humans_comments"
-expire_low_copies_posts = 3600 * 24 * 7
+TIME_TO_COMMENT_SPOILED = 3600 * 24 * 30 * 6
 
 comment_redis_address = "pub-redis-11997.us-east-1-3.7.ec2.redislabs.com"
 comment_redis_port = 11997
