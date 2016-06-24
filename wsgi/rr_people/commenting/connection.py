@@ -46,7 +46,7 @@ class CommentsStorage(DBHandler):
     def _remove_old(self):
         while 1:
             if self.remover_stop: break
-            time.sleep(60)
+            time.sleep(3600)
             log.info("will remove old comments")
             result = self.comments.delete_many({"time": {"$lte": time.time() - TIME_TO_COMMENT_SPOILED}})
             log.info("old comments removed %s, ok? %s" % (result.deleted_count, result.acknowledged))
@@ -137,4 +137,3 @@ class CommentHandler(CommentsStorage, CommentRedisQueue):
     def __init__(self, name="?"):
         CommentsStorage.__init__(self, "comment handler %s" % name).__init__()
         CommentRedisQueue.__init__(self, "handler")
-

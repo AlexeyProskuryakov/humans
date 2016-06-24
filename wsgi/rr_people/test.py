@@ -1,15 +1,9 @@
 from wsgi.rr_people.he import Kapellmeister
-from wsgi.rr_people.human import FakeHuman
+from wsgi.rr_people.human import FakeHuman, Human
 from wsgi.rr_people.posting.posts import PostSource
 
 
-def test_kapelmeister():
-    kp = Kapellmeister("test", human_class=FakeHuman)
-
-
-
-if __name__ == '__main__':
-
+def test_balanser():
     from wsgi.rr_people.posting.posts_managing import PostHandler
 
     post_handler = PostHandler(name="test")
@@ -57,3 +51,12 @@ if __name__ == '__main__':
                               important=True)
     for i in range(120):
         print post_handler.get_post("test")
+
+
+def test_kapelmeister():
+    kp = Kapellmeister("Shlak2k15", human_class=Human)
+    kp.human.do_comment_post()
+
+
+if __name__ == '__main__':
+    test_kapelmeister()

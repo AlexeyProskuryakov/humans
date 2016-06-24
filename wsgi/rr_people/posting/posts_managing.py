@@ -9,7 +9,7 @@ from wsgi.rr_people.posting.posts_balancer import PostBalancer
 from wsgi.rr_people.posting.youtube_posts import YoutubeChannelsHandler
 from wsgi.rr_people.posting.queue import PostRedisQueue
 
-log = logging.getLogger("force_action_handler")
+log = logging.getLogger("posts")
 
 
 class PostHandler(object):

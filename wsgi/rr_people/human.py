@@ -352,11 +352,15 @@ class Human(RedditHandler):
         all_posts_fns = set(map(lambda x: x.fullname, all_posts))
         if post_fullname not in all_posts_fns:
             log.warning(
-                "post fullname [%s] for comment is too old and not present at hot or new. i will skip this spoiled comment")
-            post = self.reddit.get_submission(post_fullname, comment_limit=None)
-            if post:
-                return self._comment_post(post, post_fullname, sub)
-            else:
+                "post fullname [%s] for comment is too old and not present at hot or new" % post_fullname)
+            try:
+                post = self.reddit.get_submission(submission_id=post_fullname, comment_limit=None)
+                if post:
+                    return self._comment_post(post, post_fullname, sub)
+                else:
+                    return
+            except Exception as e:
+                log.warning("can not getting submission [%s], because: %s" % (post_fullname, e))
                 return
 
         for i, _post in enumerate(all_posts):
