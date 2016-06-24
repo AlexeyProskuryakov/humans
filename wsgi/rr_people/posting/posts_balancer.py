@@ -2,14 +2,12 @@ import json
 import logging
 import random
 from collections import defaultdict
-from multiprocessing import Process, Queue
-
-import time
+from multiprocessing import Process
 
 from wsgi.db import DBHandler, HumanStorage
 from wsgi.rr_people import Singleton
 from wsgi.rr_people.posting.posts import PS_AT_QUEUE, PostsStorage
-from wsgi.rr_people.queue import PostRedisQueue
+from wsgi.rr_people.posting.queue import PostRedisQueue
 from wsgi.rr_people.states.persisted_queue import RedisQueue
 from wsgi.rr_people.states.processes import ProcessDirector
 
