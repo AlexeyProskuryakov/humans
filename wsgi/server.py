@@ -18,13 +18,13 @@ from wsgi.db import HumanStorage
 from wsgi.properties import want_coefficient_max, DAY
 from wsgi.rr_people import S_WORK, S_SUSPEND, S_STOP
 from wsgi.rr_people.ae import AuthorsStorage
-from wsgi.rr_people.he import HumanConfiguration, HumanOrchestra
+from wsgi.rr_people.he import HumanOrchestra
+from wsgi.rr_people.human import HumanConfiguration
 from wsgi.rr_people.posting import POST_GENERATOR_OBJECTS
 from wsgi.rr_people.posting.copy_gen import SubredditsRelationsStore
-from wsgi.rr_people.posting.posts import PS_BAD, PS_AT_QUEUE, PS_READY
+from wsgi.rr_people.posting.posts import PS_BAD, PS_READY
 from wsgi.rr_people.posting.posts_generator import PostsGenerator
 from wsgi.rr_people.posting.posts_managing import PostHandler
-from wsgi.rr_people.queue import CommentRedisQueue, PostRedisQueue
 from wsgi.wake_up import WakeUp, WakeUpStorage
 
 __author__ = '4ikist'
@@ -270,6 +270,7 @@ def human_auth_end():
 
 
 human_orchestra = HumanOrchestra()
+
 
 @app.route("/humans", methods=["POST", "GET"])
 @login_required

@@ -19,7 +19,6 @@ from wsgi.rr_people import USER_AGENTS, \
     Singleton, A_CONSUME
 from wsgi.rr_people.ae import ActionGenerator, time_hash
 from wsgi.rr_people.human import Human
-from wsgi.rr_people.queue import CommentRedisQueue
 from wsgi.rr_people.states.entity_states import StatesHandler
 from wsgi.rr_people.states.processes import ProcessDirector
 

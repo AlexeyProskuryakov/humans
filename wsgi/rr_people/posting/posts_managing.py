@@ -7,7 +7,7 @@ from wsgi.properties import force_post_manager_sleep_iteration_time
 from wsgi.rr_people.posting.posts import PostsStorage, PostSource
 from wsgi.rr_people.posting.posts_balancer import PostBalancer
 from wsgi.rr_people.posting.youtube_posts import YoutubeChannelsHandler
-from wsgi.rr_people.queue import PostRedisQueue
+from wsgi.rr_people.posting.queue import PostRedisQueue
 
 log = logging.getLogger("force_action_handler")
 
