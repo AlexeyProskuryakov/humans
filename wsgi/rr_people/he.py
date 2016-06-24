@@ -16,13 +16,11 @@ from wsgi.properties import WEEK, HOUR, MINUTE
 from wsgi.rr_people import USER_AGENTS, \
     A_COMMENT, A_POST, A_SLEEP, \
     S_WORK, S_BAN, S_SLEEP, S_SUSPEND, \
-    Singleton, S_STOP, A_CONSUME, A_VOTE
+    Singleton, A_CONSUME
 from wsgi.rr_people.ae import ActionGenerator, time_hash
-from wsgi.rr_people.human import Human, HumanConfiguration
-from wsgi.rr_people.posting.posts import PS_POSTED
+from wsgi.rr_people.human import Human
 from wsgi.rr_people.queue import CommentRedisQueue
 from wsgi.rr_people.states.entity_states import StatesHandler
-from wsgi.rr_people.states.persisted_queue import RedisQueue
 from wsgi.rr_people.states.processes import ProcessDirector
 
 log = logging.getLogger("he")
@@ -83,9 +81,8 @@ class Kapellmeister(Process):
         self.human_name = name
         self.ae = ActionGenerator(group_name=name)
         self.human = human_class(login=name)
-        self.states_handler = StatesHandler(name="kplmtr of [%s]" % name)
-        self.comment_queue = CommentRedisQueue(name="klmtr of [%s]" % name)
 
+        self.states_handler = StatesHandler(name="kplmtr of [%s]" % name)
         self.process_director = ProcessDirector(name="kplmtr of [%s] " % name)
 
         self.lock = Lock()

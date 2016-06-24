@@ -62,6 +62,15 @@ WORDS_HASH = "words_hash"
 POSTS_TTL = 60 * 5
 
 
+class Singleton(type):
+    _instances = {}
+
+    def __call__(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
+        return cls._instances[cls]
+
+
 class _RedditPostsCache():
     __metaclass__ = Singleton
 
@@ -146,16 +155,7 @@ class RedditHandler(object):
 
     def search(self, query):
         copies = list(self.reddit.search(query))
-        return list(copies)
-
-
-class Singleton(type):
-    _instances = {}
-
-    def __call__(cls, *args, **kwargs):
-        if cls not in cls._instances:
-            cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
-        return cls._instances[cls]
+        return copies
 
 
 token_reg = re.compile("[\\W\\d]+")
