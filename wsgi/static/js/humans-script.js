@@ -24,7 +24,11 @@ $("#human-name option").on('click', function(e){
 
 function show_human_live_state(){
         var name = $("#human-name").text();
+        if (name == "") {
+            return
+        }
         console.log("will send... to "+name);
+
         $.ajax({
             type:"POST",
             url:"/humans/"+name+"/state",

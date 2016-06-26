@@ -17,8 +17,8 @@
             </h2>
             <form action="{{ url_for('humans')}}" method="post">
                 <div class="form-group">
-                    <label for="human-name">Select human name:</label>
-                    <select class="form-control" id="human-name" name="human-name">
+                    <label for="for-human-name">Select human name:</label>
+                    <select class="form-control" id="for-human-name" name="human-name">
                         <option>Выберай чувака</option>
                         {% for human in humans %}
                         <option id="{{human.user}}">{{human.user}}</option>

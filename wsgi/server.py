@@ -279,7 +279,7 @@ def humans():
         subreddits_raw = request.form.get("sbrdts")
         subreddits = subreddits_raw.strip().split()
 
-        human_name = request.form.get("human-name")
+        human_name = request.form.get("for-human-name")
         human_name = human_name.strip()
         log.info("Add subreddits: \n%s\n to human with name: %s" % ('\n'.join([el for el in subreddits]), human_name))
 

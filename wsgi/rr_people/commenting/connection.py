@@ -47,9 +47,9 @@ class CommentsStorage(DBHandler):
         while 1:
             if self.remover_stop: break
             time.sleep(3600)
-            log.info("will remove old comments")
             result = self.comments.delete_many({"time": {"$lte": time.time() - TIME_TO_COMMENT_SPOILED}})
-            log.info("old comments removed %s, ok? %s" % (result.deleted_count, result.acknowledged))
+            if result.deleted_count != 0:
+                log.info("old comments removed %s, ok? %s" % (result.deleted_count, result.acknowledged))
 
     def _clear(self):
         try:
