@@ -128,12 +128,10 @@ class Kapellmeister(Process):
         if step > WEEK:
             step = step - WEEK
 
-        log.info("[%s] step is end. Action was: [%s], time spent: %s, next step: %s" % (
-            self.human_name, action, _diff, step))
-
         return step
 
     def run(self):
+        #todo debug it with fake for infrastructure
         if not self.process_director.can_start_aspect(HE_ASPECT(self.human_name), self.pid).get("started"):
             log.warning("another kappelmeister for [%s] worked..." % self.human_name)
             return
@@ -164,6 +162,9 @@ class Kapellmeister(Process):
                 if not self._set_state(S_SLEEP):
                     return
                 time.sleep(MINUTE)
+
+            log.info("[%s] step is end. Action was: [%s], time spent: %s, next step: %s" % (
+                self.human_name, action, time.time() - _start, step))
 
 
 class HumanOrchestra():
