@@ -17,7 +17,7 @@ from wsgi.rr_people import USER_AGENTS, \
     A_COMMENT, A_POST, A_SLEEP, \
     S_WORK, S_BAN, S_SLEEP, S_SUSPEND, \
     Singleton, A_CONSUME
-from wsgi.rr_people.ae import ActionGenerator, time_hash
+from wsgi.rr_people.ae import ActionGenerator, time_hash, delta_info
 from wsgi.rr_people.human import Human
 from wsgi.rr_people.states.entity_states import StatesHandler
 from wsgi.rr_people.states.processes import ProcessDirector
@@ -72,6 +72,8 @@ WORK_STATE = lambda x: "%s: %s" % (S_WORK, x)
 
 HE_ASPECT = lambda x: "he_%s" % x
 
+MIN_STEP_TIME = 5
+
 
 class Kapellmeister(Process):
     def __init__(self, name, human_class=Human):
@@ -124,14 +126,11 @@ class Kapellmeister(Process):
                 time.sleep((random.randint(1, 2) * MINUTE) / random.randint(1, 6))
 
         _diff = int(time.time() - _start)
-        step += _diff if _diff > 3 else 3
-        if step > WEEK:
-            step = step - WEEK
-
+        step += _diff if _diff > MIN_STEP_TIME else MIN_STEP_TIME
         return step
 
     def run(self):
-        #todo debug it with fake for infrastructure
+        # todo debug it with fake for infrastructure
         if not self.process_director.can_start_aspect(HE_ASPECT(self.human_name), self.pid).get("started"):
             log.warning("another kappelmeister for [%s] worked..." % self.human_name)
             return
@@ -156,15 +155,20 @@ class Kapellmeister(Process):
                 last_token_refresh_time = step
 
             action = self.ae.get_action(step)
+            _prev_step = step
             if action != A_SLEEP:
                 step = self._do_action(action, step, _start)
             else:
                 if not self._set_state(S_SLEEP):
                     return
+                step += MINUTE
                 time.sleep(MINUTE)
 
-            log.info("[%s] step is end. Action was: [%s], time spent: %s, next step: %s" % (
-                self.human_name, action, time.time() - _start, step))
+            if step > WEEK:
+                step = step - WEEK
+
+            log.info("[%s] step is end. Action was: [%s]; time spent: %s; current step: %s; next step: %s." % (
+                self.human_name, action, time.time() - _start, delta_info(_prev_step), delta_info(step)))
 
 
 class HumanOrchestra():
