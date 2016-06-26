@@ -396,6 +396,8 @@ def ae_represent(name):
         x = avg_start + step
         sleep_data.append([get_point_x(x), y, step * 1000, step * 1000])
 
+    sleep_data.append([get_point_x(0),y, 100, 100])
+
     result = {"color": "blue",
               "data": sleep_data,
               "points": {
