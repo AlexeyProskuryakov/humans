@@ -43,4 +43,4 @@ function show_human_live_state(){
 
 setInterval(function() {
     show_human_live_state()
-}, 1000);
+}, 5000);
