@@ -72,7 +72,7 @@ WORK_STATE = lambda x: "%s: %s" % (S_WORK, x)
 
 HE_ASPECT = lambda x: "he_%s" % x
 
-MIN_STEP_TIME = 5
+MIN_STEP_TIME = 60
 
 
 class Kapellmeister(Process):
@@ -124,13 +124,14 @@ class Kapellmeister(Process):
             else:
                 self._set_state(WORK_STATE("sleeping because can not consume"))
                 self.human.decr_counter(A_CONSUME)
+                self.human.get_hot_and_new(random.choice(self.human.db.get_human_subs(self.human_name)))
                 time.sleep((random.randint(1, 2) * MINUTE) / random.randint(1, 6))
                 action_result = A_SLEEP
         else:
             action_result = A_PRODUCE
 
         _diff = int(time.time() - _start)
-        step += _diff if _diff > MIN_STEP_TIME else MIN_STEP_TIME
+        step += _diff if _diff > MIN_STEP_TIME else MIN_STEP_TIME * random.randint(1, 10)
         return step, action_result
 
     def run(self):
@@ -175,7 +176,7 @@ class Kapellmeister(Process):
 
             log.info("[%s] step is end. Action: [%s] -> [%s]; time spent: %s; \ncurrent step: %s; \nnext step: %s." % (
                 self.human_name,
-                action,  action_result,
+                action, action_result,
                 time.time() - _start,
                 delta_info(_prev_step), delta_info(step)))
 

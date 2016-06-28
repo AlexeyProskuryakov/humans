@@ -24,6 +24,8 @@ from wsgi.rr_people import USER_AGENTS, A_SLEEP, A_CONSUME, A_COMMENT, A_POST
 
 log = logging.getLogger("ae")
 
+wake_actions = [A_CONSUME, A_COMMENT, A_POST]
+
 __doc__ = """
     По сути марковская цепь: где узлы есть временные точки, а связи - события произошедшие между этими точками, имеющие вес равный
     у скольких авторов эти события произошли. Ввсегда есть событие - ниего не делать.
@@ -410,6 +412,7 @@ class ActionGeneratorDataFormer(object):
 
 class ActionGenerator(object):
     class ActionStack():
+
         def __init__(self, size):
             self.data = []
             self.size = size
@@ -423,6 +426,50 @@ class ActionGenerator(object):
             if self.data:
                 cnt = Counter(self.data)
                 return cnt.most_common()[0][0]
+
+        def get_not_repeatable_action(self):
+
+            def get_synonym(action):
+                _wake_actions = wake_actions[:]
+                _wake_actions.remove(action)
+                return random.choice(_wake_actions)
+
+            def is_synonyms(action1, action2):
+                return action1 in wake_actions and action2 in wake_actions
+
+            if not self.data:
+                raise Exception("try to get action from empty stack :(")
+            elif len(self.data) <= 2 and len(self.data) > 0:
+                return self.data[0]
+            elif len(self.data) == 2:
+                if self.data[-1] == self.data[0] and self.data[0] in wake_actions:
+                    action = get_synonym(self.data[-1])
+                    self.data[-1] = action
+                    return action
+                elif is_synonyms(self.data[-1], self.data[0]):
+                    return self.data[-1]
+                else:
+                    for el in self.data:
+                        if el in wake_actions:
+                            return el
+                    return self.data[-1]
+            else:
+                if self.data[-1] != self.data[-2]:
+                    return self.data[-1]
+                else:
+                    action = self.data[-1]
+                    if action in [A_COMMENT, A_POST]:
+                        count = 0
+                        for el in self.data:
+                            if el == action: count += 1
+                        if count > 2:
+                            result = get_synonym(action)
+                            self.data[-1] = result
+                            return result
+                        else:
+                            return action
+                    else:
+                        return action
 
         def __contains__(self, item):
             return item in self.data
@@ -461,7 +508,7 @@ class ActionGenerator(object):
         if A_SLEEP in self._action_stack:
             return self._action_stack.get_prevailing_action()
         else:
-            return getted_action
+            return self._action_stack.get_not_repeatable_action()
 
 
 def visualise_steps(groups, authors_steps):
