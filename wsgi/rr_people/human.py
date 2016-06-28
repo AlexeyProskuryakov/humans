@@ -43,6 +43,12 @@ def _get_random_near(slice, index, max):
     return res_l, res_r
 
 
+def _wait_time_to_write(text):
+    time_to_write = int(len(text) / random.randint(2, 4))
+    log.info("will posting and write post on %s seconds" % time_to_write)
+    time.sleep(time_to_write)
+
+
 class HumanConfiguration(object):
     def __init__(self, data=None):
         """
@@ -354,12 +360,14 @@ class Human(RedditHandler):
                 "post fullname [%s] for comment is too old and not present at hot or new" % post_fullname)
             try:
                 post = self.reddit.get_submission(submission_id=post_fullname, comment_limit=None)
+
                 if post:
                     return self._comment_post(post, post_fullname, sub)
                 else:
                     return
             except Exception as e:
-                log.warning("can not getting submission [%s], because: %s" % (post_fullname, e))
+                log.warning("can not getting submission [%s], because: %s" % (post_fullname, e.message))
+                log.exception(e)
                 return
 
         for i, _post in enumerate(all_posts):
@@ -383,14 +391,16 @@ class Human(RedditHandler):
     def _comment_post(self, _post, post_fullname, sub):
         try:
             comment_info = self.comments_handler.get_comment_info(post_fullname)
-            response = _post.add_comment(comment_info.get("text"))
+            text = comment_info.get("text")
+            _wait_time_to_write(text)
+            response = _post.add_comment(text)
             self.comments_handler.set_commented(comment_info['_id'], by=self.name)
             self.register_step(A_COMMENT, info={"fullname": post_fullname,
                                                 "sub": sub,
                                                 "comment_result": response.__dict__})
             return A_COMMENT
         except Exception as e:
-            log.error(e)
+            log.exception(e)
 
     def _see_near_posts(self, posts):
         try:
@@ -443,11 +453,7 @@ class Human(RedditHandler):
             return PS_NO_POSTS
 
         subreddit = self.get_subreddit(post.for_sub)
-
-        time_to_write = int(len(post.title) / random.randint(2, 4))
-        log.info("will posting and write post on %s seconds" % time_to_write)
-        time.sleep(time_to_write)
-
+        _wait_time_to_write(post.title)
         result = subreddit.submit(save=True, title=post.title, url=post.url)
 
         log.info("was post at [%s]; title: [%s]; url: [%s]" % (post.for_sub, post.title, post.url))

@@ -35,15 +35,19 @@ USER_AGENTS = [
     "Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 6.1; Trident/4.0; SLCC2; .NET CLR 2.0.50727; .NET CLR 3.5.30729; .NET CLR",
 ]
 
+A_PRODUCE = "produce"
+
 A_POST = "post"
 A_VOTE = "vote"
 A_COMMENT = "comment"
+
 A_CONSUME = "consume"
 
 A_SUBSCRIBE = "subscribe"
 A_FRIEND = "friend"
 
 A_SLEEP = "sleep"
+
 
 S_BAN = "ban"
 S_WORK = "work"

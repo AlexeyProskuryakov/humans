@@ -16,7 +16,7 @@ from wsgi.properties import WEEK, HOUR, MINUTE
 from wsgi.rr_people import USER_AGENTS, \
     A_COMMENT, A_POST, A_SLEEP, \
     S_WORK, S_BAN, S_SLEEP, S_SUSPEND, \
-    Singleton, A_CONSUME
+    Singleton, A_CONSUME, A_PRODUCE
 from wsgi.rr_people.ae import ActionGenerator, time_hash, delta_info
 from wsgi.rr_people.human import Human
 from wsgi.rr_people.states.entity_states import StatesHandler
@@ -120,14 +120,18 @@ class Kapellmeister(Process):
             if self.human.can_do(A_CONSUME):
                 self._set_state(WORK_STATE("live random"))
                 self.human.do_live_random(max_actions=random.randint(5, 20), posts_limit=random.randint(25, 50))
+                action_result = A_CONSUME
             else:
                 self._set_state(WORK_STATE("sleeping because can not consume"))
                 self.human.decr_counter(A_CONSUME)
                 time.sleep((random.randint(1, 2) * MINUTE) / random.randint(1, 6))
+                action_result = A_SLEEP
+        else:
+            action_result = A_PRODUCE
 
         _diff = int(time.time() - _start)
         step += _diff if _diff > MIN_STEP_TIME else MIN_STEP_TIME
-        return step
+        return step, action_result
 
     def run(self):
         # todo debug it with fake for infrastructure
@@ -155,20 +159,25 @@ class Kapellmeister(Process):
                 last_token_refresh_time = step
 
             action = self.ae.get_action(step)
+            # todo не делать идущими подряд комментами и постами
             _prev_step = step
             if action != A_SLEEP:
-                step = self._do_action(action, step, _start)
+                step, action_result = self._do_action(action, step, _start)
             else:
                 if not self._set_state(S_SLEEP):
                     return
                 step += MINUTE
+                action_result = A_SLEEP
                 time.sleep(MINUTE)
 
             if step > WEEK:
                 step = step - WEEK
 
-            log.info("[%s] step is end. Action was: [%s]; time spent: %s; current step: %s; next step: %s." % (
-                self.human_name, action, time.time() - _start, delta_info(_prev_step), delta_info(step)))
+            log.info("[%s] step is end. Action: [%s] -> [%s]; time spent: %s; \ncurrent step: %s; \nnext step: %s." % (
+                self.human_name,
+                action,  action_result,
+                time.time() - _start,
+                delta_info(_prev_step), delta_info(step)))
 
 
 class HumanOrchestra():
