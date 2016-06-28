@@ -11,9 +11,9 @@ from praw.objects import MoreComments, Submission
 from wsgi import properties
 from wsgi.db import HumanStorage
 from wsgi.properties import WEEK
-from wsgi.rr_people import RedditHandler, USER_AGENTS, A_CONSUME, A_VOTE, A_COMMENT, A_POST, A_SUBSCRIBE, normalize, \
-    A_FRIEND, re_url, cmp_by_created_utc
-from wsgi.rr_people.commenting.connection import CommentsStorage, CommentHandler
+from wsgi.rr_people import RedditHandler, USER_AGENTS, A_CONSUME, A_VOTE, A_COMMENT, A_POST, A_SUBSCRIBE, A_FRIEND, \
+    re_url, cmp_by_created_utc
+from wsgi.rr_people.commenting.connection import CommentHandler
 from wsgi.rr_people.posting.posts import PS_POSTED, PS_ERROR, PS_NO_POSTS
 from wsgi.rr_people.posting.posts_managing import PostHandler
 
@@ -296,14 +296,13 @@ class Human(RedditHandler):
                         continue
 
                     urls = re_url.findall(comment.body)
-                    for url in urls:
+                    if urls:
+                        url = random.choice(urls)
                         try:
                             res = requests.get(url, headers={"User-Agent": self.user_agent})
-                            log.info("%s was consume comment url: %s" % (self.name, res.url))
+                            self.register_step(A_CONSUME, info={"url": url})
                         except Exception as e:
                             pass
-                    if urls:
-                        self.register_step(A_CONSUME, info={"urls": urls})
 
             self.wait(self.configuration.max_wait_time / 5)
 

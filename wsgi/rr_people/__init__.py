@@ -52,7 +52,7 @@ S_UNKNOWN = "unknown"
 S_STOP = "stop"
 S_SUSPEND = "suspend"
 
-re_url = re.compile("((https?|ftp)://|www\.)[^\s/$.?#].[^\s]*")
+re_url = re.compile("https?://[^\s/$.?#].[^\s]*")
 re_crying_chars = re.compile("[A-Z!]{2,}")
 
 log = logging.getLogger("man")
