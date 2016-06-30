@@ -52,6 +52,23 @@ class HumanStorage(DBHandler):
         except CollectionInvalid as e:
             self.human_config = db.get_collection("human_config")
 
+        collection_names = self.db.collection_names(include_system_collections=False)
+        if "global_config" not in collection_names:
+            self.global_config = db.create_collection("global_config")
+            self.global_config.create_index([("name", 1)], unique=True)
+        else:
+            self.global_config = db.get_collection("global_config")
+
+    def get_global_config(self, name):
+        return self.global_config.find_one({"name": name}, projection={"_id": False})
+
+    def set_global_config(self, name, data):
+        if isinstance(data, dict):
+            doc = dict({"name": name}, **data)
+        else:
+            doc = {"name": name, "data": data}
+        return self.global_config.insert_one(doc)
+
     def update_human_access_credentials_info(self, user, info):
         if isinstance(info.get("scope"), set):
             info['scope'] = list(info['scope'])
@@ -185,6 +202,7 @@ class HumanStorage(DBHandler):
             crupt = m.hexdigest()
             if crupt == found.get("pwd"):
                 return found.get("user_id")
+
 
 if __name__ == '__main__':
     hs = HumanStorage()

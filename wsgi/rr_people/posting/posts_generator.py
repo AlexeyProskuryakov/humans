@@ -4,7 +4,6 @@ import time
 from multiprocessing import Process
 
 from wsgi.db import DBHandler
-from wsgi.properties import DEFAULT_SLEEP_TIME_AFTER_GENERATE_DATA
 from wsgi.rr_people import S_WORK, S_SUSPEND
 from wsgi.rr_people.posting import POST_GENERATOR_OBJECTS
 from wsgi.rr_people.posting.posts import PostsStorage
@@ -16,10 +15,12 @@ log = logging.getLogger("post_generator")
 class PostsGeneratorsStorage(DBHandler):
     def __init__(self, name="?"):
         super(PostsGeneratorsStorage, self).__init__(name=name)
-        self.generators = self.db.get_collection("generators")
-        if not self.generators:
+        collection_names = self.db.collection_names(include_system_collections=False)
+        if "generators" not in collection_names:
             self.generators = self.db.create_collection('generators')
             self.generators.create_index([("sub", 1)], unque=True)
+        else:
+            self.generators = self.db.get_collection("generators")
 
     def set_sub_gen_info(self, sub, generators, key_words):
         self.generators.update_one({"sub": sub}, {"$set": {"gens": generators, "key_words": key_words}}, upsert=True)

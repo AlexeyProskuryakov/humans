@@ -52,14 +52,16 @@ class PostSource(object):
 class PostsStorage(DBHandler):
     def __init__(self, name="?"):
         super(PostsStorage, self).__init__(name=name)
-        self.posts = self.db.get_collection("generated_posts")
-        if not self.posts:
+        collection_names = self.db.collection_names(include_system_collections=False)
+        if "generated_posts" not in collection_names:
             self.posts = self.db.create_collection("generated_posts",
                                                    capped=True,
                                                    size=1024 * 1024 * 100)
             self.posts.create_index("url_hash", unique=True)
             self.posts.create_index("sub")
             self.posts.create_index("state")
+        else:
+            self.posts = self.db.get_collection("generated_posts")
 
     # posts
     def set_post_state(self, url_hash, state):

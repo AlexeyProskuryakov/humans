@@ -349,22 +349,6 @@ def human_config(name):
     return jsonify(**{"ok": False})
 
 
-posts_generator = PostsGenerator()
-
-
-@app.route("/posts")
-@login_required
-def posts():
-    subs = db.get_all_humans_subs()
-    qp_s = {}
-    subs_states = {}
-    for sub in subs:
-        qp_s[sub] = posts_generator.posts_storage.get_posts_for_sub(sub, state=PS_READY)
-        subs_states[sub] = posts_generator.states_handler.get_posts_generator_state(sub) or S_STOP
-
-    return render_template("posts.html", **{"subs": subs_states, "qp_s": qp_s})
-
-
 @app.route("/actions")
 @login_required
 def actions():
@@ -419,7 +403,39 @@ srs = SubredditsRelationsStore("srs server")
 splitter = re.compile('[^\w\d_-]*')
 
 
+@app.route("/configuration/<name>", methods=["GET", "POST"])
+@login_required
+def configuration(name):
+    if request.method == "GET":
+        result = db.get_global_config(name)
+        return jsonify(**result)
+    elif request.method == "POST":
+        try:
+            data = json.loads(request.data)
+            result = db.set_global_config(name, data)
+            return jsonify(**{"ok": True, "result": result})
+        except Exception as e:
+            log.warning(e.message)
+            return jsonify(**{"ok": False, "error": e.message})
+
+
 # generators
+
+posts_generator = PostsGenerator()
+
+
+@app.route("/posts")
+@login_required
+def posts():
+    subs = db.get_all_humans_subs()
+    qp_s = {}
+    subs_states = {}
+    for sub in subs:
+        qp_s[sub] = posts_generator.posts_storage.get_posts_for_sub(sub, state=PS_READY)
+        subs_states[sub] = posts_generator.states_handler.get_posts_generator_state(sub) or S_STOP
+
+    return render_template("posts.html", **{"subs": subs_states, "qp_s": qp_s})
+
 
 @app.route("/generators", methods=["GET", "POST"])
 @login_required
@@ -526,6 +542,7 @@ batch_storage = BatchStorage("server")
 post_storage = PostsStorage("server")
 posts_queue = PostRedisQueue("server")
 
+
 @app.route("/posts/balancer/info", methods=["GET"])
 @login_required
 def balancer_info():
@@ -550,6 +567,7 @@ def batches_info(name):
 
     return jsonify(**{"batches": result})
 
+
 @app.route("/posts/queue/<name>", methods=["GET"])
 @login_required
 def queue_info(name):
@@ -559,7 +577,6 @@ def queue_info(name):
         if post:
             post, _ = post
             result.append(post)
-
 
 
 if __name__ == '__main__':
