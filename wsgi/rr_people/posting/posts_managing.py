@@ -8,6 +8,7 @@ from wsgi.rr_people.posting.posts import PostsStorage, PostSource
 from wsgi.rr_people.posting.posts_balancer import PostBalancer
 from wsgi.rr_people.posting.youtube_posts import YoutubeChannelsHandler
 from wsgi.rr_people.posting.queue import PostRedisQueue
+from wsgi.rr_people.states.processes import ProcessDirector
 
 log = logging.getLogger("posts")
 
@@ -33,7 +34,7 @@ class PostHandler(object):
         else:
             raise Exception("post_source is not post source!")
 
-    def get_post(self, human_name):
+    def prepare_post(self, human_name):
         url_hash = self.queue.pop_post(human_name)
         if not url_hash:
             log.warn("Not any posts for [%s] at queue" % human_name)
@@ -49,21 +50,28 @@ class PostHandler(object):
     def set_post_state(self, url_hash, new_state):
         self.posts_storage.set_post_state(url_hash, new_state)
 
+IMPORTANT_POSTS_SUPPLIER_PROCESS_ASPECT = "im_po_su_aspect"
 
-class YoutubePostSupplier(Process):
+class ImportantPostSupplier(Process):
     """
     Process which get humans config and retrieve channel_id, after retrieve new posts from it and
     """
 
     def __init__(self, pq=None, ps=None, ms=None):
-        super(YoutubePostSupplier, self).__init__()
-        self.queue = pq or PostRedisQueue("fpm")
-        self.posts_storage = ps or PostsStorage("fpm")
-        self.main_storage = ms or HumanStorage("fpm")
+        super(ImportantPostSupplier, self).__init__()
+        self.queue = pq or PostRedisQueue("im po su")
+        self.posts_storage = ps or PostsStorage("im po su")
+        self.main_storage = ms or HumanStorage("im po su")
         self.post_handler = PostHandler(self.queue, self.posts_storage)
         self.posts_supplier = YoutubeChannelsHandler(self.posts_storage)
 
+        self.pd = ProcessDirector("im po su")
+
     def run(self):
+        if not self.pd.can_start_aspect(IMPORTANT_POSTS_SUPPLIER_PROCESS_ASPECT, self.pid).get("started"):
+            log.info("important posts supplier instance already work")
+            return
+
         while 1:
             for human_data in self.main_storage.get_humans_info(
                     projection={"user": True, "subs": True, "channel_id": True}):

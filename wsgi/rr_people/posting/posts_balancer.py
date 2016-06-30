@@ -12,7 +12,7 @@ from wsgi.rr_people.states.persisted_queue import RedisQueue
 from wsgi.rr_people.states.processes import ProcessDirector
 
 MAX_BATCH_SIZE = 10
-
+BATCH_TTL = 60
 log = logging.getLogger("balancer")
 
 
@@ -25,11 +25,12 @@ class BatchStorage(DBHandler):
             self.batches.create_index("human_name")
             self.batches.create_index("count")
 
-        self.cache = defaultdict(list)
+        self.cache = defaultdict(list) #it is not cache as you think. it is used in batches and consistent.
 
     def get_human_post_batches(self, human_name):
         if human_name not in self.cache:
             self.cache[human_name] = list(self.batches.find({"human_name": human_name}).sort("count", -1))
+
         for id, bulk in enumerate(self.cache[human_name]):
             yield PostBatch(self, bulk, id)
 
@@ -91,6 +92,9 @@ class PostBatch():
         self.store.cache[self.human_name] = cache[:self.cache_id] + cache[self.cache_id + 1:]
 
 
+BALANCER_PROCESS_ASPECT = "post_balancer"
+
+
 class PostBalancerEngine(Process):
     __metaclass__ = Singleton
 
@@ -101,8 +105,6 @@ class PostBalancerEngine(Process):
 
         self.post_queue = post_queue
         self.posts_storage = post_storage
-
-        self.sub_humans = self._load_human_sub_mapping()
 
         self.out_queue = out_queue
 
@@ -118,8 +120,9 @@ class PostBalancerEngine(Process):
         return result
 
     def _get_human_name(self, sub):
-        if sub in self.sub_humans:
-            return random.choice(self.sub_humans[sub])
+        sub_humans = self._load_human_sub_mapping()
+        if sub in sub_humans:
+            return random.choice(sub_humans[sub])
 
     def _flush_batch_to_queue(self, batch):
         for url_hash in batch.data:
@@ -130,21 +133,22 @@ class PostBalancerEngine(Process):
     def add_post(self, url_hash, channel_id, important=False, human_name=None, sub=None):
         if not sub and not human_name:
             return
-        human_name = human_name or self._get_human_name(sub)
-        if human_name is None:
+
+        _human_name = human_name or self._get_human_name(sub)
+        if _human_name is None:
             return
 
-        for batch in self.batch_storage.get_human_post_batches(human_name):
+        for batch in self.batch_storage.get_human_post_batches(_human_name):
             if batch.have_not(url_hash, channel_id):
                 batch.add(url_hash, channel_id, important)
                 if batch.size >= MAX_BATCH_SIZE:
                     self._flush_batch_to_queue(batch)
                 return
 
-        self.batch_storage.init_new_batch(human_name, url_hash, channel_id)
+        self.batch_storage.init_new_batch(_human_name, url_hash, channel_id)
 
     def run(self):
-        if not self.process_director.can_start_aspect("post_balancer", self.pid).get("started"):
+        if not self.process_director.can_start_aspect(BALANCER_PROCESS_ASPECT, self.pid).get("started"):
             log.info("another balancer worked")
             return
 

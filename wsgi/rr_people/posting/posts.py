@@ -73,6 +73,11 @@ class PostsStorage(DBHandler):
         if found:
             return found.get("state")
 
+    def get_good_post(self, url_hash):
+        found = self.posts.find_one({"url_hash": url_hash, 'state': {'$ne': PS_BAD}})
+        if found:
+            return PostSource.from_dict(found), found.get('sub')
+
     def get_post(self, url_hash):
         found = self.posts.find_one({"url_hash": url_hash, 'state': {'$ne': PS_BAD}})
         if found:
@@ -87,6 +92,8 @@ class PostsStorage(DBHandler):
                 data['sub'] = sub
                 if important:
                     data['important'] = important
+                if channel_id:
+                    data["channel_id"] = channel_id
                 self.posts.insert_one(data)
 
     def get_posts_for_sub(self, sub, state=PS_READY):

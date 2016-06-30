@@ -50,7 +50,7 @@ def test_balanser():
     post_handler.add_new_post("test", PostSource("tu", "tt", "ss", url_hash="uh_important11"), "another sub", None,
                               important=True)
     for i in range(120):
-        print post_handler.get_post("test")
+        print post_handler.prepare_post("test")
 
 
 def test_kapelmeister():

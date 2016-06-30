@@ -22,9 +22,12 @@ from wsgi.rr_people.he import HumanOrchestra
 from wsgi.rr_people.human import HumanConfiguration
 from wsgi.rr_people.posting import POST_GENERATOR_OBJECTS
 from wsgi.rr_people.posting.copy_gen import SubredditsRelationsStore
-from wsgi.rr_people.posting.posts import PS_BAD, PS_READY
+from wsgi.rr_people.posting.posts import PS_BAD, PS_READY, PostsStorage
+from wsgi.rr_people.posting.posts_balancer import BALANCER_PROCESS_ASPECT, BatchStorage
 from wsgi.rr_people.posting.posts_generator import PostsGenerator
 from wsgi.rr_people.posting.posts_managing import PostHandler
+from wsgi.rr_people.posting.queue import PostRedisQueue
+from wsgi.rr_people.states.processes import ProcessDirector
 from wsgi.wake_up import WakeUp, WakeUpStorage
 
 __author__ = '4ikist'
@@ -396,7 +399,7 @@ def ae_represent(name):
         x = avg_start + step
         sleep_data.append([get_point_x(x), y, step * 1000, step * 1000])
 
-    sleep_data.append([get_point_x(0),y, 100, 100])
+    sleep_data.append([get_point_x(0), y, 100, 100])
 
     result = {"color": "blue",
               "data": sleep_data,
@@ -415,6 +418,8 @@ srs = SubredditsRelationsStore("srs server")
 
 splitter = re.compile('[^\w\d_-]*')
 
+
+# generators
 
 @app.route("/generators", methods=["GET", "POST"])
 @login_required
@@ -513,6 +518,48 @@ def prepare_for_posting():
         return jsonify(**{"ok": True})
 
     return jsonify(**{"ok": False, "error": "sub is not exists"})
+
+
+# posts
+process_director = ProcessDirector("server")
+batch_storage = BatchStorage("server")
+post_storage = PostsStorage("server")
+posts_queue = PostRedisQueue("server")
+
+@app.route("/posts/balancer/info", methods=["GET"])
+@login_required
+def balancer_info():
+    state = process_director.get_state(BALANCER_PROCESS_ASPECT)
+    return jsonify(**state)
+
+
+@app.route("/posts/batches/<name>", methods=["GET"])
+@login_required
+def batches_info(name):
+    result = []
+    for batch in batch_storage.batches.find({"human_name": name}).sort("count", -1):
+        posts_in_batch = []
+        for url_hash in batch.get("url_hashes"):
+            post = post_storage.get_post(url_hash)
+            if post:
+                post, _ = post
+                posts_in_batch.append(post)
+
+        batch["posts"] = posts_in_batch
+        result.append(batch)
+
+    return jsonify(**{"batches": result})
+
+@app.route("/posts/queue/<name>", methods=["GET"])
+@login_required
+def queue_info(name):
+    result = []
+    for url_hash in posts_queue.show_all_posts_hashes(name):
+        post = post_storage.get_post(url_hash)
+        if post:
+            post, _ = post
+            result.append(post)
+
 
 
 if __name__ == '__main__':

@@ -447,7 +447,7 @@ class Human(RedditHandler):
                 return
 
     def do_post(self):
-        post = self.posts_handler.get_post(self.name)
+        post = self.posts_handler.prepare_post(self.name)
         if not post:
             log.warn("no posts for me [%s] :(" % self.name)
             return PS_NO_POSTS

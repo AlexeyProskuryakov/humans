@@ -173,12 +173,13 @@ class Kapellmeister(Process):
 
             if step > WEEK:
                 step = step - WEEK
+                _prev_step = _prev_step - WEEK
 
-            log.info("[%s] step is end. Action: [%s] -> [%s]; time spent: %s; \ncurrent step: %s; \nnext step: %s." % (
+            log.info("[%s] step is end. Action: [%s] -> [%s]; time spent: %s; \nnext step after: %s secs." % (
                 self.human_name,
                 action, action_result,
                 time.time() - _start,
-                delta_info(_prev_step), delta_info(step)))
+                step - _prev_step))
 
 
 class HumanOrchestra():
