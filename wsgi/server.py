@@ -573,9 +573,9 @@ def queue_info(name):
         return jsonify(**{"queue": posts})
 
 
-@app.route("/posts/posts_queue/<name>", method=["GET"])
+@app.route("/posts/posts_queue/<name>", methods=["GET"])
 @login_required
-def posts_queue(name):
+def queue_of_posts(name):
     batches = []
     for batch in batch_storage.batches.find({"human_name": name}).sort("count", -1):
         if batch.get("url_hashes"):

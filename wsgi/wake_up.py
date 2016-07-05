@@ -53,7 +53,7 @@ class WakeUp(Process):
                     time.sleep(10)
 
             except Exception as e:
-                log.exception(e)
+                log.error(e)
             time.sleep(3600)
 
 

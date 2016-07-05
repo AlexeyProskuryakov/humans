@@ -30,7 +30,7 @@ class PostHandler(object):
     def add_noise_post(self, sub, post_source):
         if isinstance(post_source, PostSource):
             channel_id = self.youtube.get_channel_id(post_source.url)
-            self.posts_storage.set_posts_states()
+            self.posts_storage.set_post_channel_id(post_source.url_hash, channel_id)
             self.balancer.add_post(post_source.url_hash, channel_id, sub=sub)
         else:
             raise Exception("post_source is not post source!")

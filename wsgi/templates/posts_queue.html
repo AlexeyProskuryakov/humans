@@ -4,7 +4,7 @@
 {% block content %}
 <div class="container-fluid">
     <div class="row">
-        <div class="col-md-6 col-md-offset-3">
+        <div class="col-md-8 col-md-offset-1">
             <h1>Очередь постов для {{human_name}}
             </h1>
             <br>
@@ -22,17 +22,28 @@
                         <div id="queue" class="accordion-body collapse">
                             <div class="accordion-inner">
                                 <table class="table table-stripped table-hover table-condensed">
+                                    <thead>
+                                    <tr>
+                                        <td>url</td>
+                                        <td>for sub</td>
+                                        <td>important</td>
+                                        <td>channel id</td>
+                                    </tr>
+                                    </thead>
                                     <tbody>
                                     {% for post in queue %}
-                                    <tr id="{{post.url_hash}}">
+                                    <tr id="{{post['url_hash']}}">
                                         <td>
-                                            <a href="{{post.url}}">{{post.title}}</a>
+                                            <a href="{{post['url']}}">{{post['title']}}</a>
                                         </td>
                                         <td>
-                                            {{post.for_sub}}
+                                            {{post['for_sub']}}
                                         </td>
                                         <td>
-                                            {{post.important}}
+                                            {{post['important']}}
+                                        </td>
+                                        <td>
+                                            {{post['channel_id']}}
                                         </td>
                                     </tr>
                                     {% endfor %}
@@ -47,22 +58,58 @@
                         <div class="accordion-heading">
                             <a class="accordion-toggle" data-toggle="collapse" data-parent="#batch-accordion"
                                href="#batch">
-                                <h3>В очереди:</h3>
+                                <h3>В балансере:</h3>
                             </a>
                         </div>
-                        <div id="batch" class="accordion-body collapse">
+                        <div id="batches" class="accordion-body collapse">
                             <div class="accordion-inner">
-                                <table class="table table-stripped table-hover table-condensed">
-                                    <tbody>
-                                    {% for batch in batches %}
-                                    <tr id="{{batch.batch_id}}">
-                                        <td>
-                                           {{batch}}
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                    </tbody>
-                                </table>
+
+                                {% for batch in batches %}
+                                <div class="row">
+                                <div class="col-md-3">
+                                    {{array_to_string(batch['channels'])}}
+                                </div>
+                                <div class="col-md-6" id="{{batch['_id']}}">
+
+                                    <div class="accordion" id="batch-post-accordion">
+                                        <div class="accordion-group">
+                                            <div class="accordion-heading">
+                                                <a class="accordion-toggle" data-toggle="collapse"
+                                                   data-parent="#batch-accordion"
+                                                   href="#batch-{{batch['_id']}}">
+                                                    <h3>В кусочке:</h3>
+                                                </a>
+                                            </div>
+                                            <div id="batch-{{batch['_id']}}" class="accordion-body collapse">
+                                                <div class="accordion-inner">
+                                                    <table class="table table-stripped table-hover table-condensed">
+                                                        <tbody>
+                                                        {% for post in batch['posts'] %}
+                                                        <tr id="{{post['url_hash']}}">
+                                                            <td>
+                                                                <a href="{{post['url']}}">{{post['title']}}</a>
+                                                            </td>
+                                                            <td>
+                                                                {{post['for_sub']}}
+                                                            </td>
+                                                            <td>
+                                                                {{post['important']}}
+                                                            </td>
+                                                            <td>
+                                                                {{post['channel_id']}}
+                                                            </td>
+                                                        </tr>
+                                                        {% endfor %}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                    </div>
+                                {% endfor %}
+
                             </div>
                         </div>
                     </div>
@@ -74,4 +121,5 @@
     </div>
 
 </div>
+{% endblock %}
 {% endblock %}
