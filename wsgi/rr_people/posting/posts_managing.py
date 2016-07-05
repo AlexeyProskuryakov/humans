@@ -90,3 +90,23 @@ class ImportantPostSupplier(Process):
                                                        channel,
                                                        important=True)
             time.sleep(force_post_manager_sleep_iteration_time)
+
+
+class NoisePostsAutoAdder(Process):
+    name = "noise_auto_adder"
+
+    def __init__(self):
+        super(NoisePostsAutoAdder, self).__init__()
+        self.process_director = ProcessDirector("noise pp")
+        self.post_handler = PostHandler("noise pp")
+        self.posts_storage = self.post_handler.posts_storage
+        self.main_db = HumanStorage("noise pp")
+
+    def run(self):
+        if not self.process_director.can_start_aspect(self.name, self.pid).get("started"):
+            log.info("%s instance already work" % self.name)
+            return
+        while 1:
+            cfg = self.main_db.get_global_config(self.name)
+            step_time = cfg.get("step_time")
+            #todo dodelat

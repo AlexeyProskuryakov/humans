@@ -28,6 +28,12 @@ class ProcessDirector(object):
         self.mutex = Lock()
         log.info("Process director [%s] inited." % name)
 
+    def set_aspect_persist_state(self, aspect, state, ex=None):
+        self.redis.set(aspect, state, ex=ex)
+
+    def get_aspect_persists_state(self, aspect):
+        return self.redis.get(aspect)
+
     def can_start_aspect(self, aspect, pid):
         """
         starting or returning False if aspect already started

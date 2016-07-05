@@ -28,6 +28,7 @@
                                         <td>for sub</td>
                                         <td>important</td>
                                         <td>channel id</td>
+                                        <td>when found</td>
                                     </tr>
                                     </thead>
                                     <tbody>
@@ -45,6 +46,10 @@
                                         <td>
                                             {{post['channel_id']}}
                                         </td>
+                                        <td>
+                                            {{post['time'] | tst_to_dt}}
+                                        </td>
+
                                     </tr>
                                     {% endfor %}
                                     </tbody>
@@ -66,48 +71,51 @@
 
                                 {% for batch in batches %}
                                 <div class="row">
-                                <div class="col-md-3">
-                                    {{array_to_string(batch['channels'])}}
-                                </div>
-                                <div class="col-md-6" id="{{batch['_id']}}">
+                                    <div class="col-md-3">
+                                        {{array_to_string(batch['channels'])}}
+                                    </div>
+                                    <div class="col-md-6" id="{{batch['_id']}}">
 
-                                    <div class="accordion" id="batch-post-accordion">
-                                        <div class="accordion-group">
-                                            <div class="accordion-heading">
-                                                <a class="accordion-toggle" data-toggle="collapse"
-                                                   data-parent="#batch-accordion"
-                                                   href="#batch-{{batch['_id']}}">
-                                                    <h3>В кусочке:</h3>
-                                                </a>
-                                            </div>
-                                            <div id="batch-{{batch['_id']}}" class="accordion-body collapse">
-                                                <div class="accordion-inner">
-                                                    <table class="table table-stripped table-hover table-condensed">
-                                                        <tbody>
-                                                        {% for post in batch['posts'] %}
-                                                        <tr id="{{post['url_hash']}}">
-                                                            <td>
-                                                                <a href="{{post['url']}}">{{post['title']}}</a>
-                                                            </td>
-                                                            <td>
-                                                                {{post['for_sub']}}
-                                                            </td>
-                                                            <td>
-                                                                {{post['important']}}
-                                                            </td>
-                                                            <td>
-                                                                {{post['channel_id']}}
-                                                            </td>
-                                                        </tr>
-                                                        {% endfor %}
-                                                        </tbody>
-                                                    </table>
+                                        <div class="accordion" id="batch-post-accordion">
+                                            <div class="accordion-group">
+                                                <div class="accordion-heading">
+                                                    <a class="accordion-toggle" data-toggle="collapse"
+                                                       data-parent="#batch-accordion"
+                                                       href="#batch-{{batch['_id']}}">
+                                                        <h3>В кусочке:</h3>
+                                                    </a>
+                                                </div>
+                                                <div id="batch-{{batch['_id']}}" class="accordion-body collapse">
+                                                    <div class="accordion-inner">
+                                                        <table class="table table-stripped table-hover table-condensed">
+                                                            <tbody>
+                                                            {% for post in batch['posts'] %}
+                                                            <tr id="{{post['url_hash']}}">
+                                                                <td>
+                                                                    <a href="{{post['url']}}">{{post['title']}}</a>
+                                                                </td>
+                                                                <td>
+                                                                    {{post['for_sub']}}
+                                                                </td>
+                                                                <td>
+                                                                    {{post['important']}}
+                                                                </td>
+                                                                <td>
+                                                                    {{post['channel_id']}}
+                                                                </td>
+                                                                <td>
+                                                                    {{post['time'] | tst_to_dt}}
+                                                                </td>
+                                                            </tr>
+                                                            {% endfor %}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
-                                    </div>
                                 {% endfor %}
 
                             </div>

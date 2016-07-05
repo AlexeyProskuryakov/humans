@@ -1,5 +1,7 @@
 import json
 
+import time
+
 from wsgi.db import DBHandler
 
 PS_READY = "ready"
@@ -104,6 +106,8 @@ class PostsStorage(DBHandler):
                 data = post.to_dict()
                 data['state'] = PS_READY
                 data['sub'] = sub
+                data['time'] = time.time()
+
                 if important:
                     data['important'] = important
                 if channel_id:
