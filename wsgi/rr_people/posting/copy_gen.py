@@ -143,5 +143,5 @@ class CopyPostGenerator(RedditHandler, Generator):
                         continue
                 if title and is_valid_title(title):
                     post = PostSource(post.url, title.strip(), for_sub=random.choice(related_subs))
-                    self.post_storage.add_generated_post(post, subreddit)
-                    yield post
+                    if self.post_storage.add_generated_post(post, subreddit):
+                        yield post

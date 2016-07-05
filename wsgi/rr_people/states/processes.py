@@ -4,8 +4,8 @@ from multiprocessing.synchronize import Lock
 
 import redis
 
+from wsgi.properties import process_director_redis_address, process_director_redis_port, process_director_redis_password
 from wsgi.rr_people.states import get_worked_pids
-from wsgi.properties import states_redis_address, states_redis_password, states_redis_port
 
 log = logging.getLogger("process_director")
 
@@ -16,9 +16,9 @@ PREFIX_GET_DATA = lambda x: x.replace("PD_", "") if isinstance(x, (str, unicode)
 
 class ProcessDirector(object):
     def __init__(self, name="?", clear=False, max_connections=2):
-        self.redis = redis.StrictRedis(host=states_redis_address,
-                                       port=states_redis_port,
-                                       password=states_redis_password,
+        self.redis = redis.StrictRedis(host=process_director_redis_address,
+                                       port=process_director_redis_port,
+                                       password=process_director_redis_password,
                                        db=0,
                                        max_connections=max_connections
                                        )
@@ -26,7 +26,7 @@ class ProcessDirector(object):
             self.redis.flushdb()
 
         self.mutex = Lock()
-        log.info("Inited")
+        log.info("Process director [%s] inited." % name)
 
     def can_start_aspect(self, aspect, pid):
         """

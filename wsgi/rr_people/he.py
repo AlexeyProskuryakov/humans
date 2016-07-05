@@ -98,7 +98,7 @@ class Kapellmeister(Process):
     def _set_state(self, new_state):
         state = self.states_handler.get_human_state(self.human_name)
         if state == S_SUSPEND:
-            log.info("%s is suspended will stop" % self.human_name)
+            log.info("%s is suspended, will stop" % self.human_name)
             return False
         else:
             self.states_handler.set_human_state(self.human_name, new_state)
@@ -160,7 +160,6 @@ class Kapellmeister(Process):
                 last_token_refresh_time = step
 
             action = self.ae.get_action(step)
-            # todo не делать идущими подряд комментами и постами
             _prev_step = step
             if action != A_SLEEP:
                 step, action_result = self._do_action(action, step, _start)

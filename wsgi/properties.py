@@ -71,6 +71,11 @@ posts_redis_address = "pub-redis-17040.us-east-1-4.3.ec2.garantiadata.com"
 posts_redis_port = 17040
 posts_redis_password = "sederfes100500"
 
+process_director_redis_address = "pub-redis-17359.us-east-1-3.4.ec2.garantiadata.com"
+process_director_redis_port = 17359
+process_director_redis_password = "sederfes100500"
+
+
 redis_max_connections = 2
 
 SEC = 1

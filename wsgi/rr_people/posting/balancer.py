@@ -25,7 +25,7 @@ class BatchStorage(DBHandler):
             self.batches.create_index("human_name")
             self.batches.create_index("count")
 
-        self.cache = defaultdict(list) #it is not cache as you think. it is used in batches and consistent.
+        self.cache = defaultdict(list)  # it is not cache as you think. it is used in batches and consistent.
 
     def get_human_post_batches(self, human_name):
         if human_name not in self.cache:
@@ -52,7 +52,7 @@ class PostBatch():
 
         self.channels = set(data.get("channels"))
         self.human_name = data.get("human_name")
-        self.bulk_id = data.get("_id")
+        self.batch_id = data.get("_id")
         self.data = data.get("url_hashes")
         self.cache_id = cache_id
 
@@ -60,7 +60,7 @@ class PostBatch():
     def to_data(self):
         return {"channels": list(self.channels),
                 "human_name": self.human_name,
-                "_id": self.bulk_id,
+                "_id": self.batch_id,
                 "url_hashes": self.data}
 
     @property
@@ -69,8 +69,8 @@ class PostBatch():
 
     def have_not(self, url_hash, channel_id):
         if url_hash not in self.data:
-            if not channel_id: return True
-            return channel_id not in self.channels
+            if not channel_id: return True  # if channel id is None or empty value
+            return channel_id not in self.channels  # or if channel id not in already added
         return False
 
     def add(self, url_hash, channel_id, to_start=False):
@@ -83,11 +83,11 @@ class PostBatch():
             modify["$push"] = {"url_hashes": {"$each": [url_hash], "$position": 0}}
             self.data.insert(0, url_hash)
 
-        self.store.batches.update_one({"_id": self.bulk_id}, modify)
+        self.store.batches.update_one({"_id": self.batch_id}, modify)
         self.store.cache[self.human_name][self.cache_id] = self.to_data
 
     def delete(self):
-        self.store.batches.delete_one({"_id": self.bulk_id})
+        self.store.batches.delete_one({"_id": self.batch_id})
         cache = self.store.cache[self.human_name]
         self.store.cache[self.human_name] = cache[:self.cache_id] + cache[self.cache_id + 1:]
 

@@ -22,15 +22,18 @@ class PostSource(object):
                         data.get("title"),
                         data.get("for_sub"),
                         data.get("at_time"),
-                        data.get("url_hash"))
+                        data.get("url_hash"),
+                        data.get("important")
+                        )
         return ps
 
-    def __init__(self, url=None, title=None, for_sub=None, at_time=None, url_hash=None):
+    def __init__(self, url=None, title=None, for_sub=None, at_time=None, url_hash=None, important=False):
         self.url = url
         self.title = title
         self.for_sub = for_sub
         self.at_time = at_time
         self.url_hash = url_hash or hash(url)
+        self.important = important
 
     def serialize(self):
         return json.dumps(self.__dict__)
@@ -64,26 +67,35 @@ class PostsStorage(DBHandler):
             self.posts = self.db.get_collection("generated_posts")
 
     # posts
+    def set_post_channel_id(self, url_hash, channel_id):
+        return self.posts.update_one({"url_hash": url_hash}, {"$set": {"channel_id": channel_id}})
+
     def set_post_state(self, url_hash, state):
-        self.posts.update_one({"url_hash": url_hash}, {"$set": {"state": state}})
+        return self.posts.update_one({"url_hash": url_hash}, {"$set": {"state": state}})
 
     def set_posts_states(self, url_hashes_list, state):
-        self.posts.update_many({"url_hash": {"$in": url_hashes_list}}, {"$set": {"state": state}})
+        return self.posts.update_many({"url_hash": {"$in": url_hashes_list}}, {"$set": {"state": state}})
 
     def get_post_state(self, url_hash):
         found = self.posts.find_one({"url_hash": url_hash}, projection={"state": 1})
         if found:
             return found.get("state")
 
-    def get_good_post(self, url_hash):
-        found = self.posts.find_one({"url_hash": url_hash, 'state': {'$ne': PS_BAD}})
+    def get_good_post(self, url_hash, projection=None):
+        _projection = projection or {"_id": False}
+        found = self.posts.find_one({"url_hash": url_hash, 'state': {'$ne': PS_BAD}}, projection=_projection)
         if found:
             return PostSource.from_dict(found), found.get('sub')
 
-    def get_post(self, url_hash):
-        found = self.posts.find_one({"url_hash": url_hash, 'state': {'$ne': PS_BAD}})
+    def get_post(self, url_hash, projection=None):
+        _projection = projection or {"_id": False}
+        found = self.posts.find_one({"url_hash": url_hash}, projection=_projection)
         if found:
-            return PostSource.from_dict(found), found.get('sub')
+            return PostSource.from_dict(found), found
+
+    def get_posts(self, url_hashes):
+        result = self.posts.find({"url_hash": {"$in": url_hashes}})
+        return result
 
     def add_generated_post(self, post, sub, important=False, channel_id=None):
         if isinstance(post, PostSource):
@@ -96,7 +108,7 @@ class PostsStorage(DBHandler):
                     data['important'] = important
                 if channel_id:
                     data["channel_id"] = channel_id
-                self.posts.insert_one(data)
+                return self.posts.insert_one(data)
 
     def get_posts_for_sub(self, sub, state=PS_READY):
         return map(lambda x: PostSource.from_dict(x), self.posts.find({"sub": sub, "state": state}))

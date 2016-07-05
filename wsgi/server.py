@@ -23,7 +23,7 @@ from wsgi.rr_people.human import HumanConfiguration
 from wsgi.rr_people.posting import POST_GENERATOR_OBJECTS
 from wsgi.rr_people.posting.copy_gen import SubredditsRelationsStore
 from wsgi.rr_people.posting.posts import PS_BAD, PS_READY, PostsStorage
-from wsgi.rr_people.posting.posts_balancer import BALANCER_PROCESS_ASPECT, BatchStorage
+from wsgi.rr_people.posting.balancer import BALANCER_PROCESS_ASPECT, BatchStorage
 from wsgi.rr_people.posting.posts_generator import PostsGenerator
 from wsgi.rr_people.posting.posts_managing import PostHandler
 from wsgi.rr_people.posting.queue import PostRedisQueue
@@ -529,7 +529,7 @@ def prepare_for_posting():
     sub = data.get("sub")
     if sub:
         for post in posts_generator.posts_storage.get_posts_for_sub(sub):
-            posts_handler.add_ready_post(sub, post)
+            posts_handler.add_noise_post(sub, post)
 
         return jsonify(**{"ok": True})
 
@@ -555,15 +555,11 @@ def balancer_info():
 def batches_info(name):
     result = []
     for batch in batch_storage.batches.find({"human_name": name}).sort("count", -1):
-        posts_in_batch = []
-        for url_hash in batch.get("url_hashes"):
-            post = post_storage.get_post(url_hash)
-            if post:
-                post, _ = post
-                posts_in_batch.append(post)
-
-        batch["posts"] = posts_in_batch
-        result.append(batch)
+        if batch.get("url_hashes"):
+            posts = post_storage.get_posts(batch.get("url_hashes"))
+            if posts:
+                batch["posts"] = posts
+                result.append(batch)
 
     return jsonify(**{"batches": result})
 
@@ -571,12 +567,29 @@ def batches_info(name):
 @app.route("/posts/queue/<name>", methods=["GET"])
 @login_required
 def queue_info(name):
-    result = []
-    for url_hash in posts_queue.show_all_posts_hashes(name):
-        post = post_storage.get_post(url_hash)
-        if post:
-            post, _ = post
-            result.append(post)
+    posts_hashes = posts_queue.show_all_posts_hashes(name)
+    if posts_hashes:
+        posts = post_storage.get_posts(posts_hashes)
+        return jsonify(**{"queue": posts})
+
+
+@app.route("/posts/posts_queue/<name>", method=["GET"])
+@login_required
+def posts_queue(name):
+    batches = []
+    for batch in batch_storage.batches.find({"human_name": name}).sort("count", -1):
+        if batch.get("url_hashes"):
+            posts = post_storage.get_posts(batch.get("url_hashes"))
+            if posts:
+                batch["posts"] = posts
+                batches.append(batch)
+
+    posts_hashes = posts_queue.show_all_posts_hashes(name)
+    if posts_hashes:
+        queue = post_storage.get_posts(posts_hashes)
+    else:
+        queue = []
+    return render_template("posts_queue.html", **{"human_name": name, "queue": queue, "batches": batches})
 
 
 if __name__ == '__main__':
