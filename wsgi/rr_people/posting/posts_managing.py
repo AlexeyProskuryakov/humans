@@ -1,10 +1,11 @@
+# coding=utf-8
 import logging
 import time
 from multiprocessing import Process
 
 from wsgi.db import HumanStorage
 from wsgi.properties import force_post_manager_sleep_iteration_time
-from wsgi.rr_people.posting.posts import PostsStorage, PostSource
+from wsgi.rr_people.posting.posts import PostsStorage, PostSource, PS_READY
 from wsgi.rr_people.posting.balancer import PostBalancer
 from wsgi.rr_people.posting.youtube_posts import YoutubeChannelsHandler
 from wsgi.rr_people.posting.queue import PostRedisQueue
@@ -93,6 +94,15 @@ class ImportantPostSupplier(Process):
 
 
 class NoisePostsAutoAdder(Process):
+    '''
+    Must be init and run server if will setting auto removing generated post to balancer
+
+    1) В глобальных конфигах должно быть установлен конфиг с ключем == имени этого дерьма
+    2) Данные этого конфига должны быть on == true и after == количеству секунд после которых
+    сгенеренные посты в состоянии PS_READY будут засунуты в балансер и определенны их идентификаторы каналов
+
+
+    '''
     name = "noise_auto_adder"
 
     def __init__(self):
@@ -106,7 +116,19 @@ class NoisePostsAutoAdder(Process):
         if not self.process_director.can_start_aspect(self.name, self.pid).get("started"):
             log.info("%s instance already work" % self.name)
             return
+
         while 1:
             cfg = self.main_db.get_global_config(self.name)
-            step_time = cfg.get("step_time")
-            #todo dodelat
+            is_on = cfg.get("on")
+            if not is_on:
+                log.info("in configuration noise posts auto adder is off i go out")
+                return
+
+            step_time = cfg.get("after")
+            counter = 0
+            for post in self.posts_storage.get_old_ready_posts(step_time):
+                self.post_handler.add_noise_post(post, post.for_sub)
+                counter += 1
+
+            log.info("Auto update will add %s posts" % counter)
+            time.sleep(step_time / 10)

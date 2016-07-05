@@ -74,7 +74,7 @@
                     <label for="auto-queue-put">Ага</label>
                     <input type="checkbox" id="auto-queue-put">
                     <label for="auto-queue-put-after">через </label>
-                    <input type="number" id="auto-queue-put-after" value="3600" class="">
+                    <input type="number" id="auto-queue-put-after" value="3600">
                     секунд
                 </div>
             </div>
@@ -92,25 +92,26 @@
     </div>
 </div>
 <script>
- //todo add config
+    $.ajax({
+        type:"get",
+        url:"/global_configuration/noise_auto_adder",
+        success:function(data){
+            $("#auto-queue-put").checked = data.on;
+        }
+    });
+
     $("#auto-queue-put").change(function(e){
+        var after = $("#auto-queue-put-after").val();
+        var data = {"on":this.checked, "after":after};
         $.ajax({
             type:"post",
-            url:"/generators/sub_info",
-            data:JSON.stringify({"sub":sub_name}),
+            url:"/noise_auto_adder",
+            data:JSON.stringify(data),
             contentType:    'application/json',
             dataType:       'json',
             success:function(data){
                 console.log(data);
-                if (data.ok == true){
-                    $(".gen-name").prop('selected', false);
-                    data.generators.forEach(function(x, el){
-                        $("#choose-sub-"+x).prop('selected', true);
-                    });
-                    $("#related-subs").text(data.related_subs);
-                    $("#key-words").text(data.key_words);
-                }
-                 $("#loader-gif").hide();
+
             }
         });
     });
@@ -143,6 +144,7 @@
         $(".sub-generator-btn").removeClass("disabled");
     }
 });
+
 
 
 

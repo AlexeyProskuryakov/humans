@@ -25,7 +25,7 @@ from wsgi.rr_people.posting.copy_gen import SubredditsRelationsStore
 from wsgi.rr_people.posting.posts import PS_BAD, PS_READY, PostsStorage
 from wsgi.rr_people.posting.balancer import BALANCER_PROCESS_ASPECT, BatchStorage
 from wsgi.rr_people.posting.posts_generator import PostsGenerator
-from wsgi.rr_people.posting.posts_managing import PostHandler
+from wsgi.rr_people.posting.posts_managing import PostHandler, NoisePostsAutoAdder
 from wsgi.rr_people.posting.queue import PostRedisQueue
 from wsgi.rr_people.states.processes import ProcessDirector
 from wsgi.wake_up import WakeUp, WakeUpStorage
@@ -403,7 +403,7 @@ srs = SubredditsRelationsStore("srs server")
 splitter = re.compile('[^\w\d_-]*')
 
 
-@app.route("/configuration/<name>", methods=["GET", "POST"])
+@app.route("/global_configuration/<name>", methods=["GET", "POST"])
 @login_required
 def configuration(name):
     if request.method == "GET":
@@ -417,6 +417,20 @@ def configuration(name):
         except Exception as e:
             log.warning(e.message)
             return jsonify(**{"ok": False, "error": e.message})
+
+
+@app.route("/noise_auto_adder", methods=["POST"])
+@login_required
+def noise_auto_add():
+    data = json.loads(request.data)
+    db.set_global_config(NoisePostsAutoAdder.name, data=data)
+
+    if data.get("on"):
+        npa = NoisePostsAutoAdder()
+        npa.start()
+        return jsonify(**{"ok": True, "started": True})
+
+    return jsonify(**{"ok": True, "started": False})
 
 
 # generators

@@ -132,10 +132,14 @@ class PostBalancerEngine(Process):
 
     def add_post(self, url_hash, channel_id, important=False, human_name=None, sub=None):
         if not sub and not human_name:
+            log.warn(
+                "For post %s [imp:%s, chId:%s] not sub and human name will not add to queue :(" % (
+                    url_hash, important, channel_id))
             return
 
         _human_name = human_name or self._get_human_name(sub)
         if _human_name is None:
+            log.warn("Can not recognise post %s %s imp?:%s, %s" % (url_hash, channel_id, important, sub))
             return
 
         for batch in self.batch_storage.get_human_post_batches(_human_name):

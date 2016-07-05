@@ -65,6 +65,7 @@ class PostsStorage(DBHandler):
             self.posts.create_index("url_hash", unique=True)
             self.posts.create_index("sub")
             self.posts.create_index("state")
+            self.posts.create_index("time")
         else:
             self.posts = self.db.get_collection("generated_posts")
 
@@ -98,6 +99,11 @@ class PostsStorage(DBHandler):
     def get_posts(self, url_hashes):
         result = self.posts.find({"url_hash": {"$in": url_hashes}})
         return result
+
+    def get_old_ready_posts(self, tdiff):
+        for post_data in self.posts.find({"time": {"$lte": time.time() - tdiff}, "state": PS_READY},
+                                         projection={"_id": False}):
+            yield PostSource.from_dict(post_data)
 
     def add_generated_post(self, post, sub, important=False, channel_id=None):
         if isinstance(post, PostSource):
