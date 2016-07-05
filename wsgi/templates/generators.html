@@ -97,6 +97,7 @@
         url:"/global_configuration/noise_auto_adder",
         success:function(data){
             $("#auto-queue-put").checked = data.on;
+            $("#auto-queue-put-after") = data.after;
         }
     });
 
