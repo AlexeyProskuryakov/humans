@@ -326,7 +326,8 @@ def humans_info(name):
                                                   "config": human_cfg.get("live_config") or HumanConfiguration().data,
                                                   "ss": human_cfg.get("ss", []),
                                                   "friends": human_cfg.get("frds", []),
-                                                  "want_coefficient": want_coefficient_max
+                                                  "want_coefficient": want_coefficient_max,
+                                                  "channel_id": human_cfg.get("channel_id")
                                                   })
 
 
@@ -345,6 +346,17 @@ def human_config(name):
         config_data.pop("_id")
         return jsonify(**{"ok": True, "data": config_data})
     return jsonify(**{"ok": False})
+
+
+@app.route("/humans/<name>/channel_id", methods=["POST"])
+@login_required
+def update_channel_id(name):
+    data = json.loads(request.data)
+    channel_id = data.get("channel_id")
+    if channel_id:
+        db.set_human_channel_id(name, channel_id)
+        return jsonify(**{"ok": True})
+    return jsonify(**{"ok": False, "error": "not channel id in input data :("})
 
 
 @app.route("/actions")

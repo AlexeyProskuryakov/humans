@@ -1,14 +1,15 @@
 # coding=utf-8
 import logging
+import random
 import time
 from multiprocessing import Process
 
 from wsgi.db import HumanStorage
 from wsgi.properties import force_post_manager_sleep_iteration_time
-from wsgi.rr_people.posting.posts import PostsStorage, PostSource, PS_READY
 from wsgi.rr_people.posting.balancer import PostBalancer
-from wsgi.rr_people.posting.youtube_posts import YoutubeChannelsHandler
+from wsgi.rr_people.posting.posts import PostsStorage, PostSource
 from wsgi.rr_people.posting.queue import PostRedisQueue
+from wsgi.rr_people.posting.youtube_posts import YoutubeChannelsHandler
 from wsgi.rr_people.states.processes import ProcessDirector
 
 log = logging.getLogger("posts")
@@ -87,7 +88,7 @@ class ImportantPostSupplier(Process):
                     for post in new_posts:
                         self.post_handler.add_new_post(human_data.get("user"),
                                                        post,
-                                                       post.for_sub,
+                                                       post.for_sub or random.choice(human_data.get("subs")),
                                                        channel,
                                                        important=True)
             time.sleep(force_post_manager_sleep_iteration_time)

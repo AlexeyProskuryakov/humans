@@ -21,10 +21,6 @@
                         <input type="submit" value="Stop human" class="btn btn-danger btn-lg">
                     </form>
                 </div>
-                <div class="col-md-3">
-                    <a class="btn btn-success btn-big btn-lg" href="{{url_for('queue_of_posts', name=human_name)}}">Posts queue
-                    </a>
-                </div>
             </div>
             <div class="row">
                 <div class="col-md-10 col-md-offset-1">
@@ -90,7 +86,7 @@
             </div>
         </div>
 
-        <div class="col-md-4">
+        <div class="col-md-6">
             <div class="row">
                 <h2>Information of <big id="human-name">{{human_name}}</big>
                     <br>
@@ -185,6 +181,18 @@
                         </div>
                     </div>
 
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-3">
+                    <a class="btn btn-default" href="{{url_for('queue_of_posts', name=human_name)}}">Post at queue
+                    </a>
+                </div>
+                <div class="col-md-3">
+                    <label for="channel-id-input">Channel id:</label>
+                    <input type="text" id="channel-id-input" value="{{channel_id}}">
+                    <button class="btn btn-sm" onclick="update_channel_id('{{human_name}}')">Update</button>
+                    <div id="channel-id-update-result"></div>
                 </div>
             </div>
         </div>

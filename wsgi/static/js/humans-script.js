@@ -44,3 +44,22 @@ function show_human_live_state(){
 setInterval(function() {
     show_human_live_state()
 }, 5000);
+
+
+function update_channel_id(name){
+    var channel_id = $("#channel-id-input").val();
+
+    $.ajax({
+        type:           "post",
+        url:            "/humans/"+name+"/channel_id",
+        data:           JSON.stringify({"channel_id":channel_id}),
+        contentType:    'application/json',
+        dataType:       'json',
+        success:        function(data){
+            if (data.ok){
+                $("#channel-id-update-result").text("Updated!");
+            }
+        }
+    })
+};
+$("#channel-id-input")

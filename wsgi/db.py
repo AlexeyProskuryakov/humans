@@ -116,9 +116,6 @@ class HumanStorage(DBHandler):
             return found.get("subs", [])
         return []
 
-    def set_human_channel_id(self, name, channel_id, subs_to_post=None):
-        self.human_config.update_one({"user": name}, {'$set': {'channel_id': channel_id, 'subs_to_post': subs_to_post}})
-
     def get_all_humans_subs(self):
         cfg = self.human_config.find({}, projection={"subs": True})
         subs = []
@@ -160,6 +157,9 @@ class HumanStorage(DBHandler):
     def get_human_config(self, name, projection=None):
         proj = projection or {"_id": False}
         return self.human_config.find_one({"user": name}, projection=proj)
+
+    def set_human_channel_id(self, name, channel_id):
+        self.human_config.update_one({"user": name}, {"$set": {"channel_id": channel_id}})
 
     #################HUMAN LOG
     def save_log_human_row(self, human_name, action_name, info):
