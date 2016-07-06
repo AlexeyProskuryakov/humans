@@ -124,11 +124,14 @@ class NoisePostsAutoAdder(Process):
                 log.info("in configuration noise posts auto adder is off i go out")
                 return
 
-            step_time = cfg.get("after")
+            after = cfg.get("after")
+            if not after:
+                after = 3600
+
             counter = 0
-            for post in self.posts_storage.get_old_ready_posts(step_time):
+            for post in self.posts_storage.get_old_ready_posts(after):
                 self.post_handler.add_noise_post(post, post.for_sub)
                 counter += 1
 
-            log.info("Auto update will add %s posts" % counter)
-            time.sleep(step_time / 10)
+            log.info("Auto add to balancer will add %s posts" % counter)
+            time.sleep(after / 10)

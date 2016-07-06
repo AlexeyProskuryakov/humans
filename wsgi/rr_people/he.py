@@ -199,7 +199,7 @@ class HumanOrchestra():
                 self.start_human(human_name)
 
     def suspend_human(self, human_name):
-        self.states.set_human_state(human_name, S_SUSPEND)
+        self.states.set_human_state(human_name, S_SUSPEND, ex=None)
 
     def start_human(self, human_name):
         self.states.set_human_state(human_name, S_WORK)

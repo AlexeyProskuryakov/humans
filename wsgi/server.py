@@ -64,10 +64,8 @@ if os.environ.get("test", False):
     toolbar = DebugToolbarExtension(app)
 
 url = "http://rr-alexeyp.rhcloud.com"
-wus = WakeUpStorage("wus server")
-wus.add_url(url)
-
 wu = WakeUp()
+wu.store.add_url(url)
 wu.daemon = True
 wu.start()
 
@@ -408,7 +406,9 @@ splitter = re.compile('[^\w\d_-]*')
 def configuration(name):
     if request.method == "GET":
         result = db.get_global_config(name)
-        return jsonify(**result)
+        if result:
+            return jsonify(**{"ok": True, "result": result})
+        return jsonify(**{"ok": False, "error": "no config with name %s" % name})
     elif request.method == "POST":
         try:
             data = json.loads(request.data)
@@ -416,7 +416,7 @@ def configuration(name):
             return jsonify(**{"ok": True, "result": result})
         except Exception as e:
             log.warning(e.message)
-            return jsonify(**{"ok": False, "error": e.message})
+            return jsonify(**{"ok": False, "error": e})
 
 
 @app.route("/noise_auto_adder", methods=["POST"])
@@ -428,7 +428,7 @@ def noise_auto_add():
     if data.get("on"):
         npa = NoisePostsAutoAdder()
         npa.start()
-        return jsonify(**{"ok": True, "started": True})
+        return jsonify(**{"ok": True, "started": True, "pid": npa.pid})
 
     return jsonify(**{"ok": True, "started": False})
 

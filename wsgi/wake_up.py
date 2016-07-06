@@ -14,10 +14,12 @@ log = logging.getLogger("wake_up")
 class WakeUpStorage(DBHandler):
     def __init__(self, name="?"):
         super(WakeUpStorage, self).__init__(name=name)
-        self.urls = self.db.get_collection("wake_up")
-        if not self.urls:
+        collections = self.db.collection_names(include_system_collections=False)
+        if "wake_up" not in collections:
             self.urls = self.db.create_collection("wake_up")
             self.urls.create_index("url_hash", unique=True)
+        else:
+            self.urls = self.db.get_collection("wake_up")
 
     def get_urls(self):
         return map(lambda x: x.get("url"), self.urls.find({}, projection={'_id': False, "url_hash": False}))
@@ -38,6 +40,7 @@ class WakeUp(Process):
 
     def run(self):
         while 1:
+            time.sleep(3600)
             try:
                 for url in self.store.get_urls():
                     salt = ''.join(random.choice(string.lowercase) for _ in range(20))
@@ -54,8 +57,3 @@ class WakeUp(Process):
 
             except Exception as e:
                 log.error(e)
-            time.sleep(3600)
-
-
-if __name__ == '__main__':
-    WakeUp().start()

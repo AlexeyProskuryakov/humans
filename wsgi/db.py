@@ -17,7 +17,7 @@ log = logging.getLogger("DB")
 class DBHandler(object):
     def __init__(self, name="?", uri=mongo_uri, db_name=db_name):
         log.info("start db handler for [%s] %s" % (name, uri))
-        self.client = MongoClient(host=uri)
+        self.client = MongoClient(host=uri, maxPoolSize=10, connect=False)
         self.db = self.client[db_name]
 
 
@@ -67,6 +67,11 @@ class HumanStorage(DBHandler):
             doc = dict({"name": name}, **data)
         else:
             doc = {"name": name, "data": data}
+
+        found = self.global_config.find_one({"name": name})
+        if found:
+            return self.global_config.update_one({"name": name}, {"$set": doc})
+
         return self.global_config.insert_one(doc)
 
     def update_human_access_credentials_info(self, user, info):
