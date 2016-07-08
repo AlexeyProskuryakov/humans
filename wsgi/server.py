@@ -23,7 +23,7 @@ from wsgi.rr_people.human import HumanConfiguration
 from wsgi.rr_people.posting import POST_GENERATOR_OBJECTS
 from wsgi.rr_people.posting.copy_gen import SubredditsRelationsStore
 from wsgi.rr_people.posting.posts import PS_BAD, PS_READY, PostsStorage
-from wsgi.rr_people.posting.balancer import BALANCER_PROCESS_ASPECT, BatchStorage
+from wsgi.rr_people.posting.balancer import BALANCER_PROCESS_ASPECT, BatchStorage, post_queue, post_storage
 from wsgi.rr_people.posting.posts_generator import PostsGenerator
 from wsgi.rr_people.posting.posts_managing import PostHandler, NoisePostsAutoAdder
 from wsgi.rr_people.posting.queue import PostRedisQueue
@@ -83,9 +83,9 @@ def wake_up_manage():
         for url in urls:
             url = url.strip()
             if url:
-                wus.add_url(url)
+                wu.store.add_url(url)
 
-    urls = wus.get_urls()
+    urls = wu.store.get_urls()
     return render_template("wake_up.html", **{"urls": urls})
 
 
@@ -460,7 +460,8 @@ def posts():
         qp_s[sub] = posts_generator.posts_storage.get_posts_for_sub(sub, state=PS_READY)
         subs_states[sub] = posts_generator.states_handler.get_posts_generator_state(sub) or S_STOP
 
-    return render_template("posts.html", **{"subs": subs_states, "qp_s": qp_s})
+    human_names = map(lambda x: x.get("user"), db.get_humans_info(projection={"user": True}))
+    return render_template("posts.html", **{"subs": subs_states, "qp_s": qp_s, "humans": human_names})
 
 
 @app.route("/generators", methods=["GET", "POST"])
@@ -565,8 +566,6 @@ def prepare_for_posting():
 # posts
 process_director = ProcessDirector("server")
 batch_storage = BatchStorage("server")
-post_storage = PostsStorage("server")
-posts_queue = PostRedisQueue("server")
 
 
 @app.route("/posts/balancer/info", methods=["GET"])
@@ -593,7 +592,7 @@ def batches_info(name):
 @app.route("/posts/queue/<name>", methods=["GET"])
 @login_required
 def queue_info(name):
-    posts_hashes = posts_queue.show_all_posts_hashes(name)
+    posts_hashes = post_queue.show_all_posts_hashes(name)
     if posts_hashes:
         posts = post_storage.get_posts(posts_hashes)
         return jsonify(**{"queue": posts})
@@ -610,11 +609,13 @@ def queue_of_posts(name):
                 batch["posts"] = posts
                 batches.append(batch)
 
-    posts_hashes = posts_queue.show_all_posts_hashes(name)
+    posts_hashes = post_queue.show_all_posts_hashes(name)
     if posts_hashes:
         queue = post_storage.get_posts(posts_hashes)
     else:
+        log.warning("no posts hashes at queue for %s :(" % name)
         queue = []
+
     return render_template("posts_queue.html", **{"human_name": name, "queue": queue, "batches": batches})
 
 

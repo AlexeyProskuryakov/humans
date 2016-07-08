@@ -9,6 +9,7 @@ PS_POSTED = "posted"
 PS_NO_POSTS = "no_posts"
 PS_BAD = "bad"
 PS_AT_QUEUE = "at_queue"
+PS_AT_BALANCER = "at_balancer"
 PS_ERROR = "error"
 
 
@@ -76,6 +77,9 @@ class PostsStorage(DBHandler):
     def set_post_state(self, url_hash, state):
         return self.posts.update_one({"url_hash": url_hash}, {"$set": {"state": state}})
 
+    def update_post(self, url_hash, new_data):
+        return self.posts.update_one({"url_hash": url_hash}, {"$set": new_data})
+
     def set_posts_states(self, url_hashes_list, state):
         return self.posts.update_many({"url_hash": {"$in": url_hashes_list}}, {"$set": {"state": state}})
 
@@ -98,7 +102,7 @@ class PostsStorage(DBHandler):
 
     def get_posts(self, url_hashes):
         result = self.posts.find({"url_hash": {"$in": url_hashes}})
-        return result
+        return list(result)
 
     def get_old_ready_posts(self, tdiff):
         for post_data in self.posts.find({"time": {"$lte": time.time() - tdiff}, "state": PS_READY},

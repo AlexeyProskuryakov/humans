@@ -16,7 +16,7 @@
                         <div class="accordion-heading">
                             <a class="accordion-toggle" data-toggle="collapse" data-parent="#info-accordion"
                                href="#queue">
-                                <h3>В очереди:</h3>
+                                <h3>В очереди <small>({{queue | length}}) </small>:</h3>
                             </a>
                         </div>
                         <div id="queue" class="accordion-body collapse">
@@ -63,7 +63,7 @@
                         <div class="accordion-heading">
                             <a class="accordion-toggle" data-toggle="collapse" data-parent="#batch-accordion"
                                href="#batch">
-                                <h3>В балансере:</h3>
+                                <h3>В балансере <small>({{batches | length}})</small> : </h3>
                             </a>
                         </div>
                         <div id="batches" class="accordion-body collapse">

@@ -109,8 +109,8 @@ class NoisePostsAutoAdder(Process):
     def __init__(self):
         super(NoisePostsAutoAdder, self).__init__()
         self.process_director = ProcessDirector("noise pp")
-        self.post_handler = PostHandler("noise pp")
-        self.posts_storage = self.post_handler.posts_storage
+        self.posts_storage = PostsStorage("noise pp")
+        self.post_handler = PostHandler("noise pp", ps=self.posts_storage)
         self.main_db = HumanStorage("noise pp")
 
     def run(self):

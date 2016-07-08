@@ -5,13 +5,22 @@
 <div class="container-fluid">
     <div class="row">
         {% if automate %}
-        <h1>Работа идет в автоматическом режиме. <small>Если пост не послать нахуй в течении {{automate_ttl}} секунд, он попадет в очередь</small> </h1>
+        <h1>Работа идет в автоматическом режиме.
+            <small>Если пост не послать нахуй в течении {{automate_ttl}} секунд, он попадет в очередь</small>
+        </h1>
         {% endif %}
 
         <div class="col-md-2">
             <h3>Настройки
                 <small><a href="{{url_for('gens_manage')}}">здеся</a></small>
             </h3>
+            <hr>
+            <h3>Очереди чуваков:</h3>
+            {% for human in humans %}
+            <a href="{{url_for('queue_of_posts', name=human)}}">
+                {{human}}
+            </a> <br>
+            {% endfor %}
         </div>
         <div class="col-md-8">
             <h3>Состояние поиска постов-хуестов: </h3>

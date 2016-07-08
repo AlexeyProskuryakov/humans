@@ -6,7 +6,7 @@ from multiprocessing import Process
 
 from wsgi.db import DBHandler, HumanStorage
 from wsgi.rr_people import Singleton
-from wsgi.rr_people.posting.posts import PS_AT_QUEUE, PostsStorage
+from wsgi.rr_people.posting.posts import PS_AT_QUEUE, PostsStorage, PS_AT_BALANCER
 from wsgi.rr_people.posting.queue import PostRedisQueue
 from wsgi.rr_people.states.persisted_queue import RedisQueue
 from wsgi.rr_people.states.processes import ProcessDirector
@@ -95,18 +95,18 @@ class PostBatch():
 BALANCER_PROCESS_ASPECT = "post_balancer"
 
 
-class PostBalancerEngine(Process):
+class _PostBalancerEngine(Process):
     __metaclass__ = Singleton
 
     def __init__(self, post_queue, post_storage, out_queue):
-        super(PostBalancerEngine, self).__init__()
+        super(_PostBalancerEngine, self).__init__()
         self.batch_storage = BatchStorage("balancer bs")
         self.human_storage = HumanStorage("balancer hs")
 
         self.post_queue = post_queue
         self.posts_storage = post_storage
 
-        self.out_queue = out_queue
+        self.input_queue = out_queue
 
         self.process_director = ProcessDirector("balancer")
 
@@ -145,11 +145,14 @@ class PostBalancerEngine(Process):
         for batch in self.batch_storage.get_human_post_batches(_human_name):
             if batch.have_not(url_hash, channel_id):
                 batch.add(url_hash, channel_id, important)
+                log.info("added to batch post %s %s of %s" % (url_hash, channel_id, human_name))
                 if batch.size >= MAX_BATCH_SIZE:
                     self._flush_batch_to_queue(batch)
-                return
+                return True
 
+        log.info("init new batch for post %s [%s] of %s" % (url_hash, channel_id, human_name))
         self.batch_storage.init_new_batch(_human_name, url_hash, channel_id)
+        return True
 
     def run(self):
         if not self.process_director.can_start_aspect(BALANCER_PROCESS_ASPECT, self.pid).get("started"):
@@ -159,7 +162,7 @@ class PostBalancerEngine(Process):
         log.info("post balancer started")
         while 1:
             try:
-                task = self.out_queue.get()
+                task = self.input_queue.get()
                 if not isinstance(task, BalancerTask):
                     raise Exception("task is not task :( ")
             except Exception as e:
@@ -167,8 +170,12 @@ class PostBalancerEngine(Process):
                 time.sleep(1)
                 continue
 
-            log.info("here i have task %s" % task)
-            self.add_post(**task.__dict__)
+            result = self.add_post(**task.__dict__)
+            if result:
+                self.posts_storage.update_post(task.url_hash, {"state": PS_AT_BALANCER,
+                                                               "human_name": task.human_name,
+                                                               "channel_id": task.channel_id,
+                                                               })
 
 
 class BalancerTask(object):
@@ -181,10 +188,6 @@ class BalancerTask(object):
 
     def __repr__(self):
         return "%s" % self.__dict__
-
-
-post_queue = PostRedisQueue("balancer")
-post_storage = PostsStorage("balancer ps")
 
 
 def deserialise(data):
@@ -201,7 +204,10 @@ balancer_queue = RedisQueue(name="balancer",
                             deserialize=deserialise,
                             topic="balancer_queue")
 
-_balancer = PostBalancerEngine(post_queue, post_storage, balancer_queue)
+post_queue = PostRedisQueue("balancer")
+post_storage = PostsStorage("balancer ps")
+
+_balancer = _PostBalancerEngine(post_queue, post_storage, balancer_queue)
 _balancer.daemon = True
 _balancer.start()
 
