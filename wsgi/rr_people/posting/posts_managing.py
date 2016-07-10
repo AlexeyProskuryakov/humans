@@ -72,6 +72,8 @@ class ImportantPostSupplier(Process):
 
         self.pd = ProcessDirector("im po su")
 
+        log.info("important post supplier started")
+
     def run(self):
         if not self.pd.can_start_aspect(IMPORTANT_POSTS_SUPPLIER_PROCESS_ASPECT, self.pid).get("started"):
             log.info("important posts supplier instance already work")
@@ -92,7 +94,6 @@ class ImportantPostSupplier(Process):
                                                              channel,
                                                              important=True)
             time.sleep(force_post_manager_sleep_iteration_time)
-
 
 class NoisePostsAutoAdder(Process):
     '''
