@@ -80,20 +80,25 @@ class ImportantPostSupplier(Process):
             return
 
         while 1:
-            for human_data in self.main_storage.get_humans_info(
-                    projection={"user": True, "subs": True, "channel_id": True}):
-                channel = human_data.get("channel_id")
-                if channel:
-                    new_posts = self.posts_supplier.get_new_channel_videos(channel)
-                    log.info("For [%s] found [%s] new posts:\n%s" % (
-                        human_data.get("user"), len(new_posts), '\n'.join([str(post) for post in new_posts])))
-                    for post in new_posts:
-                        self.post_handler.add_important_post(human_data.get("user"),
-                                                             post,
-                                                             post.for_sub or random.choice(human_data.get("subs")),
-                                                             channel,
-                                                             important=True)
+            humans_data = self.main_storage.get_humans_info(projection={"user": True, "subs": True, "channel_id": True})
+            for human_data in humans_data:
+                try:
+                    channel = human_data.get("channel_id")
+                    if channel:
+                        new_posts = self.posts_supplier.get_new_channel_videos(channel)
+                        log.info("For [%s] found [%s] new posts:\n%s" % (
+                            human_data.get("user"), len(new_posts), '\n'.join([str(post) for post in new_posts])))
+                        for post in new_posts:
+                            self.post_handler.add_important_post(human_data.get("user"),
+                                                                 post,
+                                                                 post.for_sub or random.choice(human_data.get("subs")),
+                                                                 channel,
+                                                                 important=True)
+                except Exception as e:
+                    log.exception(e)
+
             time.sleep(force_post_manager_sleep_iteration_time)
+
 
 class NoisePostsAutoAdder(Process):
     '''

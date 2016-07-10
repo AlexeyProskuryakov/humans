@@ -7,7 +7,7 @@ from apiclient.errors import HttpError
 from wsgi.properties import YOUTUBE_DEVELOPER_KEY, YOUTUBE_API_VERSION, YOUTUBE_API_SERVICE_NAME
 from wsgi.rr_people.posting.posts import PostsStorage, PostSource
 
-log = logging.getLogger("")
+log = logging.getLogger("youtube")
 
 YOUTUBE_URL = lambda x: "https://www.youtube.com/watch?v=%s" % x
 
@@ -29,11 +29,13 @@ class YoutubeChannelsHandler(object):
         result = []
         for video_info in items:
             id = video_info.get("id")
-            title = video_info.get("snippet", {}).get("title") or video_info.get("snippet", {}).get("description")
-            sub = self._get_sub(video_info.get("snippet", {}).get("tags", []))
             if id:
+                title = video_info.get("snippet", {}).get("title") or video_info.get("snippet", {}).get("description")
+                sub = self._get_sub(video_info.get("snippet", {}).get("tags", []))
                 url = YOUTUBE_URL(id)
-                result.append(PostSource(url=url, title=title, for_sub=sub))
+                ps = PostSource(url=url, title=title, for_sub=sub)
+                result.append(ps)
+                log.info("Generate important post: %s",ps)
             else:
                 log.warn("video: \n%s\nis have not id :( " % video_info)
         return result
@@ -41,7 +43,7 @@ class YoutubeChannelsHandler(object):
     def _get_new_videos_ids(self, video_ids):
         result = []
         for v_id in video_ids:
-            if self.posts_storage.get_post_state(hash(YOUTUBE_URL(v_id))):
+            if self.posts_storage.get_post_state(str(hash(YOUTUBE_URL(v_id)))):
                 break
             result.append(v_id)
         return result
@@ -63,6 +65,7 @@ class YoutubeChannelsHandler(object):
                                    search_result.get('items', [])))
             new_videos_ids = self._get_new_videos_ids(video_ids)
             if new_videos_ids:
+                log.info("found %s new videos"%(len(new_videos_ids)))
                 videos_data = self.youtube.videos().list(
                     **{"id": ",".join(new_videos_ids), "part": "snippet"}).execute()
                 prep_videos = self._form_posts_on_videos_info(videos_data.get("items", []))
