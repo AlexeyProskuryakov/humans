@@ -22,14 +22,14 @@ class PostHandler(object):
         self.youtube = YoutubeChannelsHandler(self.posts_storage)
         self.balancer = PostBalancer()
 
-    def add_new_post(self, human_name, post_source, sub, channel_id=None, important=False):
+    def add_important_post(self, human_name, post_source, sub, channel_id=None, important=False):
         if isinstance(post_source, PostSource):
             self.posts_storage.add_generated_post(post_source, sub, important=important, channel_id=channel_id)
             self.balancer.add_post(post_source.url_hash, channel_id, important=important, human_name=human_name)
         else:
             raise Exception("post_source is not post source!")
 
-    def add_noise_post(self, sub, post_source):
+    def move_noise_post_to_balancer(self, sub, post_source):
         if isinstance(post_source, PostSource):
             channel_id = self.youtube.get_channel_id(post_source.url)
             self.posts_storage.set_post_channel_id(post_source.url_hash, channel_id)
@@ -86,11 +86,11 @@ class ImportantPostSupplier(Process):
                     log.info("For [%s] found [%s] new posts:\n%s" % (
                         human_data.get("user"), len(new_posts), '\n'.join([str(post) for post in new_posts])))
                     for post in new_posts:
-                        self.post_handler.add_new_post(human_data.get("user"),
-                                                       post,
-                                                       post.for_sub or random.choice(human_data.get("subs")),
-                                                       channel,
-                                                       important=True)
+                        self.post_handler.add_important_post(human_data.get("user"),
+                                                             post,
+                                                             post.for_sub or random.choice(human_data.get("subs")),
+                                                             channel,
+                                                             important=True)
             time.sleep(force_post_manager_sleep_iteration_time)
 
 
@@ -131,7 +131,7 @@ class NoisePostsAutoAdder(Process):
 
             counter = 0
             for post in self.posts_storage.get_old_ready_posts(after):
-                self.post_handler.add_noise_post(post, post.for_sub)
+                self.post_handler.move_noise_post_to_balancer(post, post.for_sub)
                 counter += 1
 
             log.info("Auto add to balancer will add %s posts" % counter)

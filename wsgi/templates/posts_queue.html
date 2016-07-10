@@ -4,7 +4,7 @@
 {% block content %}
 <div class="container-fluid">
     <div class="row">
-        <div class="col-md-8 col-md-offset-1">
+        <div class="col-md-10 col-md-offset-1">
             <h1>Очередь постов для {{human_name}}
             </h1>
             <br>
@@ -16,7 +16,10 @@
                         <div class="accordion-heading">
                             <a class="accordion-toggle" data-toggle="collapse" data-parent="#info-accordion"
                                href="#queue">
-                                <h3>В очереди <small>({{queue | length}}) </small>:</h3>
+                                <h3>В очереди
+                                    <small>({{queue | length}})</small>
+                                    :
+                                </h3>
                             </a>
                         </div>
                         <div id="queue" class="accordion-body collapse">
@@ -63,18 +66,21 @@
                         <div class="accordion-heading">
                             <a class="accordion-toggle" data-toggle="collapse" data-parent="#batch-accordion"
                                href="#batch">
-                                <h3>В балансере <small>({{batches | length}})</small> : </h3>
+                                <h3>В балансере
+                                    <small>({{batches | length}})</small>
+                                    :
+                                </h3>
                             </a>
                         </div>
-                        <div id="batches" class="accordion-body collapse">
+                        <div id="batch" class="accordion-body collapse">
                             <div class="accordion-inner">
 
                                 {% for batch in batches %}
                                 <div class="row">
-                                    <div class="col-md-3">
-                                        {{array_to_string(batch['channels'])}}
+                                    <div class="col-md-2">
+                                        Каналы: {{array_to_string(batch['channels'])}}
                                     </div>
-                                    <div class="col-md-6" id="{{batch['_id']}}">
+                                    <div class="col-md-10" id="{{batch['_id']}}">
 
                                         <div class="accordion" id="batch-post-accordion">
                                             <div class="accordion-group">
@@ -88,6 +94,15 @@
                                                 <div id="batch-{{batch['_id']}}" class="accordion-body collapse">
                                                     <div class="accordion-inner">
                                                         <table class="table table-stripped table-hover table-condensed">
+                                                            <thead>
+                                                            <tr>
+                                                                <td>url</td>
+                                                                <td>for sub</td>
+                                                                <td>important</td>
+                                                                <td>channel id</td>
+                                                                <td>when found</td>
+                                                            </tr>
+                                                            </thead>
                                                             <tbody>
                                                             {% for post in batch['posts'] %}
                                                             <tr id="{{post['url_hash']}}">

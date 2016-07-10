@@ -21,14 +21,13 @@ from wsgi.rr_people.ae import AuthorsStorage
 from wsgi.rr_people.he import HumanOrchestra
 from wsgi.rr_people.human import HumanConfiguration
 from wsgi.rr_people.posting import POST_GENERATOR_OBJECTS
-from wsgi.rr_people.posting.copy_gen import SubredditsRelationsStore
-from wsgi.rr_people.posting.posts import PS_BAD, PS_READY, PostsStorage
 from wsgi.rr_people.posting.balancer import BALANCER_PROCESS_ASPECT, BatchStorage, post_queue, post_storage
+from wsgi.rr_people.posting.copy_gen import SubredditsRelationsStore
+from wsgi.rr_people.posting.posts import PS_BAD, PS_READY
 from wsgi.rr_people.posting.posts_generator import PostsGenerator
 from wsgi.rr_people.posting.posts_managing import PostHandler, NoisePostsAutoAdder
-from wsgi.rr_people.posting.queue import PostRedisQueue
 from wsgi.rr_people.states.processes import ProcessDirector
-from wsgi.wake_up import WakeUp, WakeUpStorage
+from wsgi.wake_up import WakeUp
 
 __author__ = '4ikist'
 
@@ -556,7 +555,7 @@ def prepare_for_posting():
     sub = data.get("sub")
     if sub:
         for post in posts_generator.posts_storage.get_posts_for_sub(sub):
-            posts_handler.add_noise_post(sub, post)
+            posts_handler.move_noise_post_to_balancer(sub, post)
 
         return jsonify(**{"ok": True})
 

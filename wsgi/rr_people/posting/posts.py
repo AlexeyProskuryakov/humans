@@ -35,7 +35,7 @@ class PostSource(object):
         self.title = title
         self.for_sub = for_sub
         self.at_time = at_time
-        self.url_hash = url_hash or hash(url)
+        self.url_hash = url_hash or str(hash(url))
         self.important = important
 
     def serialize(self):
@@ -60,9 +60,7 @@ class PostsStorage(DBHandler):
         super(PostsStorage, self).__init__(name=name)
         collection_names = self.db.collection_names(include_system_collections=False)
         if "generated_posts" not in collection_names:
-            self.posts = self.db.create_collection("generated_posts",
-                                                   capped=True,
-                                                   size=1024 * 1024 * 100)
+            self.posts = self.db.create_collection("generated_posts")
             self.posts.create_index("url_hash", unique=True)
             self.posts.create_index("sub")
             self.posts.create_index("state")
@@ -74,11 +72,11 @@ class PostsStorage(DBHandler):
     def set_post_channel_id(self, url_hash, channel_id):
         return self.posts.update_one({"url_hash": url_hash}, {"$set": {"channel_id": channel_id}})
 
-    def set_post_state(self, url_hash, state):
-        return self.posts.update_one({"url_hash": url_hash}, {"$set": {"state": state}})
-
     def update_post(self, url_hash, new_data):
         return self.posts.update_one({"url_hash": url_hash}, {"$set": new_data})
+
+    def set_post_state(self, url_hash, state):
+        return self.posts.update_one({"url_hash": url_hash}, {"$set": {"state": state}})
 
     def set_posts_states(self, url_hashes_list, state):
         return self.posts.update_many({"url_hash": {"$in": url_hashes_list}}, {"$set": {"state": state}})

@@ -114,7 +114,7 @@ class CopyPostGenerator(RedditHandler, Generator):
                     return title
 
         except Exception as e:
-            log.exception(e)
+            pass
 
     def get_title_from_comments(self, post, title):
         title_tokens = normalize(title, lambda x: x)

@@ -12,6 +12,8 @@ class PostRedisQueue(RedisHandler):
                                              posts_redis_port,
                                              posts_redis_password,
                                              0)
+        if clear:
+            self.redis.flushall()
 
     def put_post(self, human_name, url_hash):
         self.redis.rpush(QUEUE_PG(human_name), url_hash)

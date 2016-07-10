@@ -1,6 +1,8 @@
 import json
 import logging
 import random
+import time
+
 from collections import defaultdict
 from multiprocessing import Process
 
@@ -110,14 +112,25 @@ class _PostBalancerEngine(Process):
 
         self.process_director = ProcessDirector("balancer")
 
+        self._sub_human_mapping_cache = defaultdict(list)
+        self._sub_human_mapping_ttl = time.time()
+
         log.info("post balancer inited")
 
     def _load_human_sub_mapping(self):
-        result = defaultdict(list)
-        for human_info in self.human_storage.get_humans_info(projection={"user": True, "subs": True}):
-            for sub in human_info.get("subs"):
-                result[sub].append(human_info.get("user"))
+        if not self._sub_human_mapping_cache or time.time() - self._sub_human_mapping_ttl > 60:
+            result = defaultdict(list)
+            for human_info in self.human_storage.get_humans_info(projection={"user": True, "subs": True}):
+                for sub in human_info.get("subs"):
+                    result[sub].append(human_info.get("user"))
+
+            self._sub_human_mapping_cache = result
+            self._sub_human_mapping_ttl = time.time()
+        else:
+            result = self._sub_human_mapping_cache
+
         return result
+
 
     def _get_human_name(self, sub):
         sub_humans = self._load_human_sub_mapping()
@@ -142,15 +155,18 @@ class _PostBalancerEngine(Process):
             log.warn("Can not recognise post %s %s imp?:%s, %s" % (url_hash, channel_id, important, sub))
             return
 
+        self.posts_storage.update_post(url_hash, {"state": PS_AT_BALANCER,
+                                                  "human_name": _human_name})
+
         for batch in self.batch_storage.get_human_post_batches(_human_name):
             if batch.have_not(url_hash, channel_id):
                 batch.add(url_hash, channel_id, important)
-                log.info("added to batch post %s %s of %s" % (url_hash, channel_id, human_name))
+                log.info("added to batch post %s %s of %s" % (url_hash, channel_id, _human_name))
                 if batch.size >= MAX_BATCH_SIZE:
                     self._flush_batch_to_queue(batch)
                 return True
 
-        log.info("init new batch for post %s [%s] of %s" % (url_hash, channel_id, human_name))
+        log.info("init new batch for post %s [%s] of %s" % (url_hash, channel_id, _human_name))
         self.batch_storage.init_new_batch(_human_name, url_hash, channel_id)
         return True
 
@@ -170,12 +186,7 @@ class _PostBalancerEngine(Process):
                 time.sleep(1)
                 continue
 
-            result = self.add_post(**task.__dict__)
-            if result:
-                self.posts_storage.update_post(task.url_hash, {"state": PS_AT_BALANCER,
-                                                               "human_name": task.human_name,
-                                                               "channel_id": task.channel_id,
-                                                               })
+            self.add_post(**task.__dict__)
 
 
 class BalancerTask(object):
@@ -228,7 +239,6 @@ class PostBalancer(object):
 
 if __name__ == '__main__':
     pb = PostBalancer()
-    import time
 
     for i in range(101):
         pb.add_post("http://www.test.url.hash-%s.ru" % i, "channel_%s" % (i % 10), important=True, human_name="test")
