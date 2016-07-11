@@ -25,7 +25,7 @@ from wsgi.rr_people.posting.balancer import BALANCER_PROCESS_ASPECT, BatchStorag
 from wsgi.rr_people.posting.copy_gen import SubredditsRelationsStore
 from wsgi.rr_people.posting.posts import PS_BAD, PS_READY
 from wsgi.rr_people.posting.posts_generator import PostsGenerator
-from wsgi.rr_people.posting.posts_managing import PostHandler, NoisePostsAutoAdder, ImportantPostSupplier
+from wsgi.rr_people.posting.posts_managing import PostHandler, NoisePostsAutoAdder, ImportantYoutubePostSupplier
 from wsgi.rr_people.states.processes import ProcessDirector
 from wsgi.wake_up import WakeUp
 
@@ -347,7 +347,7 @@ def human_config(name):
     return jsonify(**{"ok": False})
 
 
-ips = ImportantPostSupplier()
+ips = ImportantYoutubePostSupplier()
 ips.start()
 
 

@@ -57,13 +57,13 @@ class PostHandler(object):
 IMPORTANT_POSTS_SUPPLIER_PROCESS_ASPECT = "im_po_su_aspect"
 
 
-class ImportantPostSupplier(Process):
+class ImportantYoutubePostSupplier(Process):
     """
     Process which get humans config and retrieve channel_id, after retrieve new posts from it and
     """
 
     def __init__(self, pq=None, ps=None, ms=None):
-        super(ImportantPostSupplier, self).__init__()
+        super(ImportantYoutubePostSupplier, self).__init__()
         self.queue = pq or PostRedisQueue("im po su")
         self.posts_storage = ps or PostsStorage("im po su")
         self.main_storage = ms or HumanStorage("im po su")
@@ -86,8 +86,8 @@ class ImportantPostSupplier(Process):
                     channel = human_data.get("channel_id")
                     if channel:
                         new_posts = self.posts_supplier.get_new_channel_videos(channel)
-                        log.info("For [%s] found [%s] new posts:\n%s" % (
-                            human_data.get("user"), len(new_posts), '\n'.join([str(post) for post in new_posts])))
+                        log.info("At youtube for [%s] found [%s] new posts:\n%s" % (
+                            human_data.get("user"), len(new_posts), ' youtube \n'.join([str(post) for post in new_posts])))
                         for post in new_posts:
                             self.post_handler.add_important_post(human_data.get("user"),
                                                                  post,

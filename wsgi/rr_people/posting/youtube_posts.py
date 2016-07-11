@@ -20,7 +20,7 @@ class YoutubeChannelsHandler(object):
                              developerKey=YOUTUBE_DEVELOPER_KEY)
         self.posts_storage = ps or PostsStorage(name="youtube posts supplier")
 
-    def _get_sub(self, tags):
+    def _get_sub_on_tags(self, tags):
         for tag in tags:
             if "sub" in tag:
                 return tag.replace("sub:", "").strip()
@@ -31,11 +31,14 @@ class YoutubeChannelsHandler(object):
             id = video_info.get("id")
             if id:
                 title = video_info.get("snippet", {}).get("title") or video_info.get("snippet", {}).get("description")
-                sub = self._get_sub(video_info.get("snippet", {}).get("tags", []))
+                sub = self._get_sub_on_tags(video_info.get("snippet", {}).get("tags", []))
+                if not sub:
+                    log.warn("Video [%s] (%s) without sub; Skip this video :(" % (id, title))
+                    continue
                 url = YOUTUBE_URL(id)
                 ps = PostSource(url=url, title=title, for_sub=sub)
                 result.append(ps)
-                log.info("Generate important post: %s",ps)
+                log.info("Generate important post: %s", ps)
             else:
                 log.warn("video: \n%s\nis have not id :( " % video_info)
         return result
@@ -48,15 +51,11 @@ class YoutubeChannelsHandler(object):
             result.append(v_id)
         return result
 
-    def _retrieve_video_ids(self, items):
-        video_ids = ",".join()
-        return video_ids
-
     def get_new_channel_videos(self, channel_id):
         items = []
         q = {"channelId": channel_id,
              "part": "snippet",
-             "maxResults": 50,
+             "maxResults": 10,
              "order": "date"}
         while 1:
             search_result = self.youtube.search().list(**q).execute()
@@ -64,8 +63,9 @@ class YoutubeChannelsHandler(object):
                                map(lambda x: x.get("id", {}).get("videoId"),
                                    search_result.get('items', [])))
             new_videos_ids = self._get_new_videos_ids(video_ids)
+            log.info("found %s posts in channel: %s; not saved: %s" % (len(video_ids), channel_id, len(new_videos_ids)))
+
             if new_videos_ids:
-                log.info("found %s new videos"%(len(new_videos_ids)))
                 videos_data = self.youtube.videos().list(
                     **{"id": ",".join(new_videos_ids), "part": "snippet"}).execute()
                 prep_videos = self._form_posts_on_videos_info(videos_data.get("items", []))
@@ -103,4 +103,8 @@ if __name__ == '__main__':
     # print yps.get_video_id("https://www.youtube.com/watch?v=cQL3JIYg9Io&feature=youtu.be")
     # channel_id = yps.get_channel_id("https://www.youtube.com/watch?v=cQL3JIYg9Io&feature=youtu.be")
 
-    videos = yps.get_new_channel_videos("UCPDis9pjXuqyI7RYLJ-TTSA")
+    videos = yps.get_new_channel_videos("UCEMga_5kPDRwFXaJM1NQryA")  # 3030 channel
+    # videos = yps.get_new_channel_videos("UCNBfdM4qeFvyFag-34wnCeQ") #alesha channel
+    # videos = yps.get_new_channel_videos("UCqojywe2RqVPgALVyV0LrWg")
+    channel_id = yps.get_channel_id("https://www.youtube.com/watch?v=LuXBjs7eN4o")
+    print channel_id

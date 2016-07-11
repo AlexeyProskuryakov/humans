@@ -1,6 +1,6 @@
 from wsgi.rr_people.posting.balancer import BatchStorage
 from wsgi.rr_people.posting.posts import PostsStorage
-from wsgi.rr_people.posting.queue import PostRedisQueue
+from wsgi.rr_people.posting.queue import PostRedisQueue, QUEUE_PG
 
 
 def clear_posts():
@@ -13,5 +13,18 @@ def clear_posts():
     PostRedisQueue(clear=True)
 
 
+def clear_important_posts():
+    ps = PostsStorage()
+    bs = BatchStorage()
+    q = PostRedisQueue()
+
+    for post in ps.posts.find({"important": True}):
+        bs.batches.delete_one({"human_name": post.get("human_name")})
+        q.redis.delete(QUEUE_PG(post.get("human_name")))
+        ps.posts.delete_one(post)
+        print "delete: ", post
+
+
 if __name__ == '__main__':
-    clear_posts()
+    # clear_posts()
+    clear_important_posts()
