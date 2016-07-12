@@ -106,12 +106,12 @@ class Kapellmeister(Process):
 
     def _do_action(self, action, step, _start):
         produce = False
-        if action == A_COMMENT and self.human.can_do(A_COMMENT):
+        if action == A_COMMENT and (self.human.must_do(A_COMMENT) or self.human.can_do(A_COMMENT)):
             self._set_state(WORK_STATE("commenting"))
             comment_result = self.human.do_comment_post()
             if comment_result == A_COMMENT: produce = True
 
-        elif action == A_POST and self.human.can_do(A_POST):
+        elif action == A_POST and (self.human.must_do(A_POST) or self.human.can_do(A_POST)):
             self._set_state(WORK_STATE("posting"))
             post_result = self.human.do_post()
             if post_result == A_POST: produce = True
@@ -124,7 +124,10 @@ class Kapellmeister(Process):
             else:
                 self._set_state(WORK_STATE("sleeping because can not consume"))
                 self.human.decr_counter(A_CONSUME)
-                self.human.get_hot_and_new(random.choice(self.human.db.get_human_subs(self.human_name)))
+                self.human.decr_counter(A_POST, 2)
+                self.human.decr_counter(A_COMMENT, 2)
+                self.human.get_hot_and_new(random.choice(self.human.db.get_human_subs(self.human_name)),
+                                           limit=random.randint(500, 1000))
                 time.sleep((random.randint(1, 2) * MINUTE) / random.randint(1, 6))
                 action_result = A_SLEEP
         else:
@@ -160,6 +163,7 @@ class Kapellmeister(Process):
                 last_token_refresh_time = step
 
             action = self.ae.get_action(step)
+            log.info("[%s] ae get step: %s" % (self.human_name, action))
             _prev_step = step
             if action != A_SLEEP:
                 step, action_result = self._do_action(action, step, _start)

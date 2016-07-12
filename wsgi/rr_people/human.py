@@ -157,8 +157,8 @@ class Human(RedditHandler):
     def incr_counter(self, name):
         self.counters[name] += 1
 
-    def decr_counter(self, name):
-        self.counters[name] -= 1
+    def decr_counter(self, name, by=1):
+        self.counters[name] -= by
 
     @property
     def action_function_params(self):

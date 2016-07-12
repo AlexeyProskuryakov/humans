@@ -386,21 +386,22 @@ def ae_represent(name):
 
     y = 3
     ssteps = author_storage.get_sleep_steps(name)
-    log.info("get sleep steps ^ %s" % len(ssteps))
-    sleep_days = defaultdict(list)
-    for step in ssteps:
-        sleep_days[divmod(step.get("time"), DAY)[0]].append([step['time'], step['end_time']])
-
+    log.info("get sleep steps: %s" % len(ssteps))
     sleep_data = []
-    for _, v in sleep_days.iteritems():
-        avg_start = sum(map(lambda x: x[0], v)) / len(v)
-        avg_end = sum(map(lambda x: x[1], v)) / len(v)
+    # sleep_days = defaultdict(list)
+    for step in ssteps:
+        sleep_data.append([get_point_x(step["time"]), y, 10000, 10000])
+        # sleep_days[divmod(step.get("time"), DAY)[0]].append([step['time'], step['end_time']])
 
-        step = (avg_end - avg_start) / 2
-        x = avg_start + step
-        sleep_data.append([get_point_x(x), y, step * 1000, step * 1000])
+    # for _, v in sleep_days.iteritems():
+    #     avg_start = sum(map(lambda x: x[0], v)) / len(v)
+    #     avg_end = sum(map(lambda x: x[1], v)) / len(v)
+    #
+    #     step = (avg_end - avg_start) / 2
+    #     x = avg_start + step
+    #     sleep_data.append([get_point_x(x), y, step * 1000, step * 1000])
 
-    sleep_data.append([get_point_x(0), y, 100, 100])
+    sleep_data.append([get_point_x(0), y, 0, 0, 500, 500])
 
     result = {"color": "blue",
               "data": sleep_data,

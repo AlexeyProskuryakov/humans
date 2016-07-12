@@ -25,7 +25,7 @@ var show_ae_steps_data = function(name){
                             minTickSize: [1, "hour"],
                             min: current.getTime()-60*60*1000,
                             max: next.getTime()+60*60*1000,
-                            timeformat: "%a %H:%M"
+                            timeformat: "%a %H:%M:%S"
                         }
                     }
                 );
