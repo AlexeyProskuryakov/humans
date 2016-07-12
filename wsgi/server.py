@@ -356,10 +356,14 @@ ips.start()
 def update_channel_id(name):
     data = json.loads(request.data)
     channel_id = data.get("channel_id")
+    db.set_human_channel_id(name, channel_id)
     if channel_id:
-        db.set_human_channel_id(name, channel_id)
-        return jsonify(**{"ok": True})
-    return jsonify(**{"ok": False, "error": "not channel id in input data :("})
+        result, err = ips.load_new_posts_for_human(name, channel_id)
+        if not err:
+            return jsonify(**{"ok": True, "loaded": result})
+        return jsonify(**{"ok": False, "error": err})
+
+    return jsonify(**{"ok": True, "loaded": 0})
 
 
 @app.route("/actions")

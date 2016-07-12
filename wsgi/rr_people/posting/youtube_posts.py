@@ -47,7 +47,7 @@ class YoutubeChannelsHandler(object):
         result = []
         for v_id in video_ids:
             if self.posts_storage.get_post_state(str(hash(YOUTUBE_URL(v_id)))):
-                break
+                continue
             result.append(v_id)
         return result
 
@@ -55,7 +55,7 @@ class YoutubeChannelsHandler(object):
         items = []
         q = {"channelId": channel_id,
              "part": "snippet",
-             "maxResults": 10,
+             "maxResults": 50,
              "order": "date"}
         while 1:
             search_result = self.youtube.search().list(**q).execute()

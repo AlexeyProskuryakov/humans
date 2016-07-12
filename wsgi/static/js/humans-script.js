@@ -56,9 +56,13 @@ function update_channel_id(name){
         contentType:    'application/json',
         dataType:       'json',
         success:        function(data){
+            var text = "";
             if (data.ok){
-                $("#channel-id-update-result").text("Updated!");
+                text = "Постановлено. Загруженно "+data.loaded+" постов";
+            } else{
+                text = "Что-то пошло не так: "+data.error;
             }
+            $("#channel-id-update-result").text(text);
         }
     })
 };

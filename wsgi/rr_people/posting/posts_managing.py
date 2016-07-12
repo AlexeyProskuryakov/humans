@@ -74,6 +74,23 @@ class ImportantYoutubePostSupplier(Process):
 
         log.info("important post supplier started")
 
+    def load_new_posts_for_human(self, human_name, channel_id):
+        try:
+            new_posts = self.posts_supplier.get_new_channel_videos(channel_id)
+            new_posts = filter(lambda x: x.for_sub is not None, new_posts)
+            log.info("At youtube for [%s] found [%s] new posts:\n%s" % (
+                human_name, len(new_posts), ' youtube \n'.join([str(post) for post in new_posts])))
+
+            for post in new_posts:
+                self.post_handler.add_important_post(human_name, post, post.for_sub, channel_id, important=True)
+
+            return len(new_posts), None
+
+        except Exception as e:
+            log.error("Exception at loading youtube new posts %s", e)
+            log.exception(e)
+            return e.message, e
+
     def run(self):
         if not self.pd.can_start_aspect(IMPORTANT_POSTS_SUPPLIER_PROCESS_ASPECT, self.pid).get("started"):
             log.info("important posts supplier instance already work")
@@ -82,20 +99,9 @@ class ImportantYoutubePostSupplier(Process):
         while 1:
             humans_data = self.main_storage.get_humans_info(projection={"user": True, "subs": True, "channel_id": True})
             for human_data in humans_data:
-                try:
-                    channel = human_data.get("channel_id")
-                    if channel:
-                        new_posts = self.posts_supplier.get_new_channel_videos(channel)
-                        log.info("At youtube for [%s] found [%s] new posts:\n%s" % (
-                            human_data.get("user"), len(new_posts), ' youtube \n'.join([str(post) for post in new_posts])))
-                        for post in new_posts:
-                            self.post_handler.add_important_post(human_data.get("user"),
-                                                                 post,
-                                                                 post.for_sub or random.choice(human_data.get("subs")),
-                                                                 channel,
-                                                                 important=True)
-                except Exception as e:
-                    log.exception(e)
+                channel_id = human_data.get("channel_id")
+                if channel_id:
+                    self.load_new_posts_for_human(human_data.get("user"), channel_id)
 
             time.sleep(force_post_manager_sleep_iteration_time)
 
