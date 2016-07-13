@@ -87,7 +87,7 @@ class ImportantYoutubePostSupplier(Process):
             return len(new_posts), None
 
         except Exception as e:
-            log.error("Exception at loading youtube new posts %s", e)
+            log.error("Exception at loading youtube new posts %s, for %s at %s" % (e, human_name, channel_id))
             log.exception(e)
             return e.message, e
 

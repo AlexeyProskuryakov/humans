@@ -30,7 +30,7 @@ class PostSource(object):
                         )
         return ps
 
-    def __init__(self, url=None, title=None, for_sub=None, at_time=None, url_hash=None, important=False):
+    def __init__(self, url, title, for_sub=None, at_time=None, url_hash=None, important=False):
         self.url = url
         self.title = title
         self.for_sub = for_sub
@@ -45,13 +45,11 @@ class PostSource(object):
         return self.__dict__
 
     def __repr__(self):
-        result = "url: [%s] title: [%s] " % (self.url, self.title)
+        result = "url: [%s] title: [%s] url_hash: [%s]" % (self.url, self.title, self.url_hash)
         if self.for_sub:
             result = "%sfor sub: [%s] " % (result, self.for_sub)
         if self.at_time:
             result = "%stime: [%s]" % (result, self.at_time)
-        if self.url_hash:
-            result = "%surl_hash: [%s]" % (result, self.url_hash)
         return result
 
 

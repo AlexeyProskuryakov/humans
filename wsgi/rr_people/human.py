@@ -452,14 +452,22 @@ class Human(RedditHandler):
             log.warn("no posts for me [%s] :(" % self.name)
             return PS_NO_POSTS
 
-        subreddit = self.get_subreddit(post.for_sub)
-        _wait_time_to_write(post.title)
-        result = subreddit.submit(save=True, title=post.title, url=post.url)
+        try:
+            subreddit = self.get_subreddit(post.for_sub)
+            _wait_time_to_write(post.title)
+            result = subreddit.submit(save=True, title=post.title, url=post.url)
+            log.info("was post at [%s]; title: [%s]; url: [%s]" % (post.for_sub, post.title, post.url))
+        except Exception as e:
+            #todo it must be showing at interface
+            log.error("exception at posting %s" % (post))
+            log.exception(e)
+            self.posts_handler.set_post_state(post.url_hash, PS_ERROR)
+            return PS_ERROR
 
-        log.info("was post at [%s]; title: [%s]; url: [%s]" % (post.for_sub, post.title, post.url))
         if isinstance(result, Submission):
             self.register_step(A_POST,
-                               {"fullname": result.fullname, "sub": post.for_sub, 'title': post.title, 'url': post.url})
+                               {"fullname": result.fullname, "sub": post.for_sub, 'title': post.title,
+                                'url': post.url})
             self.posts_handler.set_post_state(post.url_hash, PS_POSTED)
             log.info("OK! result: %s" % (result))
             return A_POST

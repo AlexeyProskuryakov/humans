@@ -138,7 +138,6 @@ class Kapellmeister(Process):
         return step, action_result
 
     def run(self):
-        # todo debug it with fake for infrastructure
         if not self.process_director.can_start_aspect(HE_ASPECT(self.human_name), self.pid).get("started"):
             log.warning("another kappelmeister for [%s] worked..." % self.human_name)
             return
