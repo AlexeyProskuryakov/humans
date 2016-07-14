@@ -51,7 +51,6 @@ def tst_to_dt(value):
 def array_to_string(array):
     return " ".join([str(el) for el in array])
 
-
 app.jinja_env.filters["tst_to_dt"] = tst_to_dt
 app.jinja_env.globals.update(array_to_string=array_to_string)
 

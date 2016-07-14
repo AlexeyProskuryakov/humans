@@ -215,10 +215,14 @@
                 </th>
                 <th class="col-md-8">
                     {% if "permalink" in row.get("info") %}
-                    <a href="{{row.get('info')['permalink']}}">{{row.get('info')}}</a>
+                    <a href="{{row.get('info')['permalink']}}" target="_blank">{{row.get('info')}}</a>
 
                     {%elif "fullname" in row.get("info")%}
-                    <a href="https://redd.it/{{row.get('info')['fullname']}}">{{row.get('info')}}</a>
+                    <a href="https://redd.it/{{row.get('info')['fullname'][3:]}}" target="_blank">{{row.get('info')}}</a>
+
+                    {%elif "url" in row.get("info")%}
+                    <a href="{{row.get('info')['url']}}" target="_blank">{{row.get('info')}}</a>
+
                     {%else%}
                     {{row.get("info")}}
                     {%endif%}
