@@ -576,36 +576,6 @@ process_director = ProcessDirector("server")
 batch_storage = BatchStorage("server")
 
 
-@app.route("/posts/balancer/info", methods=["GET"])
-@login_required
-def balancer_info():
-    state = process_director.get_state(BALANCER_PROCESS_ASPECT)
-    return jsonify(**state)
-
-
-@app.route("/posts/batches/<name>", methods=["GET"])
-@login_required
-def batches_info(name):
-    result = []
-    for batch in batch_storage.batches.find({"human_name": name}).sort("count", -1):
-        if batch.get("url_hashes"):
-            posts = post_storage.get_posts(batch.get("url_hashes"))
-            if posts:
-                batch["posts"] = posts
-                result.append(batch)
-
-    return jsonify(**{"batches": result})
-
-
-@app.route("/posts/queue/<name>", methods=["GET"])
-@login_required
-def queue_info(name):
-    posts_hashes = post_queue.show_all_posts_hashes(name)
-    if posts_hashes:
-        posts = post_storage.get_posts(posts_hashes)
-        return jsonify(**{"queue": posts})
-
-
 @app.route("/posts/posts_queue/<name>", methods=["GET"])
 @login_required
 def queue_of_posts(name):
@@ -618,8 +588,11 @@ def queue_of_posts(name):
                 batches.append(batch)
 
     posts_hashes = post_queue.show_all_posts_hashes(name)
+    queue = []
     if posts_hashes:
-        queue = post_storage.get_posts(posts_hashes)
+        for post_hash in posts_hashes:
+            _, post_data = post_storage.get_post(post_hash)
+            queue.append(post_data)
     else:
         log.warning("no posts hashes at queue for %s :(" % name)
         queue = []

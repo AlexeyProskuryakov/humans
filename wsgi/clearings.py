@@ -1,4 +1,4 @@
-from wsgi.rr_people.posting.balancer import BatchStorage
+from wsgi.rr_people.posting.balancer import BatchStorage, PostBalancer
 from wsgi.rr_people.posting.posts import PostsStorage
 from wsgi.rr_people.posting.queue import PostRedisQueue, QUEUE_PG
 
@@ -25,6 +25,23 @@ def clear_important_posts():
         print "delete: ", post
 
 
+def remove_head_noise_from_queue_to_balanser(for_human):
+    ps = PostsStorage()
+    q = PostRedisQueue()
+    pb = PostBalancer()
+
+    for qp in q.show_all_posts_hashes(for_human):
+        post, p_data = ps.get_post(qp)
+        if p_data.get("important") == False:
+            poped_id = q.pop_post(for_human)
+            if poped_id == qp:
+                pb.add_post(qp, p_data.get("channel_id"), human_name=for_human, sub=post.for_sub or p_data.get("sub"))
+            else:
+                print "FUCK!"
+        else:
+            break
+
 if __name__ == '__main__':
     # clear_posts()
-    clear_important_posts()
+    #clear_important_posts()
+    remove_head_noise_from_queue_to_balanser("Shlak2k16")

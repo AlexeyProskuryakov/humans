@@ -140,7 +140,8 @@ class _PostBalancerEngine(Process):
     def _flush_batch_to_queue(self, batch):
         for url_hash in batch.data:
             self.post_queue.put_post(batch.human_name, url_hash)
-        self.posts_storage.set_posts_states(batch.data, PS_AT_QUEUE)
+            self.posts_storage.set_post_state(url_hash, PS_AT_QUEUE)
+
         batch.delete()
 
     def add_post(self, url_hash, channel_id, important=False, human_name=None, sub=None):
@@ -235,11 +236,3 @@ class PostBalancer(object):
     def add_post(self, url_hash, channel_id, important=False, human_name=None, sub=None):
         task = BalancerTask(url_hash, channel_id, important, human_name, sub)
         self.queue.put(task)
-
-
-if __name__ == '__main__':
-    pb = PostBalancer()
-
-    for i in range(101):
-        pb.add_post("http://www.test.url.hash-%s.ru" % i, "channel_%s" % (i % 10), important=True, human_name="test")
-        time.sleep(5)

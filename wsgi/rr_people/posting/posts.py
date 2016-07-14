@@ -76,9 +76,6 @@ class PostsStorage(DBHandler):
     def set_post_state(self, url_hash, state):
         return self.posts.update_one({"url_hash": url_hash}, {"$set": {"state": state}})
 
-    def set_posts_states(self, url_hashes_list, state):
-        return self.posts.update_many({"url_hash": {"$in": url_hashes_list}}, {"$set": {"state": state}})
-
     def get_post_state(self, url_hash):
         found = self.posts.find_one({"url_hash": url_hash}, projection={"state": 1})
         if found:
@@ -95,6 +92,7 @@ class PostsStorage(DBHandler):
         found = self.posts.find_one({"url_hash": url_hash}, projection=_projection)
         if found:
             return PostSource.from_dict(found), found
+        return None, None
 
     def get_posts(self, url_hashes):
         result = self.posts.find({"url_hash": {"$in": url_hashes}})
@@ -107,7 +105,7 @@ class PostsStorage(DBHandler):
 
     def add_generated_post(self, post, sub, important=False, channel_id=None):
         if isinstance(post, PostSource):
-            found = self.get_post(post.url_hash)
+            found, _ = self.get_post(post.url_hash, projection={"_id": True})
             if not found:
                 data = post.to_dict()
                 data['state'] = PS_READY
