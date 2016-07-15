@@ -352,14 +352,16 @@ class Human(RedditHandler):
 
     def _humanised_comment_post(self, sub, post_fullname):
         self._load_configuration()
-        all_posts = self.get_hot_and_new(sub, sort=cmp_by_created_utc)
+        hot_and_new = self.get_hot_and_new(sub, sort=cmp_by_created_utc)
         # check if post fullname is too old
-        all_posts_fns = set(map(lambda x: x.fullname, all_posts))
+        all_posts_fns = set(map(lambda x: x.fullname, hot_and_new))
         if post_fullname not in all_posts_fns:
             log.warning(
                 "post fullname [%s] for comment is too old and not present at hot or new" % post_fullname)
             try:
-                post = self.reddit.get_submission(submission_id=post_fullname, comment_limit=None)
+                post = self.reddit.get_submission(submission_id=post_fullname[3:],
+                                                  #:3 because submission id must be without prefix
+                                                  comment_limit=None)
 
                 if post:
                     return self._comment_post(post, post_fullname, sub)
@@ -370,9 +372,9 @@ class Human(RedditHandler):
                 log.exception(e)
                 return
 
-        for i, _post in enumerate(all_posts):
+        for i, _post in enumerate(hot_and_new):
             if _post.fullname == post_fullname:
-                see_left, see_right = _get_random_near(all_posts, i, self.configuration.max_posts_near_commented)
+                see_left, see_right = _get_random_near(hot_and_new, i, self.configuration.max_posts_near_commented)
                 self._see_near_posts(see_left)
                 self._see_comments(_post)
                 result = self._comment_post(_post, post_fullname, sub)
@@ -458,7 +460,7 @@ class Human(RedditHandler):
             result = subreddit.submit(save=True, title=post.title, url=post.url)
             log.info("was post at [%s]; title: [%s]; url: [%s]" % (post.for_sub, post.title, post.url))
         except Exception as e:
-            #todo it must be showing at interface
+            # todo it must be showing at interface
             log.error("exception at posting %s" % (post))
             log.exception(e)
             self.posts_handler.set_post_state(post.url_hash, PS_ERROR)

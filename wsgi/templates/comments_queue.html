@@ -1,0 +1,65 @@
+{% extends "layout.html" %}
+{% block body %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-10 col-md-offset-1">
+            <h1>Список комментов из очереди для {{human_name}} (по сабам) <small><a href="{{url_for('humans_info', name=human_name)}}">[к управлению]</a></small>
+            </h1>
+            <h5>Не обязательно этот чувак возьмет все эти комменты. Если есть другие чуваки которые тусуются в этих сабах, то они тоже будут брать отсюда же</h5>
+            <br>
+            <hr>
+            {%for sub in subs%}
+            <div class="comments_containers">
+                <div class="accordion" id="queue-accordion">
+                    <div class="accordion-group">
+                        <div class="accordion-heading">
+                            <a class="accordion-toggle" data-toggle="collapse" data-parent="#info-accordion"
+                               href="#{{sub}}-queue">
+                                <h3>{{sub}} <small>({{comments[sub] | length}})</small>:</h3>
+                            </a>
+                        </div>
+                        <div id="{{sub}}-queue" class="accordion-body collapse">
+                            <div class="accordion-inner">
+                                <table class="table table-stripped table-hover table-condensed">
+                                    <thead>
+                                    <tr>
+                                        <td>post</td>
+                                        <td>text</td>
+                                        <td>state</td>
+                                        <td>locked</td>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    {% for comment in comments[sub] %}
+                                    <tr>
+                                        <td>
+                                            <a href="{{comment['permalink']}}" target="_blank">{{comment['fullname']}}</a>
+                                        </td>
+                                        <td>
+                                            {{comment['text']}}
+                                        </td>
+                                        <td>
+                                            {{comment['state']}}
+                                        </td>
+                                        <td>
+                                            {{comment['_lock']}}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {%endfor%}
+        </div>
+
+    </div>
+
+</div>
+{% endblock %}
+{% endblock %}

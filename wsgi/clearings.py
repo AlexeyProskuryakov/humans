@@ -24,6 +24,10 @@ def clear_important_posts():
         ps.posts.delete_one(post)
         print "delete: ", post
 
+def clear_batches(human):
+    bs = BatchStorage()
+    bs.batches.delete_many({"human_name":human})
+
 
 def remove_head_noise_from_queue_to_balanser(for_human):
     ps = PostsStorage()
@@ -44,4 +48,5 @@ def remove_head_noise_from_queue_to_balanser(for_human):
 if __name__ == '__main__':
     # clear_posts()
     #clear_important_posts()
-    remove_head_noise_from_queue_to_balanser("Shlak2k16")
+    # remove_head_noise_from_queue_to_balanser("Shlak2k16")
+    clear_batches("Shlak2k16")

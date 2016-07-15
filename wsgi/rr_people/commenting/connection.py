@@ -84,17 +84,18 @@ class CommentsStorage(DBHandler):
              "post_url": permalink}
         )
 
-    def get_posts_ready_for_comment(self, sub=None):
+    def get_comments_ready_for_comment(self, sub=None):
         q = {"state": CS_READY_FOR_COMMENT, "sub": sub}
         return list(self.comments.find(q))
 
-    def get_posts_commented(self, sub):
+    def get_comments_commented(self, sub):
         q = {"state": CS_COMMENTED, "sub": sub}
         return list(self.comments.find(q).sort([("time", -1)]))
 
-    def get_posts(self, posts_fullnames):
+    def get_comments_by_ids(self, posts_fullnames, projection=None):
+        _projection = projection or {"text": True, "fullname": True, "post_url": True}
         for el in self.comments.find({"fullname": {"$in": posts_fullnames}},
-                                     projection={"text": True, "fullname": True, "post_url": True}):
+                                     projection=_projection):
             yield el
 
 

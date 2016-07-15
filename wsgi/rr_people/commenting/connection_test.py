@@ -19,23 +19,23 @@ if __name__ == '__main__':
 
     cs.set_commented(ci['_id'], "test2")
 
-    ready = cs.get_posts_ready_for_comment("test_sub")
+    ready = cs.get_comments_ready_for_comment("test_sub")
     assert len(ready) == 2
-    commented = cs.get_posts_commented("test_sub")
+    commented = cs.get_comments_commented("test_sub")
     assert len(commented) == 1
 
     cs.set_commented(ci2['_id'], "test2")
 
-    ready = cs.get_posts_ready_for_comment("test_sub")
+    ready = cs.get_comments_ready_for_comment("test_sub")
     assert len(ready) == 1
-    commented = cs.get_posts_commented("test_sub")
+    commented = cs.get_comments_commented("test_sub")
     assert len(commented) == 2
 
     cs.set_commented(ci3['_id'], "test3")
 
-    ready = cs.get_posts_ready_for_comment("test_sub")
+    ready = cs.get_comments_ready_for_comment("test_sub")
     assert len(ready) == 0
-    commented = cs.get_posts_commented("test_sub")
+    commented = cs.get_comments_commented("test_sub")
     assert len(commented) == 3
 
     print "commented:\n", "\n".join([str(el) for el in commented])

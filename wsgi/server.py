@@ -18,6 +18,7 @@ from wsgi.db import HumanStorage
 from wsgi.properties import want_coefficient_max, DAY
 from wsgi.rr_people import S_WORK, S_SUSPEND, S_STOP
 from wsgi.rr_people.ae import AuthorsStorage
+from wsgi.rr_people.commenting.connection import CommentHandler
 from wsgi.rr_people.he import HumanOrchestra
 from wsgi.rr_people.human import HumanConfiguration
 from wsgi.rr_people.posting import POST_GENERATOR_OBJECTS
@@ -50,6 +51,7 @@ def tst_to_dt(value):
 
 def array_to_string(array):
     return " ".join([str(el) for el in array])
+
 
 app.jinja_env.filters["tst_to_dt"] = tst_to_dt
 app.jinja_env.globals.update(array_to_string=array_to_string)
@@ -575,7 +577,7 @@ process_director = ProcessDirector("server")
 batch_storage = BatchStorage("server")
 
 
-@app.route("/posts/posts_queue/<name>", methods=["GET"])
+@app.route("/queue/posts/<name>", methods=["GET"])
 @login_required
 def queue_of_posts(name):
     batches = []
@@ -597,6 +599,21 @@ def queue_of_posts(name):
         queue = []
 
     return render_template("posts_queue.html", **{"human_name": name, "queue": queue, "batches": batches})
+
+
+comment_handler = CommentHandler()
+
+
+@app.route("/queue/comments/<name>", methods=["GET"])
+@login_required
+def queue_of_comments(name):
+    subs = db.get_human_subs(name)
+    comments = defaultdict(list)
+    for sub in subs:
+        post_fns = comment_handler.get_all_comments_post_ids(sub)
+        comments[sub] = list(comment_handler.get_comments_by_ids(post_fns, projection={"_id": False}))
+        log.info("load comments for sub %s" % sub)
+    return render_template("comments_queue.html", **{"human_name": name, "comments": comments, "subs": subs})
 
 
 if __name__ == '__main__':

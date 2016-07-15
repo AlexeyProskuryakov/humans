@@ -189,7 +189,9 @@
                 <div class="col-md-10">
                     <label for="channel-id-input">Channel id:</label>
                     <input type="text" id="channel-id-input" value="{{channel_id}}">
-                    <button type="button" class="btn btn-warn btn-sm" onclick="update_channel_id('{{human_name}}')">Update</button>
+                    <button type="button" class="btn btn-warn btn-sm" onclick="update_channel_id('{{human_name}}')">
+                        Update
+                    </button>
                     <div id="channel-id-update-result"></div>
                 </div>
             </div>
@@ -197,6 +199,13 @@
                 <hr>
                 <div class="col-md-10">
                     <a href="{{url_for('queue_of_posts', name=human_name)}}">Смотри какие посты в очереди
+                    </a>
+                </div>
+            </div>
+            <div class="row">
+                <hr>
+                <div class="col-md-10">
+                    <a href="{{url_for('queue_of_comments', name=human_name)}}">Смотри какие комменты в очереди
                     </a>
                 </div>
             </div>
@@ -218,7 +227,8 @@
                     <a href="{{row.get('info')['permalink']}}" target="_blank">{{row.get('info')}}</a>
 
                     {%elif "fullname" in row.get("info")%}
-                    <a href="https://redd.it/{{row.get('info')['fullname'][3:]}}" target="_blank">{{row.get('info')}}</a>
+                    <a href="https://redd.it/{{row.get('info')['fullname'][3:]}}"
+                       target="_blank">{{row.get('info')}}</a>
 
                     {%elif "url" in row.get("info")%}
                     <a href="{{row.get('info')['url']}}" target="_blank">{{row.get('info')}}</a>
