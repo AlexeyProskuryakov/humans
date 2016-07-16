@@ -186,10 +186,9 @@ class HumanStorage(DBHandler):
         return list(res)
 
     def get_log_of_human_statistics(self, human_name):
-        return self.human_statistic.find_one({"human_name": human_name}, projection={"_id": False})
+        return self.human_statistic.find_one({"human_name": human_name}, projection={"_id": False, "human_name": False})
 
-        #######################USERS
-
+    #######################USERS
     def add_user(self, name, pwd, uid):
         log.info("add user %s %s %s" % (name, pwd, uid))
         if not self.users.find_one({"$or": [{"user_id": uid}, {"name": name}]}):
