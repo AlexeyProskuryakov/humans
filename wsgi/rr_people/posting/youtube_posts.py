@@ -22,7 +22,7 @@ class YoutubeChannelsHandler(object):
 
     def _get_sub_on_tags(self, tags):
         for tag in tags:
-            if "sub" in tag:
+            if "sub:" in tag:
                 return tag.replace("sub:", "").strip()
 
     def _form_posts_on_videos_info(self, items):

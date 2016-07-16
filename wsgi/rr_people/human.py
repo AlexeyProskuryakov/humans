@@ -393,14 +393,16 @@ class Human(RedditHandler):
     def _comment_post(self, _post, post_fullname, sub):
         try:
             comment_info = self.comments_handler.get_comment_info(post_fullname)
-            text = comment_info.get("text")
-            _wait_time_to_write(text)
-            response = _post.add_comment(text)
-            self.comments_handler.set_commented(comment_info['_id'], by=self.name)
-            self.register_step(A_COMMENT, info={"fullname": post_fullname,
-                                                "sub": sub,
-                                                "comment_result": response.__dict__})
-            return A_COMMENT
+            if comment_info:
+                text = comment_info.get("text")
+                _wait_time_to_write(text)
+                response = _post.add_comment(text)
+                self.comments_handler.set_commented(comment_info['_id'], by=self.name)
+                self.register_step(A_COMMENT, info={"fullname": post_fullname,
+                                                    "sub": sub,
+                                                    "comment_result": response.__dict__})
+                return A_COMMENT
+            return PS_ERROR
         except Exception as e:
             log.exception(e)
 

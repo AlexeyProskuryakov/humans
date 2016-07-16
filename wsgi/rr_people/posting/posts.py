@@ -68,28 +68,28 @@ class PostsStorage(DBHandler):
 
     # posts
     def set_post_channel_id(self, url_hash, channel_id):
-        return self.posts.update_one({"url_hash": url_hash}, {"$set": {"channel_id": channel_id}})
+        return self.posts.update_one({"url_hash": str(url_hash)}, {"$set": {"channel_id": channel_id}})
 
     def update_post(self, url_hash, new_data):
-        return self.posts.update_one({"url_hash": url_hash}, {"$set": new_data})
+        return self.posts.update_one({"url_hash": str(url_hash)}, {"$set": new_data})
 
     def set_post_state(self, url_hash, state):
-        return self.posts.update_one({"url_hash": url_hash}, {"$set": {"state": state}})
+        return self.posts.update_one({"url_hash": str(url_hash)}, {"$set": {"state": state}})
 
     def get_post_state(self, url_hash):
-        found = self.posts.find_one({"url_hash": url_hash}, projection={"state": 1})
+        found = self.posts.find_one({"url_hash": str(url_hash)}, projection={"state": 1})
         if found:
             return found.get("state")
 
     def get_good_post(self, url_hash, projection=None):
         _projection = projection or {"_id": False}
-        found = self.posts.find_one({"url_hash": url_hash, 'state': {'$ne': PS_BAD}}, projection=_projection)
+        found = self.posts.find_one({"url_hash": str(url_hash), 'state': {'$ne': PS_BAD}}, projection=_projection)
         if found:
             return PostSource.from_dict(found), found.get('sub')
 
     def get_post(self, url_hash, projection=None):
         _projection = projection or {"_id": False}
-        found = self.posts.find_one({"url_hash": url_hash}, projection=_projection)
+        found = self.posts.find_one({"url_hash": str(url_hash)}, projection=_projection)
         if found:
             return PostSource.from_dict(found), found
         return None, None
