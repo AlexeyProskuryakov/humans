@@ -401,7 +401,7 @@ class Human(RedditHandler):
                 self.comments_handler.set_commented(comment_info['_id'], by=self.name)
                 self.register_step(A_COMMENT, info={"fullname": post_fullname,
                                                     "sub": sub,
-                                                    "comment_result": response.__dict__})
+                                                    "result":str(response)})
                 return A_COMMENT
             return PS_ERROR
         except Exception as e:
