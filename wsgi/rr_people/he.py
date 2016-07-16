@@ -81,7 +81,7 @@ class Kapellmeister(Process):
         super(Kapellmeister, self).__init__()
         self.main_storage = HumanStorage(name="main storage for [%s]" % name)
         self.human_name = name
-        self.name = "KPLM [%s] [%s]" % (self.name, self.pid)
+        self.name = "KPLM [%s]" % (self.human_name)
         self.ae = ActionGenerator(group_name=name)
         self.human = human_class(login=name)
 
