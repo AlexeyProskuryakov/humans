@@ -105,13 +105,13 @@
                         <div id="statistic" class="accordion-body collapse in">
                             <div class="accordion-inner">
                                 <table class="table table-stripped">
-                                    {% for row in human_stat %}
+                                    {% for k,v in human_stat.iteritems() %}
                                     <tr>
                                         <th>
-                                            {{row.get("_id")}}
+                                            {{k}}
                                         </th>
                                         <th>
-                                            {{row.get("count")}}
+                                            {{v}}
                                         </th>
                                     </tr>
                                     {% endfor %}

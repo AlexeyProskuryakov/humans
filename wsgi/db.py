@@ -25,7 +25,7 @@ class HumanStorage(DBHandler):
     def __init__(self, name="?"):
         super(HumanStorage, self).__init__(name=name)
         db = self.db
-
+        collections = self.db.collection_names(include_system_collections=False)
         try:
             self.users = db.create_collection("users")
             self.users.create_index([("name", 1)], unique=True)
@@ -33,18 +33,24 @@ class HumanStorage(DBHandler):
         except CollectionInvalid as e:
             self.users = db.get_collection("users")
 
-        try:
+        if "human_log" not in collections:
             self.human_log = db.create_collection(
                 "human_log",
                 capped=True,
                 size=1024 * 1024 * 50,
             )
             self.human_log.create_index([("human_name", 1)])
-            self.human_log.create_index([("time", 1)], expireAfterSeconds=3600 * 24)
+            self.human_log.create_index([("time", 1)])
             self.human_log.create_index([("action", 1)])
 
-        except CollectionInvalid as e:
+        else:
             self.human_log = db.get_collection("human_log")
+
+        if "human_statistic" not in collections:
+            self.human_statistic = db.create_collection("human_statistic")
+            self.human_statistic.create_index([("human_name", 1)])
+        else:
+            self.human_statistic = db.get_collection("human_statistic")
 
         try:
             self.human_config = db.create_collection("human_config")
@@ -166,8 +172,12 @@ class HumanStorage(DBHandler):
         self.human_log.insert_one(
             {"human_name": human_name,
              "action": action_name,
-             "time": datetime.utcnow(),
+             "time": time.time(),
              "info": info})
+        self.add_to_statistic(human_name, action_name)
+
+    def add_to_statistic(self, human_name, action_name, inc=1):
+        self.human_statistic.update_one({"human_name": human_name}, {"$inc": {action_name: inc}})
 
     def get_log_of_human(self, human_name, limit=None):
         res = self.human_log.find({"human_name": human_name}).sort("time", -1)
@@ -176,11 +186,7 @@ class HumanStorage(DBHandler):
         return list(res)
 
     def get_log_of_human_statistics(self, human_name):
-        pipeline = [
-            {"$match": {"human_name": human_name}},
-            {"$group": {"_id": "$action", "count": {"$sum": 1}}},
-        ]
-        return list(self.human_log.aggregate(pipeline))
+        return self.human_statistic.find_one({"human_name": human_name}, projection={"_id": False})
 
         #######################USERS
 

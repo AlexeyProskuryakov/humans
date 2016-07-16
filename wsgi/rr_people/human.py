@@ -218,12 +218,16 @@ class Human(RedditHandler):
     def register_step(self, step_type, info=None):
         if step_type in self.counters:
             self.incr_counter(step_type)
+
         if step_type == A_FRIEND:
             self.last_friend_add = time.time()
+            self.db.update_human_internal_state(self.name, state=self.state)
 
-        # todo create and checking this ability for less touching db
-        self.db.save_log_human_row(self.name, step_type, info or {})
-        self.update_state()
+        if step_type != A_CONSUME:
+            self.db.save_log_human_row(self.name, step_type, info or {})
+        else:
+            self.db.add_to_statistic(self.name, A_CONSUME, 1)
+
         log.info("step by [%s] |%s|: %s", self.name, step_type, info)
 
         if info and info.get("fullname"):
@@ -238,9 +242,6 @@ class Human(RedditHandler):
 
     def can_friendship_create(self, friend_name):
         return friend_name not in self.friends and time.time() - self.last_friend_add > random.randint(WEEK / 5, WEEK)
-
-    def update_state(self):
-        self.db.update_human_internal_state(self.name, state=self.state)
 
     def do_see_post(self, post):
         """

@@ -73,6 +73,7 @@ WORK_STATE = lambda x: "%s: %s" % (S_WORK, x)
 HE_ASPECT = lambda x: "he_%s" % x
 
 MIN_STEP_TIME = 60
+MIN_TIME_BETWEEN_POSTS = 9 * 60
 
 
 class Kapellmeister(Process):
@@ -80,6 +81,7 @@ class Kapellmeister(Process):
         super(Kapellmeister, self).__init__()
         self.main_storage = HumanStorage(name="main storage for [%s]" % name)
         self.human_name = name
+        self.name = "KPLM [%s] [%s]" % (self.name, self.pid)
         self.ae = ActionGenerator(group_name=name)
         self.human = human_class(login=name)
 
@@ -104,14 +106,24 @@ class Kapellmeister(Process):
             self.states_handler.set_human_state(self.human_name, new_state)
             return True
 
+    def _get_previous_post_time(self):
+        cur = self.main_storage.human_log.find({"human_name": self.human_name, "action": A_POST},
+                                               projection={"time": 1}).sort("time", -1)
+        result = cur.next()
+        return result.get("time")
+
+    def _can_post_at_time(self):
+        return (time.time() - self._get_previous_post_time()) > MIN_TIME_BETWEEN_POSTS
+
     def _do_action(self, action, step, _start):
         produce = False
-        if action == A_COMMENT and (self.human.must_do(A_COMMENT) or self.human.can_do(A_COMMENT)):
+        if action == A_COMMENT and self.human.can_do(A_COMMENT):
             self._set_state(WORK_STATE("commenting"))
             comment_result = self.human.do_comment_post()
-            if comment_result == A_COMMENT: produce = True
+            if comment_result == A_COMMENT:
+                produce = True
 
-        elif action == A_POST and (self.human.must_do(A_POST) or self.human.can_do(A_POST)):
+        elif action == A_POST and self.human.can_do(A_POST) and self._can_post_at_time():
             self._set_state(WORK_STATE("posting"))
             post_result = self.human.do_post()
             if post_result == A_POST: produce = True

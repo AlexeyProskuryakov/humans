@@ -1,3 +1,4 @@
+from wsgi.db import HumanStorage
 from wsgi.rr_people.posting.balancer import BatchStorage, PostBalancer
 from wsgi.rr_people.posting.posts import PostsStorage
 from wsgi.rr_people.posting.queue import PostRedisQueue, QUEUE_PG
@@ -5,7 +6,7 @@ from wsgi.rr_people.posting.queue import PostRedisQueue, QUEUE_PG
 
 def clear_posts():
     ps = PostsStorage()
-    ps.posts.delete_many({})
+    ps.posts.delete_many({"important":False})
 
     bs = BatchStorage()
     bs.batches.delete_many({})
@@ -45,8 +46,14 @@ def remove_head_noise_from_queue_to_balanser(for_human):
         else:
             break
 
+
+def remove_human_log():
+    main = HumanStorage()
+    main.human_log.drop()
+
 if __name__ == '__main__':
     # clear_posts()
     #clear_important_posts()
     # remove_head_noise_from_queue_to_balanser("Shlak2k16")
-    clear_batches("Shlak2k16")
+    # clear_batches("Shlak2k16")
+    remove_human_log()
