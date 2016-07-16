@@ -35,7 +35,7 @@
                                     {% for comment in comments[sub] %}
                                     <tr>
                                         <td>
-                                            <a href="{{comment['permalink']}}" target="_blank">{{comment['fullname']}}</a>
+                                            <a href="{{comment['post_url']}}" target="_blank">{{comment['fullname']}}</a>
                                         </td>
                                         <td>
                                             {{comment['text']}}
