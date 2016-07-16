@@ -105,6 +105,7 @@
                         <div id="statistic" class="accordion-body collapse in">
                             <div class="accordion-inner">
                                 <table class="table table-stripped">
+                                    {%if human_stat %}
                                     {% for k,v in human_stat.iteritems() %}
                                     <tr>
                                         <th>
@@ -115,6 +116,9 @@
                                         </th>
                                     </tr>
                                     {% endfor %}
+                                    {%else%}
+                                    Нет покамест, жди.
+                                    {%endif%}
                                 </table>
                             </div>
                         </div>
