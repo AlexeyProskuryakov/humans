@@ -242,7 +242,7 @@
                     {%endif%}
                 </th>
                 <th class="col-md-2">
-                    {{row.get("time")}}
+                    {{row.get("time") | tst_to_dt }}
                 </th>
             </tr>
             {% endfor %}

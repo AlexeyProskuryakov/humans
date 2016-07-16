@@ -177,7 +177,7 @@ class HumanStorage(DBHandler):
         self.add_to_statistic(human_name, action_name)
 
     def add_to_statistic(self, human_name, action_name, inc=1):
-        self.human_statistic.update_one({"human_name": human_name}, {"$inc": {action_name: inc}})
+        self.human_statistic.update_one({"human_name": human_name}, {"$inc": {action_name: inc}}, upsert=True)
 
     def get_log_of_human(self, human_name, limit=None):
         res = self.human_log.find({"human_name": human_name}).sort("time", -1)
