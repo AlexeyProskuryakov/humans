@@ -52,8 +52,8 @@ def remove_human_log():
     main.human_log.drop()
 
 if __name__ == '__main__':
-    # clear_posts()
+    clear_posts()
     #clear_important_posts()
     # remove_head_noise_from_queue_to_balanser("Shlak2k16")
     # clear_batches("Shlak2k16")
-    remove_human_log()
+    # remove_human_log()

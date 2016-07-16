@@ -108,7 +108,7 @@
                                                             {% for post in batch['posts'] %}
                                                             <tr id="{{post['url_hash']}}">
                                                                 <td>
-                                                                    <a href="{{post['url']}}" target="_blank">{post['title']}}</a>
+                                                                    <a href="{{post['url']}}" target="_blank">{{post['title']}}</a>
                                                                 </td>
                                                                 <td>
                                                                     {{post['for_sub']}}
