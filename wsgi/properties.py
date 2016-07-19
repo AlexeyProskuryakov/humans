@@ -6,9 +6,6 @@ import sys
 __author__ = 'alesha'
 
 
-# import urllib3.contrib.pyopenssl
-# urllib3.contrib.pyopenssl.inject_into_urllib3()
-
 def module_path():
     if hasattr(sys, "frozen"):
         return os.path.dirname(
@@ -17,8 +14,6 @@ def module_path():
     return os.path.dirname(__file__)
 
 
-log_file_f = lambda x: os.path.join(module_path(), (x if x else "") + 'result.log')
-log_file = os.path.join(module_path(), 'result.log')
 cacert_file = os.path.join(module_path(), 'cacert.pem')
 
 logger = logging.getLogger()
@@ -31,16 +26,6 @@ formatter_human = logging.Formatter('%(asctime)s[%(levelname)s]%(name)s|%(proces
 sh = logging.StreamHandler()
 sh.setFormatter(formatter)
 logger.addHandler(sh)
-
-fh = logging.FileHandler(log_file)
-fh.setFormatter(formatter)
-logger.addHandler(fh)
-
-fh.setFormatter(formatter_process)
-
-fh_human = logging.FileHandler(log_file_f("he_"))
-fh_human.setFormatter(formatter_human)
-logging.getLogger("he").addHandler(fh_human)
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 logging.getLogger("requests").setLevel(logging.WARNING)
