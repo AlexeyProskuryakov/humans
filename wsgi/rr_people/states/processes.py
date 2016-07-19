@@ -1,6 +1,8 @@
 # coding:utf-8
 import logging
 from multiprocessing.synchronize import Lock
+import os
+import signal
 
 import redis
 
@@ -42,7 +44,7 @@ class ProcessDirector(object):
         :return:
         """
         with self.mutex:
-            log.info("will start aspect %s for %s" % (aspect, pid))
+            log.info("will check start aspect %s for %s" % (aspect, pid))
             result = self.redis.setnx(PREFIX(aspect), pid)
             if not result:
                 aspect_pid = int(self.redis.get(PREFIX(aspect)))
@@ -58,6 +60,18 @@ class ProcessDirector(object):
                     return {"state": "restarted", "started": True}
             else:
                 return {"state": "started", "started": True}
+
+    def must_start_aspect(self, aspect, pid):
+        with self.mutex:
+            log.info("will must start aspect %s for %s" % (aspect, pid))
+            prev_process = self.redis.get(PREFIX(aspect))
+            if prev_process:
+                p_pid = int(prev_process)
+                if p_pid in get_worked_pids():
+                    log.info("will kill previous process: %s" % prev_process)
+                    os.kill(p_pid, signal.SIGUSR2)
+
+            self.redis.set(PREFIX(aspect), pid)
 
     def stop_aspect_signal(self, aspect):
         return self.redis.delete(PREFIX(aspect))

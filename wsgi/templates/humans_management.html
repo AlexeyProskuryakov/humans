@@ -8,7 +8,9 @@
     </div>
     <div class="row">
         <div class="col-md-3">
-            <h5>Выберай чувака ниже в табличке и заходи на его манаж. Там и включай его <small>или выключай...</small></h5>
+            <h5>Выберай чувака ниже в табличке и заходи на его манаж. Там и включай его
+                <small>или выключай...</small>
+            </h5>
         </div>
         <div class="col-md-6">
             <h2>Добавление бота. Процедура после добавления информации о приложении и заведении
@@ -27,7 +29,8 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="human-subs">Subreddits в которых будет тусоваться чувак (пробелом али ентером разделяй):</label>
+                    <label for="human-subs">Subreddits в которых будет тусоваться чувак (пробелом али ентером
+                        разделяй):</label>
                     <textarea id='human-subs' name="sbrdts" class="form-control" rows="5">
 
                     </textarea>
@@ -41,7 +44,7 @@
         <h3> Humans info: </h3>
     </div>
     <div class="row">
-        <div class="col-md-8 col-md-offset-2">
+        <div class="col-md-10 col-md-offset-1">
             <table class="table table-stripped">
                 <thead>
                 <tr>
@@ -56,6 +59,9 @@
                     </td>
                     <td>
                         Subreddits:
+                    </td>
+                    <td>
+                        Some urls...s
                     </td>
                 </tr>
 
@@ -78,6 +84,12 @@
                     </td>
                     <td>
                         {{array_to_string(human.subs)}}
+                    </td>
+                    <td>
+                        <a href="{{url_for('queue_of_posts', name=human.user)}}">Очередь постов {{human.user}}</a>
+                    </td>
+                    <td>
+                        <a href="{{url_for('queue_of_comments', name=human.user)}}">Очередь комментов {{human.user}}</a>
                     </td>
                 </tr>
                 {% endfor %}
