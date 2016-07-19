@@ -349,7 +349,7 @@ def human_config(name):
 
 
 ips = ImportantYoutubePostSupplier()
-ips.start()
+# ips.start()
 
 
 @app.route("/humans/<name>/channel_id", methods=["POST"])
@@ -417,11 +417,6 @@ def ae_represent(name):
     return jsonify(**{"data": result, "ok": True})
 
 
-srs = SubredditsRelationsStore("srs server")
-
-splitter = re.compile('[^\w\d_-]*')
-
-
 @app.route("/global_configuration/<name>", methods=["GET", "POST"])
 @login_required
 def configuration(name):
@@ -455,124 +450,123 @@ def noise_auto_add():
 
 
 # generators
+# srs = SubredditsRelationsStore("srs server")
+# splitter = re.compile('[^\w\d_-]*')
+# posts_generator = PostsGenerator()
+#
+#
+# @app.route("/posts")
+# @login_required
+# def posts():
+#     subs = db.get_all_humans_subs()
+#     qp_s = {}
+#     subs_states = {}
+#     for sub in subs:
+#         qp_s[sub] = posts_generator.posts_storage.get_posts_for_sub(sub, state=PS_READY)
+#         subs_states[sub] = posts_generator.states_handler.get_posts_generator_state(sub) or S_STOP
+#
+#     human_names = map(lambda x: x.get("user"), db.get_humans_info(projection={"user": True}))
+#     return render_template("posts.html", **{"subs": subs_states, "qp_s": qp_s, "humans": human_names})
+#
+#
+# @app.route("/generators", methods=["GET", "POST"])
+# @login_required
+# def gens_manage():
+#     if request.method == "POST":
+#         sub = request.form.get("sub")
+#         generators = request.form.getlist("gens[]")
+#         related_subs = request.form.get("related-subs")
+#         key_words = request.form.get("key-words")
+#
+#         related_subs = splitter.split(related_subs)
+#         key_words = splitter.split(key_words)
+#
+#         srs.add_sub_relations(sub, related_subs)
+#         posts_generator.generators_storage.set_sub_gen_info(sub, generators, key_words)
+#
+#         flash(u"Генераторъ постановленъ!")
+#     gens = POST_GENERATOR_OBJECTS.keys()
+#     subs = db.get_all_humans_subs()
+#     return render_template("generators.html", **{"subs": subs, "gens": gens})
+#
+#
+# @app.route("/generators/sub_info", methods=["POST"])
+# @login_required
+# def sub_gens_cfg():
+#     data = json.loads(request.data)
+#     sub = data.get("sub")
+#     related = srs.get_related_subs(sub)
+#     generators = posts_generator.generators_storage.get_sub_gen_info(sub)
+#
+#     return jsonify(**{"ok": True, "related_subs": related, "key_words": generators.get("key_words"),
+#                       "generators": generators.get("gens")})
+#
+#
+# @app.route("/generators/start", methods=["POST"])
+# @login_required
+# def sub_gens_start():
+#     data = json.loads(request.data)
+#     sub = data.get("sub")
+#     if sub:
+#         posts_generator.states_handler.set_posts_generator_state(sub, S_WORK)
+#         posts_generator.start_generate_posts(sub)
+#         return jsonify(**{"ok": True, "state": S_WORK})
+#     return jsonify(**{"ok": False, "error": "sub is not exists"})
+#
+#
+# @app.route("/generators/pause", methods=["POST"])
+# @login_required
+# def sub_gens_pause():
+#     data = json.loads(request.data)
+#     sub = data.get("sub")
+#     if sub:
+#         posts_generator.states_handler.set_posts_generator_state(sub, S_SUSPEND, ex=3600 * 24 * 7)
+#         return jsonify(**{"ok": True, "state": S_SUSPEND})
+#     return jsonify(**{"ok": False, "error": "sub is not exists"})
+#
+#
+# @app.route("/generators/del_post", methods=["POST"])
+# @login_required
+# def del_post():
+#     data = json.loads(request.data)
+#     p_hash = data.get("url_hash")
+#     if p_hash:
+#         posts_generator.posts_storage.set_post_state(int(p_hash), PS_BAD)
+#         return jsonify(**{"ok": True})
+#     return jsonify(**{"ok": False, "error": "post url hash is not exists"})
+#
+#
+# @app.route("/generators/del_sub", methods=["POST"])
+# @login_required
+# def del_sub():
+#     data = json.loads(request.data)
+#     sub_name = data.get("sub_name")
+#     if sub_name:
+#         posts_generator.terminate_generate_posts(sub_name)
+#         db.remove_sub_for_humans(sub_name)
+#         posts_generator.posts_storage.remove_posts_of_sub(sub_name)
+#         posts_generator.states_handler.remove_post_generator(sub_name)
+#         return jsonify(**{"ok": True})
+#
+#     return jsonify(**{"ok": False, "error": "sub is not exists"})
+#
+# @app.route("/generators/prepare_for_posting", methods=["POST"])
+# @login_required
+# def prepare_for_posting():
+#     data = json.loads(request.data)
+#     sub = data.get("sub")
+#     if sub:
+#         for post in posts_generator.posts_storage.get_posts_for_sub(sub):
+#             posts_handler.move_noise_post_to_balancer(sub, post)
+#
+#         return jsonify(**{"ok": True})
+#
+#     return jsonify(**{"ok": False, "error": "sub is not exists"})
+#
 
-posts_generator = PostsGenerator()
-
-
-@app.route("/posts")
-@login_required
-def posts():
-    subs = db.get_all_humans_subs()
-    qp_s = {}
-    subs_states = {}
-    for sub in subs:
-        qp_s[sub] = posts_generator.posts_storage.get_posts_for_sub(sub, state=PS_READY)
-        subs_states[sub] = posts_generator.states_handler.get_posts_generator_state(sub) or S_STOP
-
-    human_names = map(lambda x: x.get("user"), db.get_humans_info(projection={"user": True}))
-    return render_template("posts.html", **{"subs": subs_states, "qp_s": qp_s, "humans": human_names})
-
-
-@app.route("/generators", methods=["GET", "POST"])
-@login_required
-def gens_manage():
-    if request.method == "POST":
-        sub = request.form.get("sub")
-        generators = request.form.getlist("gens[]")
-        related_subs = request.form.get("related-subs")
-        key_words = request.form.get("key-words")
-
-        related_subs = splitter.split(related_subs)
-        key_words = splitter.split(key_words)
-
-        srs.add_sub_relations(sub, related_subs)
-        posts_generator.generators_storage.set_sub_gen_info(sub, generators, key_words)
-
-        flash(u"Генераторъ постановленъ!")
-    gens = POST_GENERATOR_OBJECTS.keys()
-    subs = db.get_all_humans_subs()
-    return render_template("generators.html", **{"subs": subs, "gens": gens})
-
-
-@app.route("/generators/sub_info", methods=["POST"])
-@login_required
-def sub_gens_cfg():
-    data = json.loads(request.data)
-    sub = data.get("sub")
-    related = srs.get_related_subs(sub)
-    generators = posts_generator.generators_storage.get_sub_gen_info(sub)
-
-    return jsonify(**{"ok": True, "related_subs": related, "key_words": generators.get("key_words"),
-                      "generators": generators.get("gens")})
-
-
-@app.route("/generators/start", methods=["POST"])
-@login_required
-def sub_gens_start():
-    data = json.loads(request.data)
-    sub = data.get("sub")
-    if sub:
-        posts_generator.states_handler.set_posts_generator_state(sub, S_WORK)
-        posts_generator.start_generate_posts(sub)
-        return jsonify(**{"ok": True, "state": S_WORK})
-    return jsonify(**{"ok": False, "error": "sub is not exists"})
-
-
-@app.route("/generators/pause", methods=["POST"])
-@login_required
-def sub_gens_pause():
-    data = json.loads(request.data)
-    sub = data.get("sub")
-    if sub:
-        posts_generator.states_handler.set_posts_generator_state(sub, S_SUSPEND, ex=3600 * 24 * 7)
-        return jsonify(**{"ok": True, "state": S_SUSPEND})
-    return jsonify(**{"ok": False, "error": "sub is not exists"})
-
-
-@app.route("/generators/del_post", methods=["POST"])
-@login_required
-def del_post():
-    data = json.loads(request.data)
-    p_hash = data.get("url_hash")
-    if p_hash:
-        posts_generator.posts_storage.set_post_state(int(p_hash), PS_BAD)
-        return jsonify(**{"ok": True})
-    return jsonify(**{"ok": False, "error": "post url hash is not exists"})
-
-
-@app.route("/generators/del_sub", methods=["POST"])
-@login_required
-def del_sub():
-    data = json.loads(request.data)
-    sub_name = data.get("sub_name")
-    if sub_name:
-        posts_generator.terminate_generate_posts(sub_name)
-        db.remove_sub_for_humans(sub_name)
-        posts_generator.posts_storage.remove_posts_of_sub(sub_name)
-        posts_generator.states_handler.remove_post_generator(sub_name)
-        return jsonify(**{"ok": True})
-
-    return jsonify(**{"ok": False, "error": "sub is not exists"})
-
-
+# posts & comments
+comment_handler = CommentHandler("server")
 posts_handler = PostHandler("server")
-
-
-@app.route("/generators/prepare_for_posting", methods=["POST"])
-@login_required
-def prepare_for_posting():
-    data = json.loads(request.data)
-    sub = data.get("sub")
-    if sub:
-        for post in posts_generator.posts_storage.get_posts_for_sub(sub):
-            posts_handler.move_noise_post_to_balancer(sub, post)
-
-        return jsonify(**{"ok": True})
-
-    return jsonify(**{"ok": False, "error": "sub is not exists"})
-
-
-# posts
 process_director = ProcessDirector("server")
 batch_storage = BatchStorage("server")
 
@@ -599,9 +593,6 @@ def queue_of_posts(name):
         queue = []
 
     return render_template("posts_queue.html", **{"human_name": name, "queue": queue, "batches": batches})
-
-
-comment_handler = CommentHandler()
 
 
 @app.route("/queue/comments/<name>", methods=["GET"])
