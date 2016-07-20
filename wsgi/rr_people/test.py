@@ -16,7 +16,7 @@ def test_balanser():
     post_handler = PostHandler(name="test")
 
     post_handler.queue.redis.flushall()
-    post_handler.posts_storage.posts.delete_many({})
+    post_handler.storage.posts.delete_many({})
 
     for i in range(120):
         if i / 10 > 10:

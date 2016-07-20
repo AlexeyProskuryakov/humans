@@ -124,14 +124,3 @@ class PostsStorage(DBHandler):
     def remove_posts_of_sub(self, subname):
         result = self.posts.delete_many({"sub": subname})
         return result
-
-
-if __name__ == '__main__':
-    ps = PostSource("http://foo.bar.baz?k=100500&w=qwerty&tt=ttrtt", "Foo{bar}Baz", "someSub", 100500600)
-    raw = ps.serialize()
-    print raw
-    ps1 = PostSource.deserialize(raw)
-    assert ps.at_time == ps1.at_time
-    assert ps.title == ps1.title
-    assert ps.url == ps1.url
-    assert ps.for_sub == ps1.for_sub

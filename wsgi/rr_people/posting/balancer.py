@@ -36,14 +36,6 @@ class BatchStorage(DBHandler):
         for id, bulk in enumerate(self.cache[human_name]):
             yield PostBatch(self, bulk, id)
 
-    def init_new_batch(self, human_name, url_hash, channel_id):
-        data = {"human_name": human_name,
-                "channels": [channel_id],
-                "url_hashes": [url_hash]}
-        result = self.batches.insert_one(data)
-        data["_id"] = result.inserted_id
-        self.cache[human_name].insert(0, data)
-
 
 class PostBatch():
     def __init__(self, store, data, cache_id):
@@ -59,6 +51,10 @@ class PostBatch():
         self.cache_id = cache_id
 
     @property
+    def hashes(self):
+        return self.data
+
+    @property
     def to_data(self):
         return {"channels": list(self.channels),
                 "human_name": self.human_name,
@@ -69,125 +65,10 @@ class PostBatch():
     def size(self):
         return len(self.data)
 
-    def have_not(self, url_hash, channel_id):
-        if url_hash not in self.data:
-            if not channel_id: return True  # if channel id is None or empty value
-            return channel_id not in self.channels  # or if channel id not in already added
-        return False
-
-    def add(self, url_hash, channel_id, to_start=False):
-        self.channels.add(channel_id)
-        modify = {"$addToSet": {"channels": channel_id}}
-        if not to_start:
-            modify["$push"] = {"url_hashes": url_hash}
-            self.data.append(url_hash)
-        else:
-            modify["$push"] = {"url_hashes": {"$each": [url_hash], "$position": 0}}
-            self.data.insert(0, url_hash)
-
-        self.store.batches.update_one({"_id": self.batch_id}, modify)
-        self.store.cache[self.human_name][self.cache_id] = self.to_data
-
-    def delete(self):
-        self.store.batches.delete_one({"_id": self.batch_id})
-        cache = self.store.cache[self.human_name]
-        self.store.cache[self.human_name] = cache[:self.cache_id] + cache[self.cache_id + 1:]
 
 
 BALANCER_PROCESS_ASPECT = "post_balancer"
 
-
-class _PostBalancerEngine(Process):
-    __metaclass__ = Singleton
-
-    def __init__(self, post_queue, post_storage, out_queue):
-        super(_PostBalancerEngine, self).__init__()
-        self.batch_storage = BatchStorage("balancer bs")
-        self.human_storage = HumanStorage("balancer hs")
-
-        self.post_queue = post_queue
-        self.posts_storage = post_storage
-
-        self.input_queue = out_queue
-
-        self.process_director = ProcessDirector("balancer")
-
-        self._sub_human_mapping_cache = defaultdict(list)
-        self._sub_human_mapping_ttl = time.time()
-
-        log.info("post balancer inited")
-
-    def _load_human_sub_mapping(self):
-        if not self._sub_human_mapping_cache or time.time() - self._sub_human_mapping_ttl > 60:
-            result = defaultdict(list)
-            for human_info in self.human_storage.get_humans_info(projection={"user": True, "subs": True}):
-                for sub in human_info.get("subs"):
-                    result[sub].append(human_info.get("user"))
-
-            self._sub_human_mapping_cache = result
-            self._sub_human_mapping_ttl = time.time()
-        else:
-            result = self._sub_human_mapping_cache
-
-        return result
-
-
-    def _get_human_name(self, sub):
-        sub_humans = self._load_human_sub_mapping()
-        if sub in sub_humans:
-            return random.choice(sub_humans[sub])
-
-    def _flush_batch_to_queue(self, batch):
-        for url_hash in batch.data:
-            self.post_queue.put_post(batch.human_name, url_hash)
-            self.posts_storage.set_post_state(url_hash, PS_AT_QUEUE)
-
-        batch.delete()
-
-    def add_post(self, url_hash, channel_id, important=False, human_name=None, sub=None):
-        if not sub and not human_name:
-            log.warn(
-                "For post %s [imp:%s, chId:%s] not sub and human name will not add to queue :(" % (
-                    url_hash, important, channel_id))
-            return
-
-        _human_name = human_name or self._get_human_name(sub)
-        if _human_name is None:
-            log.warn("Can not recognise post %s %s imp?:%s, %s" % (url_hash, channel_id, important, sub))
-            return
-
-        self.posts_storage.update_post(url_hash, {"state": PS_AT_BALANCER,
-                                                  "human_name": _human_name})
-
-        for batch in self.batch_storage.get_human_post_batches(_human_name):
-            if batch.have_not(url_hash, channel_id):
-                batch.add(url_hash, channel_id, important)
-                log.info("added to batch post %s %s of %s" % (url_hash, channel_id, _human_name))
-                if batch.size >= MAX_BATCH_SIZE:
-                    self._flush_batch_to_queue(batch)
-                return True
-
-        log.info("init new batch for post %s [%s] of %s" % (url_hash, channel_id, _human_name))
-        self.batch_storage.init_new_batch(_human_name, url_hash, channel_id)
-        return True
-
-    def run(self):
-        if not self.process_director.can_start_aspect(BALANCER_PROCESS_ASPECT, self.pid).get("started"):
-            log.info("another balancer worked")
-            return
-
-        log.info("post balancer started")
-        while 1:
-            try:
-                task = self.input_queue.get()
-                if not isinstance(task, BalancerTask):
-                    raise Exception("task is not task :( ")
-            except Exception as e:
-                log.exception(e)
-                time.sleep(1)
-                continue
-
-            self.add_post(**task.__dict__)
 
 
 class BalancerTask(object):
@@ -216,12 +97,6 @@ balancer_queue = RedisQueue(name="balancer",
                             deserialize=deserialise,
                             topic="balancer_queue")
 
-post_queue = PostRedisQueue("balancer")
-post_storage = PostsStorage("balancer ps")
-
-_balancer = _PostBalancerEngine(post_queue, post_storage, balancer_queue)
-_balancer.daemon = True
-_balancer.start()
 
 
 class PostBalancer(object):
