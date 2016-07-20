@@ -276,6 +276,9 @@ class Human(RedditHandler):
         if self._is_want_to(self.configuration.comments) and wt > self.configuration.comment_mwt:  # go to post comments
             for comment in post.comments:
                 if self._is_want_to(self.configuration.comment_vote) and self.can_do("vote"):  # voting comment
+                    if isinstance(comment, MoreComments):
+                        comment = random.choice(comment.comments())
+
                     vote_count = random.choice([1, -1])
                     try:
                         comment.vote(vote_count)
@@ -401,7 +404,7 @@ class Human(RedditHandler):
                 self.comments_handler.set_commented(comment_info['_id'], by=self.name)
                 self.register_step(A_COMMENT, info={"fullname": post_fullname,
                                                     "sub": sub,
-                                                    "result":str(response)})
+                                                    "result": str(response)})
                 return A_COMMENT
             return PS_ERROR
         except Exception as e:
