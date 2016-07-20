@@ -109,8 +109,11 @@ class Kapellmeister(Process):
     def _get_previous_post_time(self):
         cur = self.main_storage.human_log.find({"human_name": self.human_name, "action": A_POST},
                                                projection={"time": 1}).sort("time", -1)
-        result = cur.next()
-        return result.get("time")
+        try:
+            result = cur.next()
+            return result.get("time")
+        except Exception:
+            return 0
 
     def _can_post_at_time(self):
         return (time.time() - self._get_previous_post_time()) > MIN_TIME_BETWEEN_POSTS
@@ -160,40 +163,47 @@ class Kapellmeister(Process):
         last_token_refresh_time = t_start
 
         while 1:
-            _start = time.time()
+            try:
 
-            if not self._set_state(S_WORK):
-                return
+                _start = time.time()
 
-            if step - last_token_refresh_time > HOUR - 100:
-                if not self._human_check():
-                    log.info("%s is not checked..." % self.human_name)
+                if not self._set_state(S_WORK):
                     return
-                log.info("will refresh token for [%s]" % self.human_name)
-                self.human.refresh_token()
-                last_token_refresh_time = step
 
-            action = self.ae.get_action(step)
-            log.info("[%s] ae get step: %s" % (self.human_name, action))
-            _prev_step = step
-            if action != A_SLEEP:
-                step, action_result = self._do_action(action, step, _start)
-            else:
-                if not self._set_state(S_SLEEP):
-                    return
-                step += MINUTE
-                action_result = A_SLEEP
-                time.sleep(MINUTE)
+                if step - last_token_refresh_time > HOUR - 100:
+                    if not self._human_check():
+                        log.info("%s is not checked..." % self.human_name)
+                        return
+                    log.info("will refresh token for [%s]" % self.human_name)
+                    self.human.refresh_token()
+                    last_token_refresh_time = step
 
-            if step > WEEK:
-                step = step - WEEK
-                _prev_step = _prev_step - WEEK
+                action = self.ae.get_action(step)
+                log.info("[%s] ae get step: %s" % (self.human_name, action))
+                _prev_step = step
+                if action != A_SLEEP:
+                    step, action_result = self._do_action(action, step, _start)
+                else:
+                    if not self._set_state(S_SLEEP):
+                        return
+                    step += MINUTE
+                    action_result = A_SLEEP
+                    time.sleep(MINUTE)
 
-            log.info("[%s] step is end. Action: [%s] -> [%s]; time spent: %s; \nnext step after: %s secs." % (
-                self.human_name,
-                action, action_result,
-                time.time() - _start,
-                step - _prev_step))
+                if step > WEEK:
+                    step = step - WEEK
+                    _prev_step = _prev_step - WEEK
+
+                log.info("[%s] step is end. Action: [%s] -> [%s]; time spent: %s; \nnext step after: %s secs." % (
+                    self.human_name,
+                    action, action_result,
+                    time.time() - _start,
+                    step - _prev_step))
+
+            except Exception as e:
+                log.error("ERROR AT HE! ")
+                log.exception(e)
+                time.sleep(10)
 
 
 class HumanOrchestra():
@@ -225,3 +235,8 @@ class HumanOrchestra():
         human_state = self.states.get_human_state(human_name)
         process_state = self.process_director.get_state(HE_ASPECT(human_name))
         return {"human_state": human_state, "process_state": process_state}
+
+
+if __name__ == '__main__':
+    kplm = Kapellmeister("Shlak2k16")
+    print kplm._get_previous_post_time()

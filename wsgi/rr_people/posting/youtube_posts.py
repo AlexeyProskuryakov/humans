@@ -102,9 +102,8 @@ if __name__ == '__main__':
     yps = YoutubeChannelsHandler()
     # print yps.get_video_id("https://www.youtube.com/watch?v=cQL3JIYg9Io&feature=youtu.be")
     # channel_id = yps.get_channel_id("https://www.youtube.com/watch?v=cQL3JIYg9Io&feature=youtu.be")
-
     videos = yps.get_new_channel_videos("UCEMga_5kPDRwFXaJM1NQryA")  # 3030 channel
     # videos = yps.get_new_channel_videos("UCNBfdM4qeFvyFag-34wnCeQ") #alesha channel
     # videos = yps.get_new_channel_videos("UCqojywe2RqVPgALVyV0LrWg")
-    channel_id = yps.get_channel_id("https://www.youtube.com/watch?v=LuXBjs7eN4o")
-    print channel_id
+    # channel_id = yps.get_channel_id("https://www.youtube.com/watch?v=LuXBjs7eN4o")
+    # print channel_id
