@@ -6,28 +6,31 @@ import time
 
 from wsgi.db import HumanStorage
 from wsgi.properties import force_post_manager_sleep_iteration_time
-from wsgi.rr_people.posting.balancer import PostBalancer
-from wsgi.rr_people.posting.posts import PostsStorage, PostSource
+from wsgi.rr_people.posting.posts import PostsStorage
 from wsgi.rr_people.posting.queue import PostRedisQueue
 from wsgi.rr_people.posting.youtube_posts import YoutubeChannelsHandler
 from wsgi.rr_people.states.processes import ProcessDirector
 
 log = logging.getLogger("posts")
 
+__doc__ = """
+Нужно отправлять посты таким образом:
+1) От N штук в неделю до N'
+2) Чтобы каждый пост был разбавлен шумовыми. Вопрос про количество шумовых между? Мне кажется, это тоже должен быть
+рандом, только не менее чего-то и не более чего-то.
+3) Каждый день должен быть рандом. Но в сумее - недельный рандом. Нужно выводить это как-то.
+4*) На прахдниках, либо в определенные дни должны быть затишья.
+5*) Должны быть затишья и наоборот подъемы глобальные. То есть, предусмотреть что чувак будет
+ходить в продолжительный отпуск.
+
+
+"""
 
 class PostHandler(object):
     def __init__(self, name="?", pq=None, ps=None):
         self.queue = pq or PostRedisQueue("ph %s" % name)
         self.storage = ps or PostsStorage("ph %s" % name)
         self.youtube = YoutubeChannelsHandler(self.storage)
-        self.balancer = PostBalancer()
-
-    def add_important_post(self, human_name, post_source, sub, channel_id=None, important=False):
-        if isinstance(post_source, PostSource):
-            self.storage.add_generated_post(post_source, sub, important=important, channel_id=channel_id)
-            self.balancer.add_post(post_source.url_hash, channel_id, important=important, human_name=human_name)
-        else:
-            raise Exception("post_source is not post source!")
 
 
     def get_prepared_post(self, human_name):

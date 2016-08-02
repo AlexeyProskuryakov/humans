@@ -124,3 +124,4 @@ class PostsStorage(DBHandler):
     def remove_posts_of_sub(self, subname):
         result = self.posts.delete_many({"sub": subname})
         return result
+

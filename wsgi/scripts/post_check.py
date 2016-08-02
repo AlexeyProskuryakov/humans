@@ -21,5 +21,5 @@ def check_duplicates_in_queue():
 
 
 if __name__ == '__main__':
-    # check_difference_between_humans()
-    check_duplicates_in_queue()
+    check_difference_between_humans()
+    # check_duplicates_in_queue()

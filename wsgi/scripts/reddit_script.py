@@ -12,11 +12,8 @@ def create_post(url, title, sub, by):
     result = sub_.submit(save=True, title=title, url=url)
     return result
 
+
 if __name__ == '__main__':
     h = Human("Shlak2k15")
-    for post_ in get_posts():
-        url = post_.get("url")
-        sub = post_.get("for_sub")
-        title = post_.get("title")
-        result = create_post(url, title, sub, h)
-        print result
+    result = h.reddit.get_submission(submission_id="t3_4rdu5r"[3:])
+    print result
