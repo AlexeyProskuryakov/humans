@@ -9,7 +9,6 @@ PS_POSTED = "posted"
 PS_NO_POSTS = "no_posts"
 PS_BAD = "bad"
 PS_AT_QUEUE = "at_queue"
-PS_AT_BALANCER = "at_balancer"
 PS_ERROR = "error"
 
 
@@ -54,38 +53,30 @@ class PostSource(object):
 
 
 class PostsStorage(DBHandler):
-    def __init__(self, name="?"):
-        super(PostsStorage, self).__init__(name=name)
+    def __init__(self, name="?", drop=False, **kwargs):
+        super(PostsStorage, self).__init__(name=name, **kwargs)
+        collection_name = "generated_posts"
         collection_names = self.db.collection_names(include_system_collections=False)
-        if "generated_posts" not in collection_names:
-            self.posts = self.db.create_collection("generated_posts")
+        if drop:
+            self.db.drop_collection(collection_name)
+            collection_names.remove(collection_name)
+
+        if collection_name not in collection_names:
+            self.posts = self.db.create_collection(collection_name)
             self.posts.create_index("url_hash", unique=True)
             self.posts.create_index("sub")
+            self.posts.create_index("human")
             self.posts.create_index("state")
             self.posts.create_index("time")
+            self.posts.create_index("_lock", sparse=True)
         else:
-            self.posts = self.db.get_collection("generated_posts")
+            self.posts = self.db.get_collection(collection_name)
 
     # posts
-    def set_post_channel_id(self, url_hash, channel_id):
-        return self.posts.update_one({"url_hash": str(url_hash)}, {"$set": {"channel_id": channel_id}})
-
-    def update_post(self, url_hash, new_data):
-        return self.posts.update_one({"url_hash": str(url_hash)}, {"$set": new_data})
-
-    def set_post_state(self, url_hash, state):
-        return self.posts.update_one({"url_hash": str(url_hash)}, {"$set": {"state": state}})
-
     def get_post_state(self, url_hash):
         found = self.posts.find_one({"url_hash": str(url_hash)}, projection={"state": 1})
         if found:
             return found.get("state")
-
-    def get_good_post(self, url_hash, projection=None):
-        _projection = projection or {"_id": False}
-        found = self.posts.find_one({"url_hash": str(url_hash), 'state': {'$ne': PS_BAD}}, projection=_projection)
-        if found:
-            return PostSource.from_dict(found), found.get('sub')
 
     def get_post(self, url_hash, projection=None):
         _projection = projection or {"_id": False}
@@ -94,21 +85,12 @@ class PostsStorage(DBHandler):
             return PostSource.from_dict(found), found
         return None, None
 
-    def get_posts(self, url_hashes):
-        result = self.posts.find({"url_hash": {"$in": url_hashes}})
-        return list(result)
-
-    def get_old_ready_posts(self, tdiff):
-        for post_data in self.posts.find({"time": {"$lte": time.time() - tdiff}, "state": PS_READY},
-                                         projection={"_id": False}):
-            yield PostSource.from_dict(post_data)
-
-    def add_generated_post(self, post, sub, important=False, channel_id=None):
+    def add_generated_post(self, post, sub, important=False, channel_id=None, human=None, state=PS_READY):
         if isinstance(post, PostSource):
             found, _ = self.get_post(post.url_hash, projection={"_id": True})
             if not found:
                 data = post.to_dict()
-                data['state'] = PS_READY
+                data['state'] = state
                 data['sub'] = sub
                 data['time'] = time.time()
 
@@ -116,6 +98,8 @@ class PostsStorage(DBHandler):
                     data['important'] = important
                 if channel_id:
                     data["channel_id"] = channel_id
+                if human:
+                    data["human"] = human
                 return self.posts.insert_one(data)
 
     def get_posts_for_sub(self, sub, state=PS_READY):
@@ -125,3 +109,33 @@ class PostsStorage(DBHandler):
         result = self.posts.delete_many({"sub": subname})
         return result
 
+    def get_queued_post(self, human=None, sub=None):
+        lock_id = time.time()
+        q = {}
+        if human:
+            q['human'] = human
+        if sub:
+            q['sub'] = sub
+        if not q:
+            raise Exception("add argument please human or sub")
+        q["state"] = PS_READY
+
+        result = self.posts.update_one(q, {"$set": {"state": PS_AT_QUEUE, "_lock": lock_id}})
+        if result.modified_count == 1:
+            post = self.posts.find_one({"_lock": lock_id})
+            return post
+
+    def get_all_queued_posts(self, human):
+        q = {"human": human, "state": PS_READY}
+        for post in self.posts.find(q):
+            yield post
+
+    def set_queued_post_used(self, state, post):
+        q = {}
+        if '_id' in post:
+            q['_id'] = post['_id']
+        if '_lock' in post:
+            q['_lock'] = post['_lock']
+        if not q:
+            raise Exception("add argument please _lock or _id")
+        self.posts.update_one(q, {"$set": {"state": state}, "$unset": {"_lock": ""}})

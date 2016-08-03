@@ -12,7 +12,6 @@ from flask.json import jsonify
 from flask_debugtoolbar import DebugToolbarExtension
 from flask_login import LoginManager, login_user, login_required, logout_user
 from werkzeug.utils import redirect
-from wsgi.rr_people.posting.balancer import BatchStorage
 
 from wsgi.db import HumanStorage
 from wsgi.properties import want_coefficient_max
@@ -20,7 +19,8 @@ from wsgi.rr_people.ae import AuthorsStorage
 from wsgi.rr_people.commenting.connection import CommentHandler
 from wsgi.rr_people.he import HumanOrchestra
 from wsgi.rr_people.human import HumanConfiguration
-from wsgi.rr_people.posting.posts_managing import PostHandler, ImportantYoutubePostSupplier
+from wsgi.rr_people.posting.posts import PostsStorage
+from wsgi.rr_people.posting.posts_managing import ImportantYoutubePostSupplier
 from wsgi.rr_people.states.processes import ProcessDirector
 from wsgi.wake_up import WakeUp
 
@@ -433,33 +433,15 @@ def configuration(name):
 
 # posts & comments
 comment_handler = CommentHandler("server")
-posts_handler = PostHandler("server")
 process_director = ProcessDirector("server")
-batch_storage = BatchStorage("server")
+post_storage = PostsStorage(name="server")
 
 
 @app.route("/queue/posts/<name>", methods=["GET"])
 @login_required
 def queue_of_posts(name):
-    batches = []
-    for batch in batch_storage.batches.find({"human_name": name}).sort("count", -1):
-        if batch.get("url_hashes"):
-            posts = posts_handler.storage.get_posts(batch.get("url_hashes"))
-            if posts:
-                batch["posts"] = posts
-                batches.append(batch)
-
-    posts_hashes = posts_handler.queue.show_all_posts_hashes(name)
-    queue = []
-    if posts_hashes:
-        for post_hash in posts_hashes:
-            _, post_data = posts_handler.storage.get_post(post_hash)
-            queue.append(post_data)
-    else:
-        log.warning("no posts hashes at queue for %s :(" % name)
-        queue = []
-
-    return render_template("posts_queue.html", **{"human_name": name, "queue": queue, "batches": batches})
+    queue_posts = list(post_storage.get_all_queued_posts(name))
+    return render_template("posts_queue.html", **{"human_name": name, "queue": queue_posts})
 
 
 @app.route("/queue/comments/<name>", methods=["GET"])

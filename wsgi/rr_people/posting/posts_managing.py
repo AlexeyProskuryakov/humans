@@ -26,30 +26,6 @@ __doc__ = """
 
 """
 
-class PostHandler(object):
-    def __init__(self, name="?", pq=None, ps=None):
-        self.queue = pq or PostRedisQueue("ph %s" % name)
-        self.storage = ps or PostsStorage("ph %s" % name)
-        self.youtube = YoutubeChannelsHandler(self.storage)
-
-
-    def get_prepared_post(self, human_name):
-        url_hash = self.queue.pop_post(human_name)
-        if not url_hash:
-            log.warn("Not any posts for [%s] at queue" % human_name)
-            return
-        post_data = self.storage.get_good_post(url_hash)
-        if not post_data:
-            log.warn("Not any good posts for [%s] at storage" % human_name)
-            return
-        post, sub = post_data
-        if not post.for_sub: post.for_sub = sub
-        return post
-
-    def set_post_state(self, url_hash, new_state):
-        self.storage.set_post_state(url_hash, new_state)
-
-
 IMPORTANT_POSTS_SUPPLIER_PROCESS_ASPECT = "im_po_su_aspect"
 
 
@@ -63,7 +39,7 @@ class ImportantYoutubePostSupplier(Process):
         self.queue = pq or PostRedisQueue("im po su")
         self.posts_storage = ps or PostsStorage("im po su")
         self.main_storage = ms or HumanStorage("im po su")
-        self.post_handler = PostHandler(self.queue, self.posts_storage)
+
         self.posts_supplier = YoutubeChannelsHandler(self.posts_storage)
 
         self.pd = ProcessDirector("im po su")
@@ -78,7 +54,10 @@ class ImportantYoutubePostSupplier(Process):
                 human_name, len(new_posts), ' youtube \n'.join([str(post) for post in new_posts])))
 
             for post in new_posts:
-                self.post_handler.add_important_post(human_name, post, post.for_sub, channel_id, important=True)
+                self.posts_storage.add_generated_post(post, post.for_sub,
+                                                      important=True,
+                                                      channel_id=channel_id,
+                                                      human=human_name)
 
             return len(new_posts), None
 

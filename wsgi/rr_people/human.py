@@ -14,8 +14,7 @@ from wsgi.properties import WEEK
 from wsgi.rr_people import RedditHandler, USER_AGENTS, A_CONSUME, A_VOTE, A_COMMENT, A_POST, A_SUBSCRIBE, A_FRIEND, \
     re_url, cmp_by_created_utc
 from wsgi.rr_people.commenting.connection import CommentHandler
-from wsgi.rr_people.posting.posts import PS_POSTED, PS_ERROR, PS_NO_POSTS
-from wsgi.rr_people.posting.posts_managing import PostHandler
+from wsgi.rr_people.posting.posts import PS_POSTED, PS_ERROR, PS_NO_POSTS, PostsStorage, PostSource
 
 log = logging.getLogger("consumer")
 
@@ -91,7 +90,7 @@ class Human(RedditHandler):
         self.login = login
         self.db = HumanStorage(name="consumer %s" % login)
         self.comments_handler = CommentHandler(name="consumer %s" % login)
-        self.posts_handler = PostHandler("consumer %s" % login)
+        self.posts = PostsStorage("consumer %s" % login)
 
         login_credentials = self.db.get_human_access_credentials(login)
         if not login_credentials:
@@ -455,11 +454,12 @@ class Human(RedditHandler):
                 return
 
     def do_post(self):
-        post = self.posts_handler.get_prepared_post(self.name)
-        if not post:
+        post_data = self.posts.get_queued_post(human=self.name)
+        if not post_data:
             log.warn("no posts for me [%s] :(" % self.name)
             return PS_NO_POSTS
 
+        post = PostSource.from_dict(post_data)
         try:
             subreddit = self.get_subreddit(post.for_sub)
             _wait_time_to_write(post.title)
@@ -469,18 +469,18 @@ class Human(RedditHandler):
             # todo it must be showing at interface
             log.error("exception at posting %s" % (post))
             log.exception(e)
-            self.posts_handler.set_post_state(post.url_hash, PS_ERROR)
+            self.posts.set_queued_post_used(post_data, PS_ERROR)
             return PS_ERROR
 
         if isinstance(result, Submission):
             self.register_step(A_POST,
                                {"fullname": result.fullname, "sub": post.for_sub, 'title': post.title,
                                 'url': post.url})
-            self.posts_handler.set_post_state(post.url_hash, PS_POSTED)
+            self.posts.set_queued_post_used(post_data, PS_POSTED)
             log.info("OK! result: %s" % (result))
-            return A_POST
+            return PS_POSTED
         else:
-            self.posts_handler.set_post_state(post.url_hash, PS_ERROR)
+            self.posts.set_queued_post_used(post_data, PS_ERROR)
             log.info("NOT OK :( result: %s" % (result))
             return PS_ERROR
 
