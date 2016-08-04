@@ -618,6 +618,18 @@ def copy_data(from_uri, from_db_name, to_uri, to_db_name, drop_dest=False):
         log.info("was insert %s authors rows for group %s" % (len(src_authors), group.get("_id")))
         dest_as.set_group(group.get("authors"), group.get("_id"))
 
+def test_count_of_action(action_name, group_name):
+    ae = ActionGenerator(group_name=group_name)
+    count = 0
+    for x in range(WEEK/(MINUTE*9)):
+        action = ae.get_action(x)
+        if action == action_name:
+            count+=1
+            print x, count
+
+    return count
+
 
 if __name__ == '__main__':
-    copy_data("mongodb://localhost:27017", "ae", ae_mongo_uri, ae_db_name, drop_dest=True)
+    # copy_data("mongodb://localhost:27017", "ae", ae_mongo_uri, ae_db_name, drop_dest=True)
+    print test_count_of_action("post","Shlak2k15")

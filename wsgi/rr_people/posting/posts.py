@@ -119,6 +119,7 @@ class PostsStorage(DBHandler):
         if not q:
             raise Exception("add argument please human or sub")
         q["state"] = PS_READY
+        q["_lock"] = {"$exists": False}
 
         result = self.posts.update_one(q, {"$set": {"state": PS_AT_QUEUE, "_lock": lock_id}})
         if result.modified_count == 1:

@@ -18,6 +18,8 @@ from wsgi.rr_people.posting.posts import PS_POSTED, PS_ERROR, PS_NO_POSTS, Posts
 
 log = logging.getLogger("consumer")
 
+LIVE_RANDOM_SUB_DATA_REFRESH_TIME = 3600 * 2
+
 
 def _get_random_near(slice, index, max):
     slice_indices = map(lambda x: x[0], enumerate(slice))
@@ -432,7 +434,7 @@ class Human(RedditHandler):
         random_sub = random.choice(subs)
         if random_sub not in self.cache_sub_posts or \
                                 time.time() - self.cache_last_loads.get(random_sub,
-                                                                        time.time()) > properties.TIME_TO_RELOAD_SUB_POSTS:
+                                                                        time.time()) > LIVE_RANDOM_SUB_DATA_REFRESH_TIME:
             log.info("%s will load posts for live random in %s" % (self.name, random_sub))
             sbrdt = self.get_subreddit(random_sub)
             posts = get_hot_or_new(sbrdt)

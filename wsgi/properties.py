@@ -70,9 +70,6 @@ DAY = HOUR * 24
 WEEK = DAY * 7
 WEEK_DAYS = {0: "MO", 1: "TU", 2: "WE", 3: "TH", 4: "FR", 5: "SA", 6: "SU"}
 
-TIME_TO_WAIT_NEW_COPIES = 3600 * 24
-TIME_TO_RELOAD_SUB_POSTS = 3600 * 2  # at live random in consumer
-
 AE_MIN_COMMENT_KARMA = 10000
 AE_MIN_LINK_KARMA = 10000
 AE_MIN_SLEEP_TIME = 6 * HOUR
@@ -83,15 +80,6 @@ AE_ADD_AUTHORS = True
 
 DEFAULT_LIMIT = 500
 # DEFAULT_LIMIT = 20
-DEFAULT_SLEEP_TIME_AFTER_GENERATE_DATA = 60 * 60 * 4
-
-min_copy_count = 3
-min_comment_create_time_difference = 3600 * 24 * 10
-
-shift_copy_comments_part = 5  # общее количество комментариев / это число  = сколько будет пропускаться
-min_donor_comment_ups = 5
-max_donor_comment_ups = 100000
-min_donor_num_comments = 50
 
 max_consuming = 80
 min_consuming = 60

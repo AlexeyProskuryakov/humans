@@ -7,24 +7,11 @@ import time
 from wsgi.db import HumanStorage
 from wsgi.properties import force_post_manager_sleep_iteration_time
 from wsgi.rr_people.posting.posts import PostsStorage
-from wsgi.rr_people.posting.queue import PostRedisQueue
 from wsgi.rr_people.posting.youtube_posts import YoutubeChannelsHandler
 from wsgi.rr_people.states.processes import ProcessDirector
 
 log = logging.getLogger("posts")
 
-__doc__ = """
-Нужно отправлять посты таким образом:
-1) От N штук в неделю до N'
-2) Чтобы каждый пост был разбавлен шумовыми. Вопрос про количество шумовых между? Мне кажется, это тоже должен быть
-рандом, только не менее чего-то и не более чего-то.
-3) Каждый день должен быть рандом. Но в сумее - недельный рандом. Нужно выводить это как-то.
-4*) На прахдниках, либо в определенные дни должны быть затишья.
-5*) Должны быть затишья и наоборот подъемы глобальные. То есть, предусмотреть что чувак будет
-ходить в продолжительный отпуск.
-
-
-"""
 
 IMPORTANT_POSTS_SUPPLIER_PROCESS_ASPECT = "im_po_su_aspect"
 
@@ -36,7 +23,6 @@ class ImportantYoutubePostSupplier(Process):
 
     def __init__(self, pq=None, ps=None, ms=None):
         super(ImportantYoutubePostSupplier, self).__init__()
-        self.queue = pq or PostRedisQueue("im po su")
         self.posts_storage = ps or PostsStorage("im po su")
         self.main_storage = ms or HumanStorage("im po su")
 
