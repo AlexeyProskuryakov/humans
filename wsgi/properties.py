@@ -81,13 +81,13 @@ AE_ADD_AUTHORS = True
 DEFAULT_LIMIT = 500
 # DEFAULT_LIMIT = 20
 
-max_consuming = 80
+max_consuming = 70
 min_consuming = 60
 
-min_voting = 65
-max_voting = 85
+min_voting = 40
+max_voting = 50
 
-step_time_after_trying = 60
+st_between_net_request = 60
 tryings_count = 10
 
 time_step_less_iteration_power = 0.85

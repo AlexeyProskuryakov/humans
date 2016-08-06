@@ -105,7 +105,8 @@ class Human(RedditHandler):
         self.last_friend_add = human_configuration.get("last_friend_add") or time.time() - WEEK
 
         self.init_engine(login_credentials)
-        self.init_work_cycle()
+        self.action_function_params = self.init_work_cycle()
+        log.info("MY [%s] WORK CYCLE: %s" % (self.name, self.action_function_params))
 
         # todo this cache must be persisted at mongo or another
         self._used = set()
@@ -170,38 +171,40 @@ class Human(RedditHandler):
         self.__action_function_params = val
         self.counters = {A_CONSUME: 0, A_VOTE: 0, A_COMMENT: 0, A_POST: 0}
 
-    def init_work_cycle(self):
+    @staticmethod
+    def init_work_cycle():
         consuming = random.randint(properties.min_consuming, properties.max_consuming)
-        production = 100 - consuming
+        production = 100. - consuming
 
         prod_voting = random.randint(properties.min_voting, properties.max_voting)
-        prod_commenting = 100 - prod_voting
+        prod_commenting = 100. - prod_voting
 
-        prod_posting = prod_commenting / random.randint(2, 4)
+        # prod_posting = prod_commenting / random.randint(2, 4)
+        prod_posting = prod_commenting / random.randint(2, 3)
         prod_commenting -= prod_posting
 
-        voting = (prod_voting * production) / 100
-        commenting = (prod_commenting * production) / 100
-        posting = (prod_posting * production) / 100
+        voting = (prod_voting * production) / 100.
+        commenting = (prod_commenting * production) / 100.
+        posting = (prod_posting * production) / 100.
 
-        self.action_function_params = {A_CONSUME: consuming,
-                                       A_VOTE: voting,
-                                       A_COMMENT: commenting,
-                                       A_POST: posting
-                                       }
-        log.info("MY [%s] WORK CYCLE: %s" % (self.name, self.action_function_params))
-        return self.action_function_params
+        action_function_params = {A_CONSUME: consuming,
+                                  A_VOTE: voting,
+                                  A_COMMENT: commenting,
+                                  A_POST: posting
+                                  }
+
+        return action_function_params
 
     def can_do(self, action):
         """
         Action
-        :param action: can be: [vote, comment, consume]
+        :param action: can be: [vote, comment, consume, post]
         :return:  true or false
         """
         summ = sum(self.counters.values())
         action_count = self.counters[action]
         granted_perc = self.action_function_params.get(action)
-        current_perc = int((float(action_count) / (summ if summ else 100)) * 100)
+        current_perc = (float(action_count) / (summ if summ else 100)) * 100
 
         return current_perc <= granted_perc
 
@@ -357,7 +360,7 @@ class Human(RedditHandler):
 
     def _humanised_comment_post(self, sub, post_fullname):
         self._load_configuration()
-        hot_and_new = self.get_hot_and_new(sub, sort=cmp_by_created_utc)
+        hot_and_new = self.load_hot_and_new(sub, sort=cmp_by_created_utc)
         # check if post fullname is too old
         all_posts_fns = set(map(lambda x: x.fullname, hot_and_new))
         if post_fullname not in all_posts_fns:

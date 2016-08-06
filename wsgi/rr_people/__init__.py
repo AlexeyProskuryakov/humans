@@ -63,7 +63,7 @@ log = logging.getLogger("man")
 
 WORDS_HASH = "words_hash"
 
-POSTS_TTL = 60 * 5
+POSTS_TTL = 60 * 10
 
 
 class Singleton(type):
@@ -112,7 +112,7 @@ class RedditHandler(object):
             subreddit = self.subreddits_cache.get(name)
         return subreddit
 
-    def get_hot_and_new(self, subreddit_name, sort=None, limit=properties.DEFAULT_LIMIT):
+    def load_hot_and_new(self, subreddit_name, sort=None, limit=properties.DEFAULT_LIMIT):
         try:
             result = self.posts_cache.get_posts(subreddit_name)
             if not result:
@@ -215,6 +215,6 @@ def post_to_dict(post):
 if __name__ == '__main__':
 
     rh = RedditHandler()
-    posts = rh.get_hot_and_new("videos", limit=10)
+    posts = rh.load_hot_and_new("videos", limit=10)
     for post in posts:
         print post.fullname
