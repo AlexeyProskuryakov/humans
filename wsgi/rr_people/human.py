@@ -4,6 +4,7 @@ import time
 import traceback
 from collections import defaultdict
 
+import praw
 import requests
 from praw import Reddit
 from praw.objects import MoreComments, Submission
@@ -459,35 +460,43 @@ class Human(RedditHandler):
                 return
 
     def do_post(self):
+        #todo at first must define which tyoe of post
+
         post_data = self.posts.get_queued_post(human=self.name)
         if not post_data:
             log.warn("no posts for me [%s] :(" % self.name)
             return PS_NO_POSTS
 
-        post = PostSource.from_dict(post_data)
-        try:
-            subreddit = self.get_subreddit(post.for_sub)
-            _wait_time_to_write(post.title)
-            result = subreddit.submit(save=True, title=post.title, url=post.url)
-            log.info("was post at [%s]; title: [%s]; url: [%s]" % (post.for_sub, post.title, post.url))
-        except Exception as e:
-            # todo it must be showing at interface
-            log.error("exception at posting %s" % (post))
-            log.exception(e)
-            self.posts.set_queued_post_used(post_data, PS_ERROR)
-            return PS_ERROR
+        while 1:
+            post = PostSource.from_dict(post_data)
+            try:
+                subreddit = self.get_subreddit(post.for_sub)
+                _wait_time_to_write(post.title)
+                result = subreddit.submit(save=True, title=post.title, url=post.url)
+                log.info("was post at [%s]; title: [%s]; url: [%s]" % (post.for_sub, post.title, post.url))
+            except praw.errors.RateLimitExceeded as e:
+                log.warning("we have rate limit will wait %s" % e.sleep_time)
+                time.sleep(e.sleep_time + 5)
+                continue
+            except Exception as e:
+                # todo it must be showing at interface
+                log.error("exception at posting %s" % (post))
+                log.exception(e)
+                self.posts.set_queued_post_used(post_data, PS_ERROR)
+                self.db.store_error(self.name, str(e))
+                return PS_ERROR
 
-        if isinstance(result, Submission):
-            self.register_step(A_POST,
-                               {"fullname": result.fullname, "sub": post.for_sub, 'title': post.title,
-                                'url': post.url})
-            self.posts.set_queued_post_used(post_data, PS_POSTED)
-            log.info("OK! result: %s" % (result))
-            return PS_POSTED
-        else:
-            self.posts.set_queued_post_used(post_data, PS_ERROR)
-            log.info("NOT OK :( result: %s" % (result))
-            return PS_ERROR
+            if isinstance(result, Submission):
+                self.register_step(A_POST,
+                                   {"fullname": result.fullname, "sub": post.for_sub, 'title': post.title,
+                                    'url': post.url})
+                self.posts.set_queued_post_used(post_data, PS_POSTED)
+                log.info("OK! result: %s" % (result))
+                return PS_POSTED
+            else:
+                self.posts.set_queued_post_used(post_data, PS_ERROR)
+                log.info("NOT OK :( result: %s" % (result))
+                return PS_ERROR
 
 
 class FakeHuman(Human):

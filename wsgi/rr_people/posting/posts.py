@@ -72,6 +72,12 @@ class PostsStorage(DBHandler):
         else:
             self.posts = self.db.get_collection(collection_name)
 
+        if "posts_counters" not in collection_names:
+            self.posts_counters = self.db.create_collection("posts_counters")
+            self.posts_counters.create_index("human", unique=True)
+        else:
+            self.posts_counters = self.db.get_collection("posts_counters")
+
     # posts
     def get_post_state(self, url_hash):
         found = self.posts.find_one({"url_hash": str(url_hash)}, projection={"state": 1})
@@ -109,7 +115,13 @@ class PostsStorage(DBHandler):
         result = self.posts.delete_many({"sub": subname})
         return result
 
-    def get_queued_post(self, human=None, sub=None):
+    def increment_counter(self, human, counter_type):
+        self.posts_counters.update_one({"human": human}, {"$inc": {counter_type: 1}}, upsert=True)
+
+    def get_counters(self, human):
+        self.posts_counters.find_one({"human": human}, projection={"_id": False})
+
+    def get_queued_post(self, human=None, sub=None, important=False):
         lock_id = time.time()
         q = {}
         if human:
@@ -120,6 +132,7 @@ class PostsStorage(DBHandler):
             raise Exception("add argument please human or sub")
         q["state"] = PS_READY
         q["_lock"] = {"$exists": False}
+        q["important"] = important
 
         result = self.posts.update_one(q, {"$set": {"state": PS_AT_QUEUE, "_lock": lock_id}})
         if result.modified_count == 1:

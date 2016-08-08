@@ -79,7 +79,7 @@ MIN_TIME_BETWEEN_POSTS = 9 * 60
 class Kapellmeister(Process):
     def __init__(self, name, human_class=Human):
         super(Kapellmeister, self).__init__()
-        self.main_storage = HumanStorage(name="main storage for [%s]" % name)
+        self.db = HumanStorage(name="main storage for [%s]" % name)
         self.human_name = name
         self.name = "KPLM [%s]" % (self.human_name)
         self.ae = ActionGenerator(group_name=name)
@@ -107,8 +107,8 @@ class Kapellmeister(Process):
             return True
 
     def _get_previous_post_time(self):
-        cur = self.main_storage.human_log.find({"human_name": self.human_name, "action": A_POST},
-                                               projection={"time": 1}).sort("time", -1)
+        cur = self.db.human_log.find({"human_name": self.human_name, "action": A_POST},
+                                     projection={"time": 1}).sort("time", -1)
         try:
             result = cur.next()
             return result.get("time")
@@ -203,6 +203,7 @@ class Kapellmeister(Process):
             except Exception as e:
                 log.error("ERROR AT HE! ")
                 log.exception(e)
+                self.db.store_error(self.human_name, str(e))
                 time.sleep(10)
 
 
