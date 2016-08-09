@@ -1,8 +1,9 @@
 import json
+import random
 
 import time
 
-from wsgi.db import DBHandler
+from wsgi.db import DBHandler, HumanStorage
 
 PS_READY = "ready"
 PS_POSTED = "posted"
@@ -136,7 +137,10 @@ class PostsStorage(DBHandler):
 
         result = self.posts.update_one(q, {"$set": {"state": PS_AT_QUEUE, "_lock": lock_id}})
         if result.modified_count == 1:
-            post = self.posts.find_one({"_lock": lock_id})
+            q = {"_lock": lock_id, "important": important, "state": PS_AT_QUEUE}
+            if human: q["human"] = human
+            if sub: q["sub"] = sub
+            post = self.posts.find_one(q)
             return post
 
     def get_all_queued_posts(self, human):
@@ -144,7 +148,7 @@ class PostsStorage(DBHandler):
         for post in self.posts.find(q):
             yield post
 
-    def set_queued_post_used(self, state, post):
+    def set_queued_post_used(self, post, state=PS_POSTED):
         q = {}
         if '_id' in post:
             q['_id'] = post['_id']
@@ -153,3 +157,35 @@ class PostsStorage(DBHandler):
         if not q:
             raise Exception("add argument please _lock or _id")
         self.posts.update_one(q, {"$set": {"state": state}, "$unset": {"_lock": ""}})
+
+
+class PostsManager(object):
+    def __init__(self, human_name, post_store=None, human_store=None):
+        self.post_store = post_store or PostsStorage(name="posts manager")
+        self.human_store = human_store or HumanStorage(name="posts manager")
+
+        self._human = human_name
+        self._post_type_in_fly = None
+
+    def start_post(self):
+        if self._post_type_in_fly:
+            raise Exception("Have not ended posts for %s" % self._human)
+
+        counters = self.post_store.get_counters(self._human)
+        if counters.get("noise", 0) % 9 != 0:
+            sub = random.choice(self.human_store.get_human_subs(self._human))
+            self._post_type_in_fly = "noise"
+            return self.post_store.get_queued_post(sub=sub, important=False)
+        else:
+            self._post_type_in_fly = "important"
+            return self.post_store.get_queued_post(human=self._human, important=True)
+
+    def end_post(self, post, result):
+        if not self._post_type_in_fly:
+            raise Exception("Have not started posts %s" % self._human)
+
+        if result == PS_POSTED:
+            self.post_store.increment_counter(self._human, self._post_type_in_fly)
+
+        self.post_store.set_queued_post_used(post, result)
+        self._post_type_in_fly = None

@@ -15,7 +15,7 @@ from wsgi.properties import WEEK
 from wsgi.rr_people import RedditHandler, USER_AGENTS, A_CONSUME, A_VOTE, A_COMMENT, A_POST, A_SUBSCRIBE, A_FRIEND, \
     re_url, cmp_by_created_utc
 from wsgi.rr_people.commenting.connection import CommentHandler
-from wsgi.rr_people.posting.posts import PS_POSTED, PS_ERROR, PS_NO_POSTS, PostsStorage, PostSource
+from wsgi.rr_people.posting.posts import PS_POSTED, PS_ERROR, PS_NO_POSTS, PostsStorage, PostSource, PostsManager
 
 log = logging.getLogger("consumer")
 
@@ -93,7 +93,7 @@ class Human(RedditHandler):
         self.login = login
         self.db = HumanStorage(name="consumer %s" % login)
         self.comments_handler = CommentHandler(name="consumer %s" % login)
-        self.posts = PostsStorage("consumer %s" % login)
+        self.posts = PostsManager(PostsStorage("consumer %s" % login), self.db)
 
         login_credentials = self.db.get_human_access_credentials(login)
         if not login_credentials:
@@ -460,9 +460,7 @@ class Human(RedditHandler):
                 return
 
     def do_post(self):
-        #todo at first must define which tyoe of post
-
-        post_data = self.posts.get_queued_post(human=self.name)
+        post_data = self.posts.start_post()
         if not post_data:
             log.warn("no posts for me [%s] :(" % self.name)
             return PS_NO_POSTS
@@ -479,10 +477,9 @@ class Human(RedditHandler):
                 time.sleep(e.sleep_time + 5)
                 continue
             except Exception as e:
-                # todo it must be showing at interface
                 log.error("exception at posting %s" % (post))
                 log.exception(e)
-                self.posts.set_queued_post_used(post_data, PS_ERROR)
+                self.posts.end_post(post_data, PS_ERROR)
                 self.db.store_error(self.name, str(e))
                 return PS_ERROR
 
@@ -490,12 +487,13 @@ class Human(RedditHandler):
                 self.register_step(A_POST,
                                    {"fullname": result.fullname, "sub": post.for_sub, 'title': post.title,
                                     'url': post.url})
-                self.posts.set_queued_post_used(post_data, PS_POSTED)
+                self.posts.end_post(post_data, PS_POSTED)
                 log.info("OK! result: %s" % (result))
                 return PS_POSTED
             else:
-                self.posts.set_queued_post_used(post_data, PS_ERROR)
+                self.posts.end_post(post_data, PS_ERROR)
                 log.info("NOT OK :( result: %s" % (result))
+                self.db.store_error(self.name, str(result))
                 return PS_ERROR
 
 
