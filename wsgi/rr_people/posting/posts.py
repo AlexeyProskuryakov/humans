@@ -79,6 +79,12 @@ class PostsStorage(DBHandler):
         else:
             self.posts_counters = self.db.get_collection("posts_counters")
 
+        if "posts_sequnece" not in collection_names:
+            self.posts_sequence = self.db.create_collection("posts_sequence")
+            self.posts_sequence.create_index("human", unique=True)
+        else:
+            self.posts_sequence = self.db.get_collection("posts_sequence")
+
     # posts
     def get_post_state(self, url_hash):
         found = self.posts.find_one({"url_hash": str(url_hash)}, projection={"state": 1})
@@ -158,8 +164,13 @@ class PostsStorage(DBHandler):
             raise Exception("add argument please _lock or _id")
         self.posts.update_one(q, {"$set": {"state": state}, "$unset": {"_lock": ""}})
 
+    def set_posts_sequence(self, human, sequence):
+        self.posts_sequence.update_one({"human": human}, {"$set": {"sequence": sequence}})
 
-class PostsManager(object):
+
+
+
+class PostsBalancer(object):
     def __init__(self, human_name, post_store=None, human_store=None):
         self.post_store = post_store or PostsStorage(name="posts manager")
         self.human_store = human_store or HumanStorage(name="posts manager")
@@ -172,7 +183,7 @@ class PostsManager(object):
             raise Exception("Have not ended posts for %s" % self._human)
 
         counters = self.post_store.get_counters(self._human)
-        if counters.get("noise", 0) % 9 != 0:
+        if counters.get("noise", 0) % 9 != 0: #todo change this predicate
             sub = random.choice(self.human_store.get_human_subs(self._human))
             self._post_type_in_fly = "noise"
             return self.post_store.get_queued_post(sub=sub, important=False)

@@ -20,7 +20,7 @@ from wsgi.rr_people.commenting.connection import CommentHandler
 from wsgi.rr_people.he import HumanOrchestra
 from wsgi.rr_people.human import HumanConfiguration
 from wsgi.rr_people.posting.posts import PostsStorage
-from wsgi.rr_people.posting.posts_managing import ImportantYoutubePostSupplier
+from wsgi.rr_people.posting.posts_important import ImportantYoutubePostSupplier
 from wsgi.rr_people.states.processes import ProcessDirector
 from wsgi.wake_up import WakeUp
 

@@ -15,7 +15,7 @@ from wsgi.properties import WEEK
 from wsgi.rr_people import RedditHandler, USER_AGENTS, A_CONSUME, A_VOTE, A_COMMENT, A_POST, A_SUBSCRIBE, A_FRIEND, \
     re_url, cmp_by_created_utc
 from wsgi.rr_people.commenting.connection import CommentHandler
-from wsgi.rr_people.posting.posts import PS_POSTED, PS_ERROR, PS_NO_POSTS, PostsStorage, PostSource, PostsManager
+from wsgi.rr_people.posting.posts import PS_POSTED, PS_ERROR, PS_NO_POSTS, PostsStorage, PostSource, PostsBalancer
 
 log = logging.getLogger("consumer")
 
@@ -93,7 +93,7 @@ class Human(RedditHandler):
         self.login = login
         self.db = HumanStorage(name="consumer %s" % login)
         self.comments_handler = CommentHandler(name="consumer %s" % login)
-        self.posts = PostsManager(PostsStorage("consumer %s" % login), self.db)
+        self.posts = PostsBalancer(PostsStorage("consumer %s" % login), self.db)
 
         login_credentials = self.db.get_human_access_credentials(login)
         if not login_credentials:
