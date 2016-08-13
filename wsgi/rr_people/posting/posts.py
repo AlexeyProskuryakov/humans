@@ -2,8 +2,10 @@ import json
 import random
 
 import time
+from datetime import datetime
 
 from wsgi.db import DBHandler, HumanStorage
+from wsgi.rr_people.ae import time_hash
 
 PS_READY = "ready"
 PS_POSTED = "posted"
@@ -165,9 +167,23 @@ class PostsStorage(DBHandler):
         self.posts.update_one(q, {"$set": {"state": state}, "$unset": {"_lock": ""}})
 
     def set_posts_sequence(self, human, sequence):
-        self.posts_sequence.update_one({"human": human}, {"$set": {"sequence": sequence}})
+        self.posts_sequence.update_one({"human": human},
+                                       {"$set":
+                                            {"sequence": sequence,
+                                             "start": time_hash(datetime.utcnow()),
+                                             "passed": 0
+                                             },
+                                        }, upsert=True)
+
+    def get_posts_sequence(self, human):
+        result = self.posts_sequence.find_one({"human": human})
+        return result
 
 
+
+CNT_NOISE = "noise"
+CNT_IMPORTANT = "important"
+EVERY = 9
 
 
 class PostsBalancer(object):
@@ -183,13 +199,16 @@ class PostsBalancer(object):
             raise Exception("Have not ended posts for %s" % self._human)
 
         counters = self.post_store.get_counters(self._human)
-        if counters.get("noise", 0) % 9 != 0: #todo change this predicate
-            sub = random.choice(self.human_store.get_human_subs(self._human))
-            self._post_type_in_fly = "noise"
-            return self.post_store.get_queued_post(sub=sub, important=False)
-        else:
-            self._post_type_in_fly = "important"
+        noise = int(counters.get(CNT_NOISE), 0)
+        important = int(counters.get(CNT_IMPORTANT, 0))
+
+        if important == 0 or (noise % EVERY == 0 and noise / EVERY >= important):  # todo change this predicate
+            self._post_type_in_fly = CNT_IMPORTANT
             return self.post_store.get_queued_post(human=self._human, important=True)
+        else:
+            sub = random.choice(self.human_store.get_human_subs(self._human))
+            self._post_type_in_fly = CNT_NOISE
+            return self.post_store.get_queued_post(sub=sub, important=False)
 
     def end_post(self, post, result):
         if not self._post_type_in_fly:
@@ -200,3 +219,15 @@ class PostsBalancer(object):
 
         self.post_store.set_queued_post_used(post, result)
         self._post_type_in_fly = None
+
+
+if __name__ == '__main__':
+    i = 0
+    n = 0
+    e = 10
+    for x in range(1000):
+        if (i == 0) or (n % e == 0 and n / e >= i):
+            i += 1
+        else:
+            n += 1
+        print i, n

@@ -15,46 +15,45 @@ __doc__ = """
 DAYS_IN_WEEK = 7
 
 
-class PotsSequenceManager(object):
-    def __init__(self, n_min, n_max=None, pass_count=10):
-        self.n_min = n_min
-        self.n_max = n_max or n_min
-        self.pass_count = pass_count
+def create_posts_sequence(n_min, n_max=None, pass_count=10):
+    result = [0] * DAYS_IN_WEEK
+    _n_max = n_max or n_min
+    creator = (n_min + _n_max) / (2. * DAYS_IN_WEEK)
+    adder = 0
+    prev_adder = 0
+    for passage in range(pass_count):
+        for day_number in range(DAYS_IN_WEEK):
+            if result[day_number] == 0:
+                day_count = random.randint(
+                    int(-(creator / 4)),
+                    int(creator + creator / 2)
+                )
+            else:
+                day_count = result[day_number]
 
-    def evaluate(self):
-        result = [0] * DAYS_IN_WEEK
-        creator = (self.n_min + self.n_max) / (2. * DAYS_IN_WEEK)
-        adder = 0
+            if adder != 0:
+                day_count += int(random.random() * adder)
 
-        for passage in range(self.pass_count):
-            for day_number in range(DAYS_IN_WEEK):
-                if result[day_number] == 0:
-                    day_count = random.randint(
-                        int(-(creator / 4)),
-                        int(creator + creator / 2)
-                    )
-                    if day_count < 0:
-                        day_count = 0
-                else:
-                    day_count = result[day_number]
+            if day_count < 0:
+                day_count = 0
 
-                if adder != 0:
-                    day_count += int(random.random() * adder)
+            result[day_number] = day_count
 
-                result[day_number] = day_count
+        week_count = sum(result)
+        if week_count <= _n_max and week_count >= n_min:
+            return result
+        elif week_count > _n_max:
+            adder = float(_n_max - week_count) / DAYS_IN_WEEK
+        elif week_count < n_min:
+            adder = float((n_min - week_count) * 3) / DAYS_IN_WEEK
 
-            week_count = sum(result)
-            if week_count <= self.n_max and week_count >= self.n_min:
-                return result
-            elif week_count > self.n_max:
-                adder = float(self.n_max - week_count) / DAYS_IN_WEEK
-            elif week_count < self.n_min:
-                adder = float((self.n_min - week_count) * 2) / DAYS_IN_WEEK
-
-        return result
+        if adder == prev_adder:
+            return result
+        else:
+            prev_adder = adder
+    return result
 
 
 if __name__ == '__main__':
-    psm = PotsSequenceManager(70, 100)
-    res = psm.evaluate()
+    res = create_posts_sequence(70, pass_count=50)
     print sum(res), res
