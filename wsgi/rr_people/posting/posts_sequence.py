@@ -1,16 +1,14 @@
 # coding=utf-8
-import random
 from datetime import datetime
+import random
+from sys import maxint
 
-import math
-
+from Crypto.Random import random as crypto_random
 from flask import logging
 
 from wsgi.db import DBHandler
-from Crypto.Random import random as crypto_random
-from wsgi.properties import DAY, WEEK, AVG_ACTION_TIME, COUNT_SHUFFLE_ITERATIONS
-from wsgi.rr_people.ae import AuthorsStorage, time_hash
-from wsgi.rr_people.posting.posts import PostsStorage
+from wsgi.properties import WEEK, AVG_ACTION_TIME
+from wsgi.rr_people.ae import AuthorsStorage, time_hash, delta_info
 
 __doc__ = """
 Нужно отправлять посты таким образом:
@@ -89,7 +87,7 @@ class PostSequenceHandler(object):
             3.2) create array of 0 count = dtA/tAct - cp and add array of 1 with count = cp
             3.3) shuffle result array.
             3.4) on shuffled result array create list of timings posts
-        4) persist
+        4) setting head of result is max similar of now
 
         :param n_min ~minimum posts at week
         :param n_max ~maximum posts at week
@@ -99,7 +97,7 @@ class PostSequenceHandler(object):
         time_sequence = self.ae_store.get_time_sequence(self.human)
         sequence_data = generate_sequence_data(n_min, n_max=n_max, pass_count=pass_count, count=len(time_sequence))
         log.info("\n%s:: %s : %s" % (self.human, sum(sequence_data), sequence_data))
-        sequence_result = []
+        post_time_sequence = []
         for i, slice in enumerate(time_sequence):
             start, stop = tuple(slice)
             if start > stop:
@@ -109,15 +107,69 @@ class PostSequenceHandler(object):
 
             action_counts_per_slice = (td / AVG_ACTION_TIME) - sequence_data[i]
             actions_sequence = [0] * action_counts_per_slice + [1] * sequence_data[i]
+
             crypto_random.shuffle(actions_sequence)
+            crypto_random.shuffle(actions_sequence)
+            crypto_random.shuffle(actions_sequence)
+            print actions_sequence
+
             for i, action_flag in enumerate(actions_sequence):
                 if action_flag:
                     time = start + (i * AVG_ACTION_TIME)
                     if time > WEEK: time -= WEEK
-                    sequence_result.append(time)
+                    post_time_sequence.append(time)
 
-        log.info("\n%s: \n%s" % (self.human, "\n".join([str(t) for t in sequence_result])))
-        self.posts_time_sequence = sequence_result
+        post_time_sequence = self._sort_from_current_time(post_time_sequence)
+        min, max, avg = self._evaluate_info_counts(post_time_sequence)
+        log.info("\n%s %s: \n%s\n----------\nmin: %s \nmax: %s \navg: %s" % (
+            self.human,
+            time_hash(datetime.utcnow()), "\n".join([str(t) for t in post_time_sequence]),
+            delta_info(min),
+            delta_info(max),
+            delta_info(avg),
+        ))
+        self.posts_time_sequence = post_time_sequence
+
+    def _sort_from_current_time(self, post_time_sequence):
+        i_time = time_hash(datetime.utcnow())
+        prev_pt = None
+        position = None
+        for i, pt in enumerate(post_time_sequence):
+            if prev_pt == None:
+                prev_pt = pt
+
+            if i_time < pt and i_time > prev_pt:
+                position = i
+                break
+        result_post_time_sequence = post_time_sequence[position:] + post_time_sequence[:position]
+        return result_post_time_sequence
+
+    def _evaluate_info_counts(self, post_time_sequence):
+        min_diff = maxint
+        max_diff = 0
+
+        diff_acc = []
+        prev_pt = None
+        for pt in post_time_sequence:
+            if prev_pt == None:
+                prev_pt = pt
+                continue
+            if prev_pt > pt:
+                pt += WEEK
+            diff = abs(prev_pt - pt)
+            if diff < min_diff:
+                min_diff = diff
+            if diff > max_diff:
+                max_diff = diff
+            diff_acc.append(diff)
+
+            prev_pt = pt
+
+        avg_diff = sum(diff_acc) / len(diff_acc)
+        return min_diff, max_diff, avg_diff
+
+    def _check_shuffle(self, ):
+        pass
 
 
 def generate_sequence_data(n_min, n_max=None, pass_count=10, count=DAYS_IN_WEEK):
