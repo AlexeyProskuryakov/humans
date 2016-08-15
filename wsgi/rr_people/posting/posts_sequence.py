@@ -4,8 +4,11 @@ from datetime import datetime
 
 import math
 
+from flask import logging
+
 from wsgi.db import DBHandler
-from wsgi.properties import DAY, WEEK
+from Crypto.Random import random as crypto_random
+from wsgi.properties import DAY, WEEK, AVG_ACTION_TIME, COUNT_SHUFFLE_ITERATIONS
 from wsgi.rr_people.ae import AuthorsStorage, time_hash
 from wsgi.rr_people.posting.posts import PostsStorage
 
@@ -19,6 +22,8 @@ __doc__ = """
 5*) Должны быть затишья и наоборот подъемы глобальные. То есть, предусмотреть что чувак будет
 ходить в продолжительный отпуск.
 """
+
+log = logging.getLogger("POST_SEQUENCE")
 
 DAYS_IN_WEEK = 7
 
@@ -75,27 +80,7 @@ class PostSequenceHandler(object):
         self.ps_store = ps_store or PostsSequenceStore(self.name)
         self.ae_store = ae_store or AuthorsStorage(self.name)
 
-        week_time = [1] * WEEK
-        sleep_steps = self.ae_store.get_steps(self.human)
-        for step in sleep_steps:
-            for i in range(step.get("time"), step.get("end_time")):
-                week_time[i] = 0
-
-        prev_data = None
-        for i, data in enumerate(week_time):
-            if prev_data == None:
-                prev_data = data
-                continue
-
-            if prev_data == 0 and data == 1:
-                print i, "->"
-
-            if prev_data == 1 and data == 0:
-                print i, "<-"
-
-            prev_data = data
-
-    def evaluate_posts_times(self, count):
+    def evaluate_posts_times(self, n_min, n_max=None, pass_count=10):
         '''
         1) getting time slices when human not sleep in ae .
         2) generate sequence data
@@ -105,8 +90,34 @@ class PostSequenceHandler(object):
             3.3) shuffle result array.
             3.4) on shuffled result array create list of timings posts
         4) persist
+
+        :param n_min ~minimum posts at week
+        :param n_max ~maximum posts at week
+        :param pass_count count of iterations for evaluate sequence data
         :return:
         '''
+        time_sequence = self.ae_store.get_time_sequence(self.human)
+        sequence_data = generate_sequence_data(n_min, n_max=n_max, pass_count=pass_count, count=len(time_sequence))
+        log.info("\n%s:: %s : %s" % (self.human, sum(sequence_data), sequence_data))
+        sequence_result = []
+        for i, slice in enumerate(time_sequence):
+            start, stop = tuple(slice)
+            if start > stop:
+                td = (WEEK - start) + stop
+            else:
+                td = stop - start
+
+            action_counts_per_slice = (td / AVG_ACTION_TIME) - sequence_data[i]
+            actions_sequence = [0] * action_counts_per_slice + [1] * sequence_data[i]
+            crypto_random.shuffle(actions_sequence)
+            for i, action_flag in enumerate(actions_sequence):
+                if action_flag:
+                    time = start + (i * AVG_ACTION_TIME)
+                    if time > WEEK: time -= WEEK
+                    sequence_result.append(time)
+
+        log.info("\n%s: \n%s" % (self.human, "\n".join([str(t) for t in sequence_result])))
+        self.posts_time_sequence = sequence_result
 
 
 def generate_sequence_data(n_min, n_max=None, pass_count=10, count=DAYS_IN_WEEK):
@@ -153,3 +164,4 @@ if __name__ == '__main__':
     # res = generate_sequence_data(70, pass_count=50)
     # print sum(res), res
     psh = PostSequenceHandler("Shlak2k15")
+    psh.evaluate_posts_times(70)

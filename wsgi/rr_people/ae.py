@@ -118,9 +118,25 @@ class AuthorsStorage(DBHandler):
 
         self.author_groups = self.db.get_collection("ae_author_groups")
 
+        if "time_sequences" not in self.collection_names:
+            self.time_sequence = self.db.create_collection("time_sequences")
+            self.time_sequence.create_index([("used", 1), ("type", 1)], unique=True)
+        else:
+            self.time_sequence = self.db.get_collection("time_sequences")
+
         if not self.author_groups:
             self.author_groups = self.db.create_collection("ae_author_groups")
             self.author_groups.create_index([("name", pymongo.ASCENDING)])
+
+    def set_time_sequence(self, used, sequence):
+        self.time_sequence.update_one({"used": used},
+                                      {"$set": {"sequence": sequence}},
+                                      upsert=True)
+
+    def get_time_sequence(self, used):
+        found = self.time_sequence.find_one({"used":used}, projection={"sequence":1})
+        if found:
+            return found.get("sequence")
 
     def get_interested_authors(self, min_count_actions=AE_AUTHOR_MIN_ACTIONS):
         result = self.steps.aggregate([
@@ -634,6 +650,55 @@ def test_count_of_action(action_name, group_name):
     return count
 
 
+def ensure_time_sequence(used):
+    """
+    Do it after action engine data formed for certain group
+    Creating sequence when human will guarantee not sleep
+    :param used: - group name
+    :return: None
+    """
+    ae_store = AuthorsStorage(name="ensure time sequence")
+    week_time = [1] * WEEK
+    sleep_steps = ae_store.get_steps(used)
+    for step in sleep_steps:
+        for i in range(step.get("time"), step.get("end_time")):
+            week_time[i] = 0
+
+    posts_times_sequence = []
+    prev_data = None
+    start, stop, first_stop = 0, 0, 0
+    first_start_at_end = False
+
+    for i, data in enumerate(week_time):
+        if data == 1 and i == 0:
+            first_start_at_end = True
+
+        if prev_data == None:
+            prev_data = data
+            continue
+
+        if prev_data == 0 and data == 1:
+            start = i
+
+        if prev_data == 1 and data == 0:
+            stop = i
+
+        if start and stop:
+            posts_times_sequence.append((start, stop))
+            start, stop = 0, 0
+        elif first_start_at_end:
+            if stop and not start:
+                first_stop = stop
+                stop = 0
+            if start and not stop and i == len(week_time) - 1:
+                posts_times_sequence.append((start, first_stop))
+
+        prev_data = data
+    print used, posts_times_sequence
+    ae_store.set_time_sequence(used, posts_times_sequence)
+
+
 if __name__ == '__main__':
     # copy_data("mongodb://localhost:27017", "ae", ae_mongo_uri, ae_db_name, drop_dest=True)
-    print test_count_of_action("post", "Shlak2k15")
+    # print test_count_of_action("post", "Shlak2k15")
+    ensure_time_sequence("Shlak2k16")
