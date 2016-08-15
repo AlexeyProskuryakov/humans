@@ -19,6 +19,7 @@ class DBHandler(object):
         log.info("start db handler for [%s] %s" % (name, uri))
         self.client = MongoClient(host=uri, maxPoolSize=10, connect=False)
         self.db = self.client[db_name]
+        self.collection_names = self.db.collection_names(include_system_collections=False)
 
 
 class HumanStorage(DBHandler):

@@ -81,11 +81,6 @@ class PostsStorage(DBHandler):
         else:
             self.posts_counters = self.db.get_collection("posts_counters")
 
-        if "posts_sequnece" not in collection_names:
-            self.posts_sequence = self.db.create_collection("posts_sequence")
-            self.posts_sequence.create_index("human", unique=True)
-        else:
-            self.posts_sequence = self.db.get_collection("posts_sequence")
 
     # posts
     def get_post_state(self, url_hash):
@@ -165,20 +160,6 @@ class PostsStorage(DBHandler):
         if not q:
             raise Exception("add argument please _lock or _id")
         self.posts.update_one(q, {"$set": {"state": state}, "$unset": {"_lock": ""}})
-
-    def set_posts_sequence(self, human, sequence):
-        self.posts_sequence.update_one({"human": human},
-                                       {"$set":
-                                            {"sequence": sequence,
-                                             "start": time_hash(datetime.utcnow()),
-                                             "passed": 0
-                                             },
-                                        }, upsert=True)
-
-    def get_posts_sequence(self, human):
-        result = self.posts_sequence.find_one({"human": human})
-        return result
-
 
 
 CNT_NOISE = "noise"

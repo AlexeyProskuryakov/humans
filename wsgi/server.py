@@ -382,7 +382,7 @@ def ae_represent(name):
         return calendar.timegm(dt.timetuple()) * 1000
 
     y = 3
-    ssteps = author_storage.get_sleep_steps(name)
+    ssteps = author_storage.get_steps(name)
     log.info("get sleep steps: %s" % len(ssteps))
     sleep_data = []
     # sleep_days = defaultdict(list)

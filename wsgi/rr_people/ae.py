@@ -104,17 +104,17 @@ class AuthorsStorage(DBHandler):
     def __init__(self, name="?", mongo_uri=ae_mongo_uri, db_name=ae_db_name):
         super(AuthorsStorage, self).__init__(name=name, uri=mongo_uri, db_name=db_name)
 
-        self.authors = self.db.get_collection("ae_authors")
-        if not self.authors:
-            self.authors = self.db.create_collection(
+        self.steps = self.db.get_collection("ae_authors")
+        if not self.steps:
+            self.steps = self.db.create_collection(
                 "ae_authors",
             )
 
-            self.authors.create_index([("author", pymongo.ASCENDING)])
-            self.authors.create_index([("action_type", pymongo.ASCENDING)])
-            self.authors.create_index([("time", pymongo.ASCENDING)])
-            self.authors.create_index([("end_time", pymongo.ASCENDING)])
-            self.authors.create_index([("used", pymongo.ASCENDING)], sparse=True)
+            self.steps.create_index([("author", pymongo.ASCENDING)])
+            self.steps.create_index([("action_type", pymongo.ASCENDING)])
+            self.steps.create_index([("time", pymongo.ASCENDING)])
+            self.steps.create_index([("end_time", pymongo.ASCENDING)])
+            self.steps.create_index([("used", pymongo.ASCENDING)], sparse=True)
 
         self.author_groups = self.db.get_collection("ae_author_groups")
 
@@ -123,7 +123,7 @@ class AuthorsStorage(DBHandler):
             self.author_groups.create_index([("name", pymongo.ASCENDING)])
 
     def get_interested_authors(self, min_count_actions=AE_AUTHOR_MIN_ACTIONS):
-        result = self.authors.aggregate([
+        result = self.steps.aggregate([
             {"$match": {"used": {"$exists": False}}},
             {"$group": {"_id": "$author", "count": {"$sum": "$count"}}},
             {"$match": {"count": {"$gte": min_count_actions}}}])
@@ -136,7 +136,7 @@ class AuthorsStorage(DBHandler):
 
         for author in self.get_interested_authors():
             author_steps = []
-            for step in self.authors.find(
+            for step in self.steps.find(
                     {"end_time": {"$exists": True}, "action_type": by, "author": author}).sort("time"):
                 author_steps.append(dict(step))
             if len(author_steps) >= min_nights:
@@ -295,13 +295,16 @@ class AuthorsStorage(DBHandler):
             self.author_groups.insert_one({"name": group_name, "authors": authors})
         else:
             self.author_groups.update_one({"name": group_name}, {'$set': {"authors": authors}})
-            self.authors.update_many({"author": {"$in": found.get("authors")}}, {"$unset": {"used", ""}})
+            self.steps.update_many({"author": {"$in": found.get("authors")}}, {"$unset": {"used", ""}})
 
-        self.authors.update_many({"author": {"$in": authors}, "used": {"$ne": group_name}},
-                                 {"$set": {"used": group_name}})
+        self.steps.update_many({"author": {"$in": authors}, "used": {"$ne": group_name}},
+                               {"$set": {"used": group_name}})
 
-    def get_sleep_steps(self, group):
-        return list(self.authors.find({"used": group, "action_type": A_SLEEP}))
+    def get_steps(self, group, action_type=A_SLEEP, sort="time"):
+        q = self.steps.find({"used": group, "action_type": action_type})
+        if sort:
+            q.sort(sort)
+        return list(q)
 
     def get_all_groups(self):
         return list(self.author_groups.find({}))
@@ -337,7 +340,7 @@ class ActionGeneratorDataFormer(object):
         adder.start()
 
     def is_author_added(self, author):
-        found = self._storage.authors.find_one({"author": author})
+        found = self._storage.steps.find_one({"author": author})
         return found is not None
 
     def save_action(self, author, action_type, time, end_time=None):
@@ -350,24 +353,24 @@ class ActionGeneratorDataFormer(object):
         if end_time:
             q["end_time"] = end_time
 
-        found = self._storage.authors.find_one(q)
+        found = self._storage.steps.find_one(q)
         if found:
-            self._storage.authors.update_one(q, {"$inc": {"count": 1}})
+            self._storage.steps.update_one(q, {"$inc": {"count": 1}})
         else:
             q["count"] = 1
-            self._storage.authors.insert_one(q)
+            self._storage.steps.insert_one(q)
 
     def revert_sleep_actions(self, group_id=None):
         q = {'end_time': {'$exists': True}}
         if group_id:
             q["used"] = group_id
-        self._storage.authors.delete_many(q)
+        self._storage.steps.delete_many(q)
 
     def fill_consume_and_sleep(self, authors_min_actions_count=AE_AUTHOR_MIN_ACTIONS, min_sleep=AE_MIN_SLEEP_TIME,
                                max_sleep=AE_MAX_SLEEP_TIME):
         for author in self._storage.get_interested_authors(authors_min_actions_count):
             start_time, end_time = 0, 0
-            actions = self._storage.authors.find({"author": author}).sort("time", 1)
+            actions = self._storage.steps.find({"author": author}).sort("time", 1)
             for i, action in enumerate(actions):
                 if i == 0:
                     start_time = action.get("time")
@@ -496,7 +499,7 @@ class ActionGenerator(object):
              },
             {"$group": {"_id": "$action_type", "count": {"$sum": "$count"}, "authors": {"$addToSet": "$author"}}}
         ]
-        result = self._storage.authors.aggregate(pipe)
+        result = self._storage.steps.aggregate(pipe)
         action_weights = {}
         non_consumed_authors = []
         for r in result:
@@ -608,23 +611,24 @@ def copy_data(from_uri, from_db_name, to_uri, to_db_name, drop_dest=False):
     src_as = AuthorsStorage(name="from", mongo_uri=from_uri, db_name=from_db_name)
     dest_as = AuthorsStorage(name="to", mongo_uri=to_uri, db_name=to_db_name)
     if drop_dest:
-        dest_as.authors.drop()
+        dest_as.steps.drop()
         dest_as.author_groups.drop()
 
-    for group in src_as.authors.aggregate([{"$match": {"used": {"$exists": True}}},
-                                           {"$group": {"_id": "$used", "authors": {"$addToSet": "$author"}}}]):
-        src_authors = list(src_as.authors.find({"used": group.get("_id")}))
-        dest_as.authors.insert_many(src_authors)
+    for group in src_as.steps.aggregate([{"$match": {"used": {"$exists": True}}},
+                                         {"$group": {"_id": "$used", "authors": {"$addToSet": "$author"}}}]):
+        src_authors = list(src_as.steps.find({"used": group.get("_id")}))
+        dest_as.steps.insert_many(src_authors)
         log.info("was insert %s authors rows for group %s" % (len(src_authors), group.get("_id")))
         dest_as.set_group(group.get("authors"), group.get("_id"))
+
 
 def test_count_of_action(action_name, group_name):
     ae = ActionGenerator(group_name=group_name)
     count = 0
-    for x in range(WEEK/(MINUTE*9)):
+    for x in range(WEEK / (MINUTE * 9)):
         action = ae.get_action(x)
         if action == action_name:
-            count+=1
+            count += 1
             print x, count
 
     return count
@@ -632,4 +636,4 @@ def test_count_of_action(action_name, group_name):
 
 if __name__ == '__main__':
     # copy_data("mongodb://localhost:27017", "ae", ae_mongo_uri, ae_db_name, drop_dest=True)
-    print test_count_of_action("post","Shlak2k15")
+    print test_count_of_action("post", "Shlak2k15")
