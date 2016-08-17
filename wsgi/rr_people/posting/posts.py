@@ -81,7 +81,6 @@ class PostsStorage(DBHandler):
         else:
             self.posts_counters = self.db.get_collection("posts_counters")
 
-
     # posts
     def get_post_state(self, url_hash):
         found = self.posts.find_one({"url_hash": str(url_hash)}, projection={"state": 1})
@@ -123,7 +122,8 @@ class PostsStorage(DBHandler):
         self.posts_counters.update_one({"human": human}, {"$inc": {counter_type: 1}}, upsert=True)
 
     def get_counters(self, human):
-        self.posts_counters.find_one({"human": human}, projection={"_id": False})
+        found = self.posts_counters.find_one({"human": human}, projection={"_id": False})
+        return found or {}
 
     def get_queued_post(self, human=None, sub=None, important=False):
         lock_id = time.time()
@@ -203,12 +203,16 @@ class PostsBalancer(object):
 
 
 if __name__ == '__main__':
-    i = 0
-    n = 0
-    e = 10
-    for x in range(1000):
-        if (i == 0) or (n % e == 0 and n / e >= i):
-            i += 1
-        else:
-            n += 1
-        print i, n
+    ps = PostsStorage("test")
+    for i in range(100):
+        important = True if random.randint(0, 3) < 1 else False
+        ps.add_generated_post(
+            PostSource("test url %s" % i, "title: huaitle %s" % i, for_sub="funny", important=important), "funny",
+            important=important, state=PS_READY)
+
+    pb = PostsBalancer("Shlak2k15", ps)
+
+    for i in range(100):
+        post = pb.start_post()
+        print post
+        pb.end_post(post, "TEST")

@@ -1,4 +1,5 @@
 # coding=utf-8
+from copy import copy
 from datetime import datetime
 import random
 from sys import maxint
@@ -27,25 +28,28 @@ DAYS_IN_WEEK = 7
 
 
 class PostsSequence(object):
-    def __init__(self, sequence, data=None, storage=None):
-        data = data or {}
-        self.sequence = sequence
-        self.started = data.get("started", time_hash(datetime.utcnow()))
-        self.cur_day = data.get("cur_day", 0)
-        self.cur_day_posts_passed = data.get("cur_day_posts_passed", 0)
+    def __init__(self, data, store):
+        self.human = data.get('human')
+        self.right = data.get('right')
+        self.left = data.get('left')
+        self._store = store
 
-        self._human = data.get("human")
-        self._storage = storage
+    def get_near_time(self, time):
+        result = {}
+        for i, n_el in enumerate(self.right):
+            result[abs(n_el - time)] = i
+        near = min(result.keys())
+        position = result[near]
+        return self.right[position], position, near
 
-    def to_dict(self):
-        return dict(filter(lambda x: not str(x[0]).startswith("_"), self.__dict__.iteritems()))
-
-    def get_today_posts_count(self):
-        return self.sequence[self.cur_day]
-
-    def set_post_passed(self):
-        self.cur_day_posts_passed += 1
-        self._storage.posts_sequence.update({"human": self._human}, {"$inc": {"cur_day_post_passed": 1}})
+    def pass_element(self, position):
+        new_length = len(self.right)
+        for i in range(new_length):
+            if i <= position:
+                self.left.push(self.right.pop())
+            else:
+                break
+        self._store.update_sequence(self.human, self.right, self.left)
 
 
 class PostsSequenceStore(DBHandler):
@@ -59,15 +63,18 @@ class PostsSequenceStore(DBHandler):
         else:
             self.posts_sequence = self.db.get_collection(self.coll_name)
 
-    def set_posts_sequence_data(self, human, sequence):
+    def create_posts_sequence_data(self, human, sequence_metadata, sequence_data):
         self.posts_sequence.update_one({"human": human},
-                                       {"$set": sequence},
+                                       {"$set": {"metadata": sequence_metadata, "right": sequence_data, "left": []}},
                                        upsert=True)
 
     def get_posts_sequence(self, human):
         result = self.posts_sequence.find_one({"human": human})
         if result:
-            return PostsSequence(sequence=result.get("sequence"), data=result, storage=self)
+            return PostsSequence(result, store=self)
+
+    def update_sequence(self, human, right, left):
+        self.posts_sequence.update_one({"human": human}, {"$set": {"right": right, "left": left}})
 
 
 class PostSequenceHandler(object):
@@ -78,7 +85,7 @@ class PostSequenceHandler(object):
         self.ps_store = ps_store or PostsSequenceStore(self.name)
         self.ae_store = ae_store or AuthorsStorage(self.name)
 
-    def evaluate_posts_times(self, n_min, n_max=None, pass_count=10):
+    def evaluate_posts_time_sequence(self, n_min, n_max=None, pass_count=10):
         '''
         1) getting time slices when human not sleep in ae .
         2) generate sequence data
@@ -95,7 +102,8 @@ class PostSequenceHandler(object):
         :return:
         '''
         time_sequence = self.ae_store.get_time_sequence(self.human)
-        sequence_data = generate_sequence_data(n_min, n_max=n_max, pass_count=pass_count, count=len(time_sequence))
+        sequence_data = generate_sequence_days_metadata(n_min, n_max=n_max, pass_count=pass_count,
+                                                        count=len(time_sequence))
         log.info("\n%s:: %s : %s" % (self.human, sum(sequence_data), sequence_data))
         post_time_sequence = []
         for i, slice in enumerate(time_sequence):
@@ -109,8 +117,11 @@ class PostSequenceHandler(object):
             actions_sequence = [0] * action_counts_per_slice + [1] * sequence_data[i]
 
             crypto_random.shuffle(actions_sequence)
+            random.shuffle(actions_sequence)
             crypto_random.shuffle(actions_sequence)
+            random.shuffle(actions_sequence)
             crypto_random.shuffle(actions_sequence)
+
             print actions_sequence
 
             for i, action_flag in enumerate(actions_sequence):
@@ -128,7 +139,7 @@ class PostSequenceHandler(object):
             delta_info(max),
             delta_info(avg),
         ))
-        self.posts_time_sequence = post_time_sequence
+        self.time_sequence = post_time_sequence
 
     def _sort_from_current_time(self, post_time_sequence):
         i_time = time_hash(datetime.utcnow())
@@ -168,11 +179,13 @@ class PostSequenceHandler(object):
         avg_diff = sum(diff_acc) / len(diff_acc)
         return min_diff, max_diff, avg_diff
 
-    def _check_shuffle(self, ):
-        pass
+    def accept_post(self):
+        date_hash = time_hash(datetime.utcnow())
+        self.ps_store.get_posts_sequence(self.human)
 
 
-def generate_sequence_data(n_min, n_max=None, pass_count=10, count=DAYS_IN_WEEK):
+
+def generate_sequence_days_metadata(n_min, n_max=None, pass_count=10, count=DAYS_IN_WEEK):
     result = [0] * count
     _n_max = n_max or n_min
     creator = (n_min + _n_max) / (2. * DAYS_IN_WEEK)
@@ -216,4 +229,4 @@ if __name__ == '__main__':
     # res = generate_sequence_data(70, pass_count=50)
     # print sum(res), res
     psh = PostSequenceHandler("Shlak2k15")
-    psh.evaluate_posts_times(70)
+    psh.evaluate_posts_time_sequence(70)

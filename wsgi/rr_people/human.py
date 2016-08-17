@@ -465,16 +465,20 @@ class Human(RedditHandler):
             log.warn("no posts for me [%s] :(" % self.name)
             return PS_NO_POSTS
 
+        post = PostSource.from_dict(post_data)
         while 1:
-            post = PostSource.from_dict(post_data)
             try:
                 subreddit = self.get_subreddit(post.for_sub)
                 _wait_time_to_write(post.title)
                 result = subreddit.submit(save=True, title=post.title, url=post.url)
-                log.info("was post at [%s]; title: [%s]; url: [%s]" % (post.for_sub, post.title, post.url))
+                log.info("%s was post at [%s]; title: [%s]; url: [%s]" % (
+                    "!!!important!!!" if post.important else "noise",
+                    post.for_sub,
+                    post.title,
+                    post.url))
             except praw.errors.RateLimitExceeded as e:
-                log.warning("we have rate limit will wait %s" % e.sleep_time)
-                time.sleep(e.sleep_time + 5)
+                log.warning("rate_limit and will wait %s" % e.sleep_time)
+                time.sleep(e.sleep_time + random.randint(5, 10))
                 continue
             except Exception as e:
                 log.error("exception at posting %s" % (post))

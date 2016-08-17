@@ -181,7 +181,7 @@ class Kapellmeister(Process):
                 action = self.ae.get_action(step)
                 log.info("[%s] ae get step: %s" % (self.human_name, action))
                 _prev_step = step
-                if action != A_SLEEP:
+                if action not in A_SLEEP:
                     step, action_result = self._do_action(action, step, _start)
                 else:
                     if not self._set_state(S_SLEEP):
