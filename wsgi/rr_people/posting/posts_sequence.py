@@ -2,6 +2,7 @@
 from copy import copy
 from datetime import datetime
 import random
+import time
 from sys import maxint
 
 from Crypto.Random import random as crypto_random
@@ -32,7 +33,18 @@ class PostsSequence(object):
         self.human = data.get('human')
         self.right = data.get('right')
         self.left = data.get('left')
-        self._store = store
+
+        self.passed = data.get("passed")
+        self.skipped = data.get("skipped")
+
+        self.__store = store
+
+    def to_dict(self):
+        dict = self.__dict__
+        for k in dict.keys():
+            if str(k).startswith("__"):
+                del dict[k]
+        return dict
 
     def get_near_time(self, time):
         result = {}
@@ -44,12 +56,19 @@ class PostsSequence(object):
 
     def pass_element(self, position):
         new_length = len(self.right)
-        for i in range(new_length):
-            if i <= position:
-                self.left.push(self.right.pop())
-            else:
-                break
-        self._store.update_sequence(self.human, self.right, self.left)
+        self.passed += 1
+        if position > 0:
+            self.skipped += position - 1
+            for i in range(new_length):
+                if i <= position:
+                    self.left.append(self.right.pop(0))
+                else:
+                    break
+            self.__store.update_sequence(self)
+        else:
+            post = self.right.pop(0)
+            self.left.append(post)
+            self.__store.pass_post(self.human, post)
 
 
 class PostsSequenceStore(DBHandler):
@@ -65,7 +84,12 @@ class PostsSequenceStore(DBHandler):
 
     def create_posts_sequence_data(self, human, sequence_metadata, sequence_data):
         self.posts_sequence.update_one({"human": human},
-                                       {"$set": {"metadata": sequence_metadata, "right": sequence_data, "left": []}},
+                                       {"$set": {"metadata": sequence_metadata,
+                                                 "right": sequence_data,
+                                                 "left": [],
+                                                 "passed": 0,
+                                                 "skipped": 0
+                                                 }},
                                        upsert=True)
 
     def get_posts_sequence(self, human):
@@ -73,8 +97,13 @@ class PostsSequenceStore(DBHandler):
         if result:
             return PostsSequence(result, store=self)
 
-    def update_sequence(self, human, right, left):
-        self.posts_sequence.update_one({"human": human}, {"$set": {"right": right, "left": left}})
+    def pass_post(self, human, post_time):
+        result = self.posts_sequence.update_one({"human": human}, {"$push": {"left", post_time}, "$pop": {"right": -1}})
+        return result
+
+    def update_sequence(self, sequence):
+        self.posts_sequence.update_one({"human": sequence.human},
+                                       {"$set": sequence.to_dict()})
 
 
 class PostSequenceHandler(object):
@@ -84,6 +113,10 @@ class PostSequenceHandler(object):
         self.human = human
         self.ps_store = ps_store or PostsSequenceStore(self.name)
         self.ae_store = ae_store or AuthorsStorage(self.name)
+
+        self._sequence_cache = None
+        self._sequence_cache_time = None
+
 
     def evaluate_posts_time_sequence(self, n_min, n_max=None, pass_count=10):
         '''
@@ -179,9 +212,30 @@ class PostSequenceHandler(object):
         avg_diff = sum(diff_acc) / len(diff_acc)
         return min_diff, max_diff, avg_diff
 
+    def _get_sequence(self):
+        if not self._sequence_cache or time.time() - self._sequence_cache_time > AVG_ACTION_TIME:
+            self._sequence_cache = self.ps_store.get_posts_sequence(self.human)
+            self._sequence_cache_time = time.time()
+
+        return self._sequence_cache
+
+
     def accept_post(self):
         date_hash = time_hash(datetime.utcnow())
-        self.ps_store.get_posts_sequence(self.human)
+        sequence = self._get_sequence()
+        time, position, remained = sequence.get_near_time(date_hash)
+        if position > 0:
+            return position
+        else:
+            steps_remained = remained / AVG_ACTION_TIME
+            if steps_remained < 2:
+                return position
+        return False
+
+    def pass_post(self, position):
+        sequence = self._get_sequence()
+        sequence.pass_element(position)
+
 
 
 
