@@ -8,7 +8,7 @@ from sys import maxint
 from Crypto.Random import random as crypto_random
 from flask import logging
 
-from wsgi.db import DBHandler
+from wsgi.db import DBHandler, HumanStorage
 from wsgi.properties import WEEK, AVG_ACTION_TIME
 from wsgi.rr_people.ae import AuthorsStorage, time_hash, delta_info
 
@@ -26,6 +26,8 @@ __doc__ = """
 log = logging.getLogger("POST_SEQUENCE")
 
 DAYS_IN_WEEK = 7
+DEFAULT_MIN_POSTS_COUNT = 75
+DEFAULT_POSTS_SEQUEMCE_CACHED_TTL = 5 * AVG_ACTION_TIME
 
 
 class PostsSequence(object):
@@ -83,7 +85,7 @@ class PostsSequenceStore(DBHandler):
             self.posts_sequence = self.db.get_collection(self.coll_name)
 
     def create_posts_sequence_data(self, human, sequence_metadata, sequence_data):
-        self.posts_sequence.update_one({"human": human},
+        return self.posts_sequence.update_one({"human": human},
                                        {"$set": {"metadata": sequence_metadata,
                                                  "right": sequence_data,
                                                  "left": [],
@@ -106,19 +108,19 @@ class PostsSequenceStore(DBHandler):
                                        {"$set": sequence.to_dict()})
 
 
-class PostSequenceHandler(object):
+class PostsSequenceHandler(object):
     name = "post sequence handler"
 
-    def __init__(self, human, ps_store=None, ae_store=None):
+    def __init__(self, human, ps_store=None, ae_store=None, hs=None):
         self.human = human
         self.ps_store = ps_store or PostsSequenceStore(self.name)
         self.ae_store = ae_store or AuthorsStorage(self.name)
+        self.hs = hs or HumanStorage(self.name)
 
         self._sequence_cache = None
         self._sequence_cache_time = None
 
-
-    def evaluate_posts_time_sequence(self, n_min, n_max=None, pass_count=10):
+    def evaluate_posts_time_sequence(self, min_posts, max_posts=None, iterations_count=10):
         '''
         1) getting time slices when human not sleep in ae .
         2) generate sequence data
@@ -129,16 +131,20 @@ class PostSequenceHandler(object):
             3.4) on shuffled result array create list of timings posts
         4) setting head of result is max similar of now
 
-        :param n_min ~minimum posts at week
-        :param n_max ~maximum posts at week
-        :param pass_count count of iterations for evaluate sequence data
+        :param min_posts ~minimum posts at week
+        :param max_posts ~maximum posts at week
+        :param iterations_count count of iterations for evaluate sequence data
         :return:
         '''
         time_sequence = self.ae_store.get_time_sequence(self.human)
-        sequence_data = generate_sequence_days_metadata(n_min, n_max=n_max, pass_count=pass_count,
-                                                        count=len(time_sequence))
-        log.info("\n%s:: %s : %s" % (self.human, sum(sequence_data), sequence_data))
-        post_time_sequence = []
+        if not time_sequence:
+            raise Exception("Not time sequence for %s" % self.human)
+
+        sequence_meta_data = generate_sequence_days_metadata(min_posts, n_max=max_posts,
+                                                             iterations_count=iterations_count,
+                                                             count=len(time_sequence))
+        log.info("\n%s:: %s : %s" % (self.human, sum(sequence_meta_data), sequence_meta_data))
+        sequence_data = []
         for i, slice in enumerate(time_sequence):
             start, stop = tuple(slice)
             if start > stop:
@@ -146,8 +152,8 @@ class PostSequenceHandler(object):
             else:
                 td = stop - start
 
-            action_counts_per_slice = (td / AVG_ACTION_TIME) - sequence_data[i]
-            actions_sequence = [0] * action_counts_per_slice + [1] * sequence_data[i]
+            action_counts_per_slice = (td / AVG_ACTION_TIME) - sequence_meta_data[i]
+            actions_sequence = [0] * action_counts_per_slice + [1] * sequence_meta_data[i]
 
             crypto_random.shuffle(actions_sequence)
             random.shuffle(actions_sequence)
@@ -161,18 +167,18 @@ class PostSequenceHandler(object):
                 if action_flag:
                     time = start + (i * AVG_ACTION_TIME)
                     if time > WEEK: time -= WEEK
-                    post_time_sequence.append(time)
+                    sequence_data.append(time)
 
-        post_time_sequence = self._sort_from_current_time(post_time_sequence)
-        min, max, avg = self._evaluate_info_counts(post_time_sequence)
+        sequence_data = self._sort_from_current_time(sequence_data)
+        min, max, avg = self._evaluate_info_counts(sequence_data)
         log.info("\n%s %s: \n%s\n----------\nmin: %s \nmax: %s \navg: %s" % (
             self.human,
-            time_hash(datetime.utcnow()), "\n".join([str(t) for t in post_time_sequence]),
+            time_hash(datetime.utcnow()), "\n".join([str(t) for t in sequence_data]),
             delta_info(min),
             delta_info(max),
             delta_info(avg),
         ))
-        self.time_sequence = post_time_sequence
+        return sequence_data, sequence_meta_data
 
     def _sort_from_current_time(self, post_time_sequence):
         i_time = time_hash(datetime.utcnow())
@@ -213,15 +219,22 @@ class PostSequenceHandler(object):
         return min_diff, max_diff, avg_diff
 
     def _get_sequence(self):
-        if not self._sequence_cache or time.time() - self._sequence_cache_time > AVG_ACTION_TIME:
-            self._sequence_cache = self.ps_store.get_posts_sequence(self.human)
+        if not self._sequence_cache or time.time() - self._sequence_cache_time > DEFAULT_POSTS_SEQUEMCE_CACHED_TTL:
+            sequence = self.ps_store.get_posts_sequence(self.human)
+            if not sequence:
+                sequence_config = self.hs.get_human_posts_sequence_config(self.human) or \
+                                  {"min_post": DEFAULT_MIN_POSTS_COUNT}
+                data, metadata = self.evaluate_posts_time_sequence(**sequence_config)
+                self.ps_store.create_posts_sequence_data(self.human, metadata, data)
+                sequence = self.ps_store.get_posts_sequence(self.human)
+
+            self._sequence_cache = sequence
             self._sequence_cache_time = time.time()
 
         return self._sequence_cache
 
-
-    def accept_post(self):
-        date_hash = time_hash(datetime.utcnow())
+    def accept_post(self, date_hash=None):
+        date_hash = date_hash or time_hash(datetime.utcnow())
         sequence = self._get_sequence()
         time, position, remained = sequence.get_near_time(date_hash)
         if position > 0:
@@ -237,15 +250,13 @@ class PostSequenceHandler(object):
         sequence.pass_element(position)
 
 
-
-
-def generate_sequence_days_metadata(n_min, n_max=None, pass_count=10, count=DAYS_IN_WEEK):
+def generate_sequence_days_metadata(n_min, n_max=None, iterations_count=10, count=DAYS_IN_WEEK):
     result = [0] * count
     _n_max = n_max or n_min
     creator = (n_min + _n_max) / (2. * DAYS_IN_WEEK)
     adder = 0
     prev_adder = 0
-    for passage in range(pass_count):
+    for passage in range(iterations_count):
         for day_number in range(DAYS_IN_WEEK):
             if result[day_number] == 0:
                 day_count = random.randint(
@@ -282,5 +293,5 @@ def generate_sequence_days_metadata(n_min, n_max=None, pass_count=10, count=DAYS
 if __name__ == '__main__':
     # res = generate_sequence_data(70, pass_count=50)
     # print sum(res), res
-    psh = PostSequenceHandler("Shlak2k15")
+    psh = PostsSequenceHandler("Shlak2k15")
     psh.evaluate_posts_time_sequence(70)

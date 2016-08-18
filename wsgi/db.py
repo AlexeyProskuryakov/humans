@@ -1,6 +1,8 @@
 # coding=utf-8
+import functools
 import hashlib
 import logging
+import threading
 import time
 from datetime import datetime
 
@@ -12,6 +14,65 @@ from wsgi.properties import mongo_uri, db_name
 __author__ = 'alesha'
 
 log = logging.getLogger("DB")
+
+
+class Cache(object):
+    DEFAULT_TTL = 60
+
+    def __init__(self):
+        self.mutex = threading.Lock()
+        self.cache_data = {}
+        self.cache_timings = {}
+
+        self.ttl = {}
+
+    @staticmethod
+    def key(data, path=None):
+        return "%s$$%s" % (path or "", data)
+
+    def get(self, key, path=None):
+        _key = Cache.key(key, path)
+        if _key in self.cache_timings:
+            t = time.time()
+            ttl = self.ttl.get(_key, self.DEFAULT_TTL)
+            if t - self.cache_timings[_key] < ttl:
+                return self.cache_data.get(_key)
+            else:
+                self.__remove_key(_key)
+
+    def __remove_key(self, _key):
+        with self.mutex:
+            del self.cache_data[_key]
+            del self.cache_timings[_key]
+            if _key in self.ttl:
+                del self.ttl[_key]
+
+    def set(self, key, value, path=None, ttl=None):
+        _key = Cache.key(key, path)
+        with self.mutex:
+            self.cache_data[_key] = value
+            self.cache_timings[_key] = time.time()
+            if ttl:
+                self.ttl[_key] = ttl
+
+
+cache = Cache()
+
+
+def cached(ttl=None):
+    def cached_dec(f):
+        def wrapped(*args):
+            print args
+            k = "".join([str(a) for a in args])
+            result = cache.get(k, f.__name__)
+            if not result:
+                f_result = f(*args)
+                if f_result:
+                    cache.set(k, f.__name__, ttl=ttl)
+
+        return wrapped
+
+    return cached_dec
 
 
 class DBHandler(object):
@@ -66,7 +127,7 @@ class HumanStorage(DBHandler):
         else:
             self.global_config = db.get_collection("global_config")
 
-        if "humans_errors" not in collections:
+        if "human_errors" not in collections:
             self.human_errors = db.create_collection("human_errors")
             self.human_errors.create_index([("human_name", 1)])
         else:
@@ -79,7 +140,7 @@ class HumanStorage(DBHandler):
         return list(self.human_errors.find({"human_name": name}))
 
     def clear_errors(self, name):
-        self.human_errors.delete_many({"human_name":name})
+        self.human_errors.delete_many({"human_name": name})
 
     def get_global_config(self, name):
         return self.global_config.find_one({"name": name}, projection={"_id": False})
@@ -130,13 +191,27 @@ class HumanStorage(DBHandler):
         return result
 
     def set_human_subs(self, name, subreddits):
-        self.human_config.update_one({"user": name}, {"$set": {"subs": subreddits}})
+        self.human_config.update_one({"user": name}, {"$set": {"subs": subreddits}}, upsert=True)
 
+    @cached(ttl=120)
     def get_human_subs(self, name):
         found = self.human_config.find_one({"user": name}, projection={"subs": True})
         if found:
-            return found.get("subs", [])
-        return []
+            human_subs = found.get("subs", [])
+            return human_subs
+
+    def set_human_posts_sequence_config(self, name, min_posts, max_posts=None, iterations_count=None):
+        to_set = {"min_posts": min_posts}
+        if max_posts: to_set["max_posts"] = max_posts
+        if iterations_count: to_set["iterations_count"] = iterations_count
+
+        self.human_config.update_one({"user": name}, {"$set": {"posts_sequence_config": to_set}}, upsert=True)
+
+    @cached()
+    def get_human_posts_sequence_config(self, name):
+        found = self.human_config.find_one({"user": name}, projection={"posts_sequence_config": 1})
+        if found:
+            return found.get("posts_sequence_config")
 
     def get_all_humans_subs(self):
         cfg = self.human_config.find({}, projection={"subs": True})
@@ -176,6 +251,7 @@ class HumanStorage(DBHandler):
             live_config = found.get("live_config")
             return live_config
 
+    @cached(ttl=120)
     def get_human_config(self, name, projection=None):
         proj = projection or {"_id": False}
         return self.human_config.find_one({"user": name}, projection=proj)

@@ -141,8 +141,6 @@ class PostsStorage(DBHandler):
         result = self.posts.update_one(q, {"$set": {"state": PS_AT_QUEUE, "_lock": lock_id}})
         if result.modified_count == 1:
             q = {"_lock": lock_id, "important": important, "state": PS_AT_QUEUE}
-            if human: q["human"] = human
-            if sub: q["sub"] = sub
             post = self.posts.find_one(q)
             return post
 
@@ -172,47 +170,37 @@ class PostsBalancer(object):
         self.post_store = post_store or PostsStorage(name="posts manager")
         self.human_store = human_store or HumanStorage(name="posts manager")
 
-        self._human = human_name
+        self.human = human_name
         self._post_type_in_fly = None
 
     def start_post(self):
         if self._post_type_in_fly:
-            raise Exception("Have not ended posts for %s" % self._human)
+            raise Exception("Have not ended posts for %s" % self.human)
 
-        counters = self.post_store.get_counters(self._human)
-        noise = int(counters.get(CNT_NOISE), 0)
+        counters = self.post_store.get_counters(self.human)
+        noise = int(counters.get(CNT_NOISE, 0))
         important = int(counters.get(CNT_IMPORTANT, 0))
 
-        if important == 0 or (noise % EVERY == 0 and noise / EVERY >= important):  # todo change this predicate
-            self._post_type_in_fly = CNT_IMPORTANT
-            return self.post_store.get_queued_post(human=self._human, important=True)
+        if important == 0 or (noise % EVERY == 0 and noise / EVERY >= important):
+            post = self.post_store.get_queued_post(human=self.human,
+                                                   important=True)  # TODO ERROR if queued post will None
+            if post:
+                self._post_type_in_fly = CNT_IMPORTANT
         else:
-            sub = random.choice(self.human_store.get_human_subs(self._human))
-            self._post_type_in_fly = CNT_NOISE
-            return self.post_store.get_queued_post(sub=sub, important=False)
+            human_subs = self.human_store.get_human_subs(self.human)
+            sub = random.choice(human_subs)
+            post = self.post_store.get_queued_post(sub=sub, important=False)
+            if post:
+                self._post_type_in_fly = CNT_NOISE
+
+        return post
 
     def end_post(self, post, result):
         if not self._post_type_in_fly:
-            raise Exception("Have not started posts %s" % self._human)
+            raise Exception("Have not started posts %s" % self.human)
 
         if result == PS_POSTED:
-            self.post_store.increment_counter(self._human, self._post_type_in_fly)
+            self.post_store.increment_counter(self.human, self._post_type_in_fly)
 
         self.post_store.set_queued_post_used(post, result)
         self._post_type_in_fly = None
-
-
-if __name__ == '__main__':
-    ps = PostsStorage("test")
-    for i in range(100):
-        important = True if random.randint(0, 3) < 1 else False
-        ps.add_generated_post(
-            PostSource("test url %s" % i, "title: huaitle %s" % i, for_sub="funny", important=important), "funny",
-            important=important, state=PS_READY)
-
-    pb = PostsBalancer("Shlak2k15", ps)
-
-    for i in range(100):
-        post = pb.start_post()
-        print post
-        pb.end_post(post, "TEST")
