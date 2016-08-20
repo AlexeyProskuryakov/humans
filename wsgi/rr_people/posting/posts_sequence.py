@@ -9,7 +9,7 @@ from Crypto.Random import random as crypto_random
 from flask import logging
 
 from wsgi.db import DBHandler, HumanStorage
-from wsgi.properties import WEEK, AVG_ACTION_TIME
+from wsgi.properties import WEEK, AVG_ACTION_TIME, DEFAULT_MIN_POSTS_COUNT, DEFAULT_POSTS_SEQUENCE_CACHED_TTL
 from wsgi.rr_people.ae import AuthorsStorage, time_hash, delta_info
 
 __doc__ = """
@@ -26,8 +26,46 @@ __doc__ = """
 log = logging.getLogger("POST_SEQUENCE")
 
 DAYS_IN_WEEK = 7
-DEFAULT_MIN_POSTS_COUNT = 75
-DEFAULT_POSTS_SEQUEMCE_CACHED_TTL = 5 * AVG_ACTION_TIME
+
+
+def generate_sequence_days_metadata(n_min, n_max=None, iterations_count=10, count=DAYS_IN_WEEK):
+    result = [0] * count
+    _n_max = n_max or n_min
+    creator = (n_min + _n_max) / (2. * DAYS_IN_WEEK)
+    adder = 0
+    prev_adder = 0
+    for passage in range(iterations_count):
+        for day_number in range(DAYS_IN_WEEK):
+            if result[day_number] == 0:
+                day_count = random.randint(
+                    int(-(creator / 4)),
+                    int(creator + creator / 2)
+                )
+            else:
+                day_count = result[day_number]
+
+            if adder != 0:
+                day_count += int(random.random() * adder)
+
+            if day_count < 0:
+                day_count = 0
+
+            result[day_number] = day_count
+
+        week_count = sum(result)
+        if week_count <= _n_max and week_count >= n_min:
+            break
+        elif week_count > _n_max:
+            adder = float(_n_max - week_count) / DAYS_IN_WEEK
+        elif week_count < n_min:
+            adder = float((n_min - week_count) * 3) / DAYS_IN_WEEK
+
+        if adder == prev_adder:
+            break
+        else:
+            prev_adder = adder
+
+    return result
 
 
 class PostsSequence(object):
@@ -48,15 +86,13 @@ class PostsSequence(object):
         return dict
 
     def get_near_time(self, time):
-
         result = {}
         for i, n_el in enumerate(self.right):
             result[abs(n_el - time)] = i
 
         remain = min(result.keys())
         position = result[remain]
-
-        return position, remain
+        return position + 1, remain
 
     def pass_element(self, position):
         for i in range(position):
@@ -116,6 +152,9 @@ class PostsSequenceHandler(object):
         self._sequence_cache = None
         self._sequence_cache_time = None
 
+        self._accept_count = 0
+        self._remain_tst = 0
+
     def __evaluate_posts_time_sequence(self, min_posts, max_posts=None, iterations_count=10):
         '''
         1) getting time slices when human not sleep in ae .
@@ -136,9 +175,9 @@ class PostsSequenceHandler(object):
         if not time_sequence:
             raise Exception("Not time sequence for %s" % self.human)
 
-        sequence_meta_data = _generate_sequence_days_metadata(min_posts, n_max=max_posts,
-                                                              iterations_count=iterations_count,
-                                                              count=len(time_sequence))
+        sequence_meta_data = generate_sequence_days_metadata(min_posts, n_max=max_posts,
+                                                             iterations_count=iterations_count,
+                                                             count=len(time_sequence))
         log.info("\n%s:: %s : %s" % (self.human, sum(sequence_meta_data), sequence_meta_data))
         sequence_data = []
         for i, slice in enumerate(time_sequence):
@@ -213,7 +252,7 @@ class PostsSequenceHandler(object):
         return min_diff, max_diff, avg_diff
 
     def _get_sequence(self):
-        if not self._sequence_cache or time.time() - self._sequence_cache_time > DEFAULT_POSTS_SEQUEMCE_CACHED_TTL:
+        if not self._sequence_cache or time.time() - self._sequence_cache_time > DEFAULT_POSTS_SEQUENCE_CACHED_TTL:
             sequence = self.ps_store.get_posts_sequence(self.human)
             if not sequence or sequence.is_end():
                 sequence_config = self.hs.get_human_posts_sequence_config(self.human) or \
@@ -227,55 +266,25 @@ class PostsSequenceHandler(object):
 
         return self._sequence_cache
 
-    def nearest_position(self, date_hash=None):
+    def accept_post_time(self, date_hash=None):
+        if self._accept_count > 0 and ((self._remain_tst - date_hash) / self._accept_count) < (AVG_ACTION_TIME * 2):
+            self._accept_count -= 1
+            return True
+
         date_hash = date_hash or time_hash(datetime.utcnow())
         sequence = self._get_sequence()
         position, remained = sequence.get_near_time(date_hash)
-        return position, remained
-
-    def pass_post(self, position):
-        sequence = self._get_sequence()
         sequence.pass_element(position)
-
-
-def _generate_sequence_days_metadata(n_min, n_max=None, iterations_count=10, count=DAYS_IN_WEEK):
-    result = [0] * count
-    _n_max = n_max or n_min
-    creator = (n_min + _n_max) / (2. * DAYS_IN_WEEK)
-    adder = 0
-    prev_adder = 0
-    for passage in range(iterations_count):
-        for day_number in range(DAYS_IN_WEEK):
-            if result[day_number] == 0:
-                day_count = random.randint(
-                    int(-(creator / 4)),
-                    int(creator + creator / 2)
-                )
-            else:
-                day_count = result[day_number]
-
-            if adder != 0:
-                day_count += int(random.random() * adder)
-
-            if day_count < 0:
-                day_count = 0
-
-            result[day_number] = day_count
-
-        week_count = sum(result)
-        if week_count <= _n_max and week_count >= n_min:
-            break
-        elif week_count > _n_max:
-            adder = float(_n_max - week_count) / DAYS_IN_WEEK
-        elif week_count < n_min:
-            adder = float((n_min - week_count) * 3) / DAYS_IN_WEEK
-
-        if adder == prev_adder:
-            break
+        if position > 1:
+            self._remain_tst = date_hash + remained
+            self._accept_count = position - 1
+            return True
+        elif remained < AVG_ACTION_TIME:
+            return True
         else:
-            prev_adder = adder
-
-    return result
+            self._remain_tst = date_hash + remained
+            self._accept_count = position
+            return False
 
 
 if __name__ == '__main__':
@@ -283,8 +292,8 @@ if __name__ == '__main__':
     # print sum(res), res
     psh = PostsSequenceHandler("Shlak2k15")
     for dt in range(time_hash(datetime.utcnow()), WEEK, AVG_ACTION_TIME):
-        posts_count, remained = psh.nearest_position(dt)
+        posts_count, remained = psh.accept_post_time(dt)
         psh.pass_post(posts_count)
 
     for dt in range(0, time_hash(datetime.utcnow()) / 2, random.randint(AVG_ACTION_TIME, AVG_ACTION_TIME * 100)):
-        posts_count = psh.nearest_position(dt)
+        posts_count = psh.accept_post_time(dt)

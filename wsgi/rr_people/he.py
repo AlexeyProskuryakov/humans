@@ -12,7 +12,7 @@ import requests.auth
 
 from wsgi import properties
 from wsgi.db import HumanStorage
-from wsgi.properties import WEEK, HOUR, MINUTE
+from wsgi.properties import WEEK, HOUR, MINUTE, POLITIC_WORK_HARD
 from wsgi.rr_people import USER_AGENTS, \
     A_COMMENT, A_POST, A_SLEEP, \
     S_WORK, S_BAN, S_SLEEP, S_SUSPEND, \
@@ -178,17 +178,19 @@ class Kapellmeister(Process):
                     self.human.refresh_token()
                     last_token_refresh_time = step
 
+                politic = self.db.get_human_post_politic(self.human_name)
                 action = self.ae.get_action(step)
                 log.info("[%s] ae get step: %s" % (self.human_name, action))
-                _prev_step = step
-                if action not in A_SLEEP:
-                    step, action_result = self._do_action(action, step, _start)
-                else:
-                    if not self._set_state(S_SLEEP):
-                        return
-                    step += MINUTE
-                    action_result = A_SLEEP
-                    time.sleep(MINUTE)
+                if politic == POLITIC_WORK_HARD and action != A_POST:
+                    _prev_step = step
+                    if action != A_SLEEP:
+                        step, action_result = self._do_action(action, step, _start)
+                    else:
+                        if not self._set_state(S_SLEEP):
+                            return
+                        step += MINUTE
+                        action_result = A_SLEEP
+                        time.sleep(MINUTE)
 
                 if step > WEEK:
                     step = step - WEEK

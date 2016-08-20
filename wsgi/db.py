@@ -9,7 +9,7 @@ from datetime import datetime
 from pymongo import MongoClient
 from pymongo.errors import CollectionInvalid
 
-from wsgi.properties import mongo_uri, db_name
+from wsgi.properties import mongo_uri, db_name, DEFAULT_POLITIC
 
 __author__ = 'alesha'
 
@@ -212,6 +212,16 @@ class HumanStorage(DBHandler):
         found = self.human_config.find_one({"user": name}, projection={"posts_sequence_config": 1})
         if found:
             return found.get("posts_sequence_config")
+
+    def set_human_post_politic(self, name, politic):
+        self.human_config.update_one({"user": name}, {"$set": {"posting_politic": politic}})
+
+    def get_human_post_politic(self, name):
+        found = self.human_config.find_one({"user": name}, projection={"posting_politic"})
+        if found:
+            return found.get("posting_politic")
+        else:
+            return DEFAULT_POLITIC
 
     def get_all_humans_subs(self):
         cfg = self.human_config.find({}, projection={"subs": True})
