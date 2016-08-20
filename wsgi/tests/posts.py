@@ -43,7 +43,7 @@ def test_noise_and_important():
 
 def test_posts_sequence():
     psh = PostsSequenceHandler(human)
-    psh.accept_post()
+    psh.nearest_position()
 
 if __name__ == '__main__':
     test_noise_and_important()

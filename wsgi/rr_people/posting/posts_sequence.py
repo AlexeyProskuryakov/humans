@@ -36,8 +36,7 @@ class PostsSequence(object):
         self.right = data.get('right')
         self.left = data.get('left')
 
-        self.passed = data.get("passed")
-        self.skipped = data.get("skipped")
+        self.metadata = data.get("metadata")
 
         self.__store = store
 
@@ -49,28 +48,27 @@ class PostsSequence(object):
         return dict
 
     def get_near_time(self, time):
+
         result = {}
         for i, n_el in enumerate(self.right):
             result[abs(n_el - time)] = i
-        near = min(result.keys())
-        position = result[near]
-        return self.right[position], position, near
+
+        remain = min(result.keys())
+        position = result[remain]
+
+        return position, remain
 
     def pass_element(self, position):
-        new_length = len(self.right)
-        self.passed += 1
-        if position > 0:
-            self.skipped += position - 1
-            for i in range(new_length):
-                if i <= position:
-                    self.left.append(self.right.pop(0))
-                else:
-                    break
-            self.__store.update_sequence(self)
-        else:
+        for i in range(position):
             post = self.right.pop(0)
             self.left.append(post)
             self.__store.pass_post(self.human, post)
+
+    def is_end(self):
+        return len(self.right) == 0
+
+    def check(self):
+        return sum(self.metadata) == len(self.right) + len(self.left)
 
 
 class PostsSequenceStore(DBHandler):
@@ -86,13 +84,11 @@ class PostsSequenceStore(DBHandler):
 
     def create_posts_sequence_data(self, human, sequence_metadata, sequence_data):
         return self.posts_sequence.update_one({"human": human},
-                                       {"$set": {"metadata": sequence_metadata,
-                                                 "right": sequence_data,
-                                                 "left": [],
-                                                 "passed": 0,
-                                                 "skipped": 0
-                                                 }},
-                                       upsert=True)
+                                              {"$set": {"metadata": sequence_metadata,
+                                                        "right": sequence_data,
+                                                        "left": [],
+                                                        }},
+                                              upsert=True)
 
     def get_posts_sequence(self, human):
         result = self.posts_sequence.find_one({"human": human})
@@ -100,7 +96,7 @@ class PostsSequenceStore(DBHandler):
             return PostsSequence(result, store=self)
 
     def pass_post(self, human, post_time):
-        result = self.posts_sequence.update_one({"human": human}, {"$push": {"left", post_time}, "$pop": {"right": -1}})
+        result = self.posts_sequence.update_one({"human": human}, {"$push": {"left": post_time}, "$pop": {"right": -1}})
         return result
 
     def update_sequence(self, sequence):
@@ -120,7 +116,7 @@ class PostsSequenceHandler(object):
         self._sequence_cache = None
         self._sequence_cache_time = None
 
-    def evaluate_posts_time_sequence(self, min_posts, max_posts=None, iterations_count=10):
+    def __evaluate_posts_time_sequence(self, min_posts, max_posts=None, iterations_count=10):
         '''
         1) getting time slices when human not sleep in ae .
         2) generate sequence data
@@ -140,9 +136,9 @@ class PostsSequenceHandler(object):
         if not time_sequence:
             raise Exception("Not time sequence for %s" % self.human)
 
-        sequence_meta_data = generate_sequence_days_metadata(min_posts, n_max=max_posts,
-                                                             iterations_count=iterations_count,
-                                                             count=len(time_sequence))
+        sequence_meta_data = _generate_sequence_days_metadata(min_posts, n_max=max_posts,
+                                                              iterations_count=iterations_count,
+                                                              count=len(time_sequence))
         log.info("\n%s:: %s : %s" % (self.human, sum(sequence_meta_data), sequence_meta_data))
         sequence_data = []
         for i, slice in enumerate(time_sequence):
@@ -160,8 +156,6 @@ class PostsSequenceHandler(object):
             crypto_random.shuffle(actions_sequence)
             random.shuffle(actions_sequence)
             crypto_random.shuffle(actions_sequence)
-
-            print actions_sequence
 
             for i, action_flag in enumerate(actions_sequence):
                 if action_flag:
@@ -221,10 +215,10 @@ class PostsSequenceHandler(object):
     def _get_sequence(self):
         if not self._sequence_cache or time.time() - self._sequence_cache_time > DEFAULT_POSTS_SEQUEMCE_CACHED_TTL:
             sequence = self.ps_store.get_posts_sequence(self.human)
-            if not sequence:
+            if not sequence or sequence.is_end():
                 sequence_config = self.hs.get_human_posts_sequence_config(self.human) or \
-                                  {"min_post": DEFAULT_MIN_POSTS_COUNT}
-                data, metadata = self.evaluate_posts_time_sequence(**sequence_config)
+                                  {"min_posts": DEFAULT_MIN_POSTS_COUNT}
+                data, metadata = self.__evaluate_posts_time_sequence(**sequence_config)
                 self.ps_store.create_posts_sequence_data(self.human, metadata, data)
                 sequence = self.ps_store.get_posts_sequence(self.human)
 
@@ -233,24 +227,18 @@ class PostsSequenceHandler(object):
 
         return self._sequence_cache
 
-    def accept_post(self, date_hash=None):
+    def nearest_position(self, date_hash=None):
         date_hash = date_hash or time_hash(datetime.utcnow())
         sequence = self._get_sequence()
-        time, position, remained = sequence.get_near_time(date_hash)
-        if position > 0:
-            return position
-        else:
-            steps_remained = remained / AVG_ACTION_TIME
-            if steps_remained < 2:
-                return position
-        return False
+        position, remained = sequence.get_near_time(date_hash)
+        return position, remained
 
     def pass_post(self, position):
         sequence = self._get_sequence()
         sequence.pass_element(position)
 
 
-def generate_sequence_days_metadata(n_min, n_max=None, iterations_count=10, count=DAYS_IN_WEEK):
+def _generate_sequence_days_metadata(n_min, n_max=None, iterations_count=10, count=DAYS_IN_WEEK):
     result = [0] * count
     _n_max = n_max or n_min
     creator = (n_min + _n_max) / (2. * DAYS_IN_WEEK)
@@ -294,4 +282,9 @@ if __name__ == '__main__':
     # res = generate_sequence_data(70, pass_count=50)
     # print sum(res), res
     psh = PostsSequenceHandler("Shlak2k15")
-    psh.evaluate_posts_time_sequence(70)
+    for dt in range(time_hash(datetime.utcnow()), WEEK, AVG_ACTION_TIME):
+        posts_count, remained = psh.nearest_position(dt)
+        psh.pass_post(posts_count)
+
+    for dt in range(0, time_hash(datetime.utcnow()) / 2, random.randint(AVG_ACTION_TIME, AVG_ACTION_TIME * 100)):
+        posts_count = psh.nearest_position(dt)
