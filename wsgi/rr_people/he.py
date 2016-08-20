@@ -12,13 +12,14 @@ import requests.auth
 
 from wsgi import properties
 from wsgi.db import HumanStorage
-from wsgi.properties import WEEK, HOUR, MINUTE, POLITIC_WORK_HARD
+from wsgi.properties import WEEK, HOUR, MINUTE, POLITIC_WORK_HARD, AVG_ACTION_TIME
 from wsgi.rr_people import USER_AGENTS, \
     A_COMMENT, A_POST, A_SLEEP, \
     S_WORK, S_BAN, S_SLEEP, S_SUSPEND, \
     Singleton, A_CONSUME, A_PRODUCE
 from wsgi.rr_people.ae import ActionGenerator, time_hash, delta_info
 from wsgi.rr_people.human import Human
+from wsgi.rr_people.posting.posts_sequence import PostsSequenceHandler
 from wsgi.rr_people.states.entity_states import StatesHandler
 from wsgi.rr_people.states.processes import ProcessDirector
 
@@ -83,6 +84,7 @@ class Kapellmeister(Process):
         self.human_name = name
         self.name = "KPLM [%s]" % (self.human_name)
         self.ae = ActionGenerator(group_name=name)
+        self.psh = PostsSequenceHandler(human=self.human_name, hs=self.db, ae_store=self.ae._storage)
         self.human = human_class(login=name)
 
         self.states_handler = StatesHandler(name="kplmtr of [%s]" % name)
@@ -118,7 +120,7 @@ class Kapellmeister(Process):
     def _can_post_at_time(self):
         return (time.time() - self._get_previous_post_time()) > MIN_TIME_BETWEEN_POSTS
 
-    def _do_action(self, action, step, _start):
+    def _do_action(self, action, step, _start, force=False):
         produce = False
         if action == A_COMMENT and self.human.can_do(A_COMMENT):
             self._set_state(WORK_STATE("commenting"))
@@ -126,7 +128,7 @@ class Kapellmeister(Process):
             if comment_result == A_COMMENT:
                 produce = True
 
-        elif action == A_POST and self.human.can_do(A_POST) and self._can_post_at_time():
+        elif action == A_POST and ((self.human.can_do(A_POST) and self._can_post_at_time()) or force):
             self._set_state(WORK_STATE("posting"))
             post_result = self.human.do_post()
             if post_result == A_POST: produce = True
@@ -152,6 +154,12 @@ class Kapellmeister(Process):
         step += _diff
         return step, action_result
 
+    def check_token_refresh(self, step):
+        if step - self.last_token_refresh_time > HOUR - 100:
+            log.info("will refresh token for [%s]" % self.human_name)
+            self.human.refresh_token()
+            self.last_token_refresh_time = step
+
     def run(self):
         if not self.process_director.can_start_aspect(HE_ASPECT(self.human_name), self.pid).get("started"):
             log.warning("another kappelmeister for [%s] worked..." % self.human_name)
@@ -160,37 +168,37 @@ class Kapellmeister(Process):
         log.info("start kappellmeister for [%s]" % self.human_name)
         t_start = time_hash(datetime.utcnow())
         step = t_start
-        last_token_refresh_time = t_start
+        self.last_token_refresh_time = t_start
 
         while 1:
             try:
 
                 _start = time.time()
+                _prev_step = step
 
                 if not self._set_state(S_WORK):
                     return
 
-                if step - last_token_refresh_time > HOUR - 100:
-                    if not self._human_check():
-                        log.info("%s is not checked..." % self.human_name)
-                        return
-                    log.info("will refresh token for [%s]" % self.human_name)
-                    self.human.refresh_token()
-                    last_token_refresh_time = step
+                self.check_token_refresh(step)
 
                 politic = self.db.get_human_post_politic(self.human_name)
                 action = self.ae.get_action(step)
-                log.info("[%s] ae get step: %s" % (self.human_name, action))
-                if politic == POLITIC_WORK_HARD and action != A_POST:
-                    _prev_step = step
-                    if action != A_SLEEP:
-                        step, action_result = self._do_action(action, step, _start)
-                    else:
-                        if not self._set_state(S_SLEEP):
-                            return
-                        step += MINUTE
-                        action_result = A_SLEEP
-                        time.sleep(MINUTE)
+                if politic == POLITIC_WORK_HARD and self.psh.accept_post_time():
+                    log.info('[%s] have WH politic and will post')
+                    action = A_POST
+                    force = True
+                else:
+                    force = False
+
+                log.info("[%s] decide: %s" % (self.human_name, action))
+
+                if action != A_SLEEP:
+                    step, action_result = self._do_action(action, step, _start, force)
+                else:
+                    self._set_state(S_SLEEP)
+                    step += MINUTE
+                    action_result = A_SLEEP
+                    time.sleep(AVG_ACTION_TIME)
 
                 if step > WEEK:
                     step = step - WEEK
