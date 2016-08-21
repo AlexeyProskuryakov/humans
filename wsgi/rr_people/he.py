@@ -83,7 +83,8 @@ class Kapellmeister(Process):
         self.db = HumanStorage(name="main storage for [%s]" % name)
         self.human_name = name
         self.name = "KPLM [%s]" % (self.human_name)
-        self.ae = ActionGenerator(group_name=name)
+        ae_group_name = self.db.get_ae_group(self.human_name)
+        self.ae = ActionGenerator(group_name=ae_group_name)
         self.psh = PostsSequenceHandler(human=self.human_name, hs=self.db, ae_store=self.ae._storage)
         self.human = human_class(login=name)
 

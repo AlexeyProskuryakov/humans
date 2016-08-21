@@ -87,12 +87,14 @@ class PostsSequence(object):
 
     def get_near_time(self, time):
         result = {}
-        for i, n_el in enumerate(self.right):
-            result[abs(n_el - time)] = i
+        for i, n_el in enumerate(self.right, start=1):
+            dt = abs(n_el - time) * pow(i, 3)
+            result[dt] = i
 
         remain = min(result.keys())
         position = result[remain]
-        return position + 1, remain
+
+        return position, remain / pow(position, 3)
 
     def pass_element(self, position):
         for i in range(position):
@@ -143,11 +145,12 @@ class PostsSequenceStore(DBHandler):
 class PostsSequenceHandler(object):
     name = "post sequence handler"
 
-    def __init__(self, human, ps_store=None, ae_store=None, hs=None):
+    def __init__(self, human, ps_store=None, ae_store=None, hs=None, ae_group=None):
         self.human = human
         self.ps_store = ps_store or PostsSequenceStore(self.name)
         self.ae_store = ae_store or AuthorsStorage(self.name)
         self.hs = hs or HumanStorage(self.name)
+        self.ae_group = ae_group or self.hs.get_ae_group(self.human)
 
         self._sequence_cache = None
         self._sequence_cache_time = None
@@ -155,7 +158,7 @@ class PostsSequenceHandler(object):
         self._accept_count = 0
         self._remain_tst = 0
 
-    def __evaluate_posts_time_sequence(self, min_posts, max_posts=None, iterations_count=10):
+    def __evaluate_posts_time_sequence(self, min_posts, max_posts=None, iterations_count=10, current_datetime=None):
         '''
         1) getting time slices when human not sleep in ae .
         2) generate sequence data
@@ -171,7 +174,7 @@ class PostsSequenceHandler(object):
         :param iterations_count count of iterations for evaluate sequence data
         :return:
         '''
-        time_sequence = self.ae_store.get_time_sequence(self.human)
+        time_sequence = self.ae_store.get_time_sequence(self.ae_group)
         if not time_sequence:
             raise Exception("Not time sequence for %s" % self.human)
 
@@ -202,7 +205,7 @@ class PostsSequenceHandler(object):
                     if time > WEEK: time -= WEEK
                     sequence_data.append(time)
 
-        sequence_data = self._sort_from_current_time(sequence_data)
+        sequence_data = self._sort_from_current_time(sequence_data, current_datetime=current_datetime)
         min, max, avg = self._evaluate_info_counts(sequence_data)
         log.info("\n%s %s: \n%s\n----------\nmin: %s \nmax: %s \navg: %s" % (
             self.human,
@@ -213,8 +216,8 @@ class PostsSequenceHandler(object):
         ))
         return sequence_data, sequence_meta_data
 
-    def _sort_from_current_time(self, post_time_sequence):
-        i_time = time_hash(datetime.utcnow())
+    def _sort_from_current_time(self, post_time_sequence, current_datetime=None):
+        i_time = current_datetime or time_hash(datetime.utcnow())
         prev_pt = None
         position = None
         for i, pt in enumerate(post_time_sequence):
@@ -251,38 +254,51 @@ class PostsSequenceHandler(object):
         avg_diff = sum(diff_acc) / len(diff_acc)
         return min_diff, max_diff, avg_diff
 
+    def evaluate_new(self):
+        sequence_config = self.hs.get_human_posts_sequence_config(self.human) or \
+                          {"min_posts": DEFAULT_MIN_POSTS_COUNT}
+
+        data, metadata = self.__evaluate_posts_time_sequence(**sequence_config)
+        self.ps_store.create_posts_sequence_data(self.human, metadata, data)
+        return self.ps_store.get_posts_sequence(self.human)
+
     def _get_sequence(self):
         if not self._sequence_cache or time.time() - self._sequence_cache_time > DEFAULT_POSTS_SEQUENCE_CACHED_TTL:
             sequence = self.ps_store.get_posts_sequence(self.human)
-            if not sequence or sequence.is_end():
-                sequence_config = self.hs.get_human_posts_sequence_config(self.human) or \
-                                  {"min_posts": DEFAULT_MIN_POSTS_COUNT}
-                data, metadata = self.__evaluate_posts_time_sequence(**sequence_config)
-                self.ps_store.create_posts_sequence_data(self.human, metadata, data)
-                sequence = self.ps_store.get_posts_sequence(self.human)
+            if not sequence or sequence.is_end() or not sequence.check():
+                sequence = self.evaluate_new()
 
             self._sequence_cache = sequence
             self._sequence_cache_time = time.time()
 
         return self._sequence_cache
 
+    def get_remained(self, x):
+        return x - WEEK if x > WEEK else x
+
     def accept_post_time(self, date_hash=None):
-        if self._accept_count > 0 and ((self._remain_tst - date_hash) / self._accept_count) < (AVG_ACTION_TIME * 2):
-            self._accept_count -= 1
-            return True
+        sequence = self._get_sequence()
+        if self._accept_count > 0:
+            if (abs(self._remain_tst - date_hash) / self._accept_count) < (AVG_ACTION_TIME * 2):
+                self._accept_count -= 1
+                sequence.pass_element(1)
+                return True
+            else:
+                return False
 
         date_hash = date_hash or time_hash(datetime.utcnow())
-        sequence = self._get_sequence()
         position, remained = sequence.get_near_time(date_hash)
-        sequence.pass_element(position)
+
         if position > 1:
-            self._remain_tst = date_hash + remained
+            self._remain_tst = self.get_remained(remained + date_hash)
             self._accept_count = position - 1
+            sequence.pass_element(1)
             return True
         elif remained < AVG_ACTION_TIME:
+            sequence.pass_element(1)
             return True
         else:
-            self._remain_tst = date_hash + remained
+            self._remain_tst = self.get_remained(remained + date_hash)
             self._accept_count = position
             return False
 
@@ -291,9 +307,12 @@ if __name__ == '__main__':
     # res = generate_sequence_data(70, pass_count=50)
     # print sum(res), res
     psh = PostsSequenceHandler("Shlak2k15")
+    psh.evaluate_new()
+
     for dt in range(time_hash(datetime.utcnow()), WEEK, AVG_ACTION_TIME):
-        posts_count, remained = psh.accept_post_time(dt)
-        psh.pass_post(posts_count)
+        print psh.accept_post_time(
+            dt), dt, "[", psh._accept_count, psh._remain_tst,  psh._remain_tst-dt, ']\n', psh._sequence_cache.left, '\n', psh._sequence_cache.right, '\n--------------\n\n'
 
     for dt in range(0, time_hash(datetime.utcnow()) / 2, random.randint(AVG_ACTION_TIME, AVG_ACTION_TIME * 100)):
-        posts_count = psh.accept_post_time(dt)
+        print psh.accept_post_time(
+            dt), dt, '\n', psh._sequence_cache.left, '\n', psh._sequence_cache.right, '\n--------------\n\n'

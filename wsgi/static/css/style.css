@@ -27,7 +27,7 @@ table.sortable thead {
     display:none;
 }
 
-#ae-represent-container {
+#sequences-represent-container {
 	box-sizing: border-box;
 	width: 1750px;
 	height: 250px;

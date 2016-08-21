@@ -116,14 +116,13 @@ class AuthorsStorage(DBHandler):
             self.steps.create_index([("end_time", pymongo.ASCENDING)])
             self.steps.create_index([("used", pymongo.ASCENDING)], sparse=True)
 
-        self.author_groups = self.db.get_collection("ae_author_groups")
-
         if "time_sequences" not in self.collection_names:
             self.time_sequence = self.db.create_collection("time_sequences")
             self.time_sequence.create_index([("used", 1), ("type", 1)], unique=True)
         else:
             self.time_sequence = self.db.get_collection("time_sequences")
 
+        self.author_groups = self.db.get_collection("ae_author_groups")
         if not self.author_groups:
             self.author_groups = self.db.create_collection("ae_author_groups")
             self.author_groups.create_index([("name", pymongo.ASCENDING)])
@@ -499,9 +498,6 @@ class ActionGenerator(object):
         self._r = praw.Reddit(user_agent=choice(USER_AGENTS))
         self._action_stack = ActionGenerator.ActionStack(size)
         log.info("Activity engine inited!")
-
-    def set_group_name(self, group_name):
-        self.group_name = group_name
 
     def get_action(self, for_time, step=5 * MINUTE):
         if not self.group_name:

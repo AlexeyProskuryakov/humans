@@ -4,12 +4,13 @@ import hashlib
 import logging
 import threading
 import time
+from collections import defaultdict
 from datetime import datetime
 
 from pymongo import MongoClient
 from pymongo.errors import CollectionInvalid
 
-from wsgi.properties import mongo_uri, db_name, DEFAULT_POLITIC
+from wsgi.properties import mongo_uri, db_name, DEFAULT_POLITIC, AE_DEFAULT_GROUP
 
 __author__ = 'alesha'
 
@@ -23,6 +24,7 @@ class Cache(object):
         self.mutex = threading.Lock()
         self.cache_data = {}
         self.cache_timings = {}
+        self.pathes = defaultdict(list)
 
         self.ttl = {}
 
@@ -38,37 +40,56 @@ class Cache(object):
             if t - self.cache_timings[_key] < ttl:
                 return self.cache_data.get(_key)
             else:
-                self.__remove_key(_key)
+                self.remove_key(_key)
 
-    def __remove_key(self, _key):
+    def remove_key(self, _key):
         with self.mutex:
             del self.cache_data[_key]
             del self.cache_timings[_key]
             if _key in self.ttl:
                 del self.ttl[_key]
 
+    def remove_path(self, path):
+        for key in self.pathes[path]:
+            _key = Cache.key(key, path)
+            self.remove_key(_key=_key)
+
     def set(self, key, value, path=None, ttl=None):
         _key = Cache.key(key, path)
         with self.mutex:
             self.cache_data[_key] = value
             self.cache_timings[_key] = time.time()
+            self.pathes[path].append(key)
             if ttl:
                 self.ttl[_key] = ttl
 
 
 cache = Cache()
 
+cache_path = lambda x: str(x).replace("set", "").replace("get", "").replace("_", "").strip()
+
+
+def cache_refresh(f):
+    def wrapped(*args, **kwargs):
+        cache.remove_path(cache_path(f.__name__))
+        return f(*args, **kwargs)
+
+    return wrapped
+
 
 def cached(ttl=None):
     def cached_dec(f):
         def wrapped(*args):
-            print args
             k = "".join([str(a) for a in args])
-            result = cache.get(k, f.__name__)
+            print k
+            path = cache_path(f.__name__)
+            result = cache.get(k, path=path)
             if not result:
                 f_result = f(*args)
                 if f_result:
-                    cache.set(k, f.__name__, ttl=ttl)
+                    cache.set(k, f_result, path=path, ttl=ttl)
+                    result = f_result
+            return result
 
         return wrapped
 
@@ -190,6 +211,7 @@ class HumanStorage(DBHandler):
         result = list(found)
         return result
 
+    @cache_refresh
     def set_human_subs(self, name, subreddits):
         self.human_config.update_one({"user": name}, {"$set": {"subs": subreddits}}, upsert=True)
 
@@ -200,6 +222,18 @@ class HumanStorage(DBHandler):
             human_subs = found.get("subs", [])
             return human_subs
 
+    @cache_refresh
+    def set_ae_group(self, name, group_name):
+        self.human_config.update_one({"user": name}, {"$set": {"ae_group": group_name}})
+
+    @cached()
+    def get_ae_group(self, name):
+        found = self.human_config.find_one({"user": name}, projection={"ae_group": 1})
+        if found:
+            return found["ae_group"]
+        else:
+            return AE_DEFAULT_GROUP
+
     def set_human_posts_sequence_config(self, name, min_posts, max_posts=None, iterations_count=None):
         to_set = {"min_posts": min_posts}
         if max_posts: to_set["max_posts"] = max_posts
@@ -207,12 +241,12 @@ class HumanStorage(DBHandler):
 
         self.human_config.update_one({"user": name}, {"$set": {"posts_sequence_config": to_set}}, upsert=True)
 
-    @cached()
     def get_human_posts_sequence_config(self, name):
         found = self.human_config.find_one({"user": name}, projection={"posts_sequence_config": 1})
         if found:
             return found.get("posts_sequence_config")
 
+    @cache_refresh
     def set_human_post_politic(self, name, politic):
         self.human_config.update_one({"user": name}, {"$set": {"posting_politic": politic}})
 

@@ -5,7 +5,20 @@
 <div class="container-fluid">
 
     <div class="row">
+        <div class="col-md-6 col-md-offset-3">
+            <img id='loader-gif' src="{{url_for('static', filename='img/giphy.gif')}}">
+        </div>
+    </div>
 
+    <div class="row">
+        <div class="col-md-10 col-md-offset-1">
+
+            <div id="sequences-represent-container">
+            </div>
+
+        </div>
+    </div>
+    <div class="row">
         <div class="col-md-6">
             <div class="row">
                 <div class="col-md-3">
@@ -252,6 +265,12 @@
     </div>
 </div>
 <script src="{{url_for('static',filename='js/humans-script.js')}}"></script>
+<script src="{{url_for('static',filename='js/sequences-script.js')}}"></script>
+<script>
+    $(function(){
+        show_sequences('{{ae_group}}');
+    });
+</script>
 {% endblock %}
 
 {% endblock %}

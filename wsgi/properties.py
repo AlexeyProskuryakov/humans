@@ -76,6 +76,10 @@ AE_MIN_SLEEP_TIME = 6 * HOUR
 AE_MAX_SLEEP_TIME = 12 * HOUR
 AE_AUTHOR_MIN_ACTIONS = 1000
 
+AE_GROUPS = ["eniki", "beniki"]
+
+AE_DEFAULT_GROUP = "eniki"
+
 #for posts sequence evaluate
 AVG_ACTION_TIME = 3 * MINUTE
 COUNT_SHUFFLE_ITERATIONS = 5
