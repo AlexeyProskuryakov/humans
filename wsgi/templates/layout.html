@@ -5,19 +5,18 @@
     <meta charset="UTF-8">
     <title>RR-People</title>
     <!-- Latest compiled and minified CSS -->
-    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
-    <link rel="stylesheet"
-          href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.5.0/css/bootstrap-datepicker.min.css">
+    <link rel="stylesheet" href="{{url_for('static', filename='css/bootstrap.min.css') }}">
+    <link rel="stylesheet" href="{{url_for('static', filename='css/bootstrap-datepicker.min.css') }}">
 
     <!-- Optional theme -->
-    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap-theme.min.css">
+    <link rel="stylesheet" href="{{url_for('static', filename='css/bootstrap-theme.min.css')}}">
     <link rel="stylesheet" href="{{url_for('static', filename='css/style.css')}}">
     <!-- Latest compiled and minified JavaScript -->
     <script src="{{ url_for('static', filename='js/jquery-2.1.4.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/sorttable.js') }}"></script>
-    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/1.0.2/Chart.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.5.0/js/bootstrap-datepicker.min.js"></script>
+    <script src="{{ url_for('static', filename='js/bootstrap.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/Chart.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/bootstrap-datepicker.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/jquery.flot.js') }}"></script>
     <script src="{{ url_for('static', filename='js/jquery.flot.canvas.js') }}"></script>
     <script src="{{ url_for('static', filename='js/jquery.flot.resize.js') }}"></script>
