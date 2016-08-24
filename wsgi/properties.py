@@ -34,9 +34,6 @@ logging.getLogger("werkzeug").setLevel(logging.WARNING)
 mongo_uri = "mongodb://3030:sederfes100500@ds055525.mongolab.com:55525/reddit_people"
 db_name = "reddit_people"
 
-# ae_mongo_uri = "mongodb://localhost:27017"
-# ae_db_name = "ae"
-
 ae_mongo_uri = "mongodb://aliper:sederfes100500@ds025449.mlab.com:25449/ae"
 ae_db_name = "ae"
 
@@ -60,7 +57,6 @@ process_director_redis_address = "pub-redis-17359.us-east-1-3.4.ec2.garantiadata
 process_director_redis_port = 17359
 process_director_redis_password = "sederfes100500"
 
-
 redis_max_connections = 2
 
 SEC = 1
@@ -80,17 +76,16 @@ AE_GROUPS = ["eniki", "beniki"]
 
 AE_DEFAULT_GROUP = "eniki"
 
-#for posts sequence evaluate
+# for posts sequence evaluate
 AVG_ACTION_TIME = 3 * MINUTE
 COUNT_SHUFFLE_ITERATIONS = 5
 DEFAULT_MIN_POSTS_COUNT = 75
 DEFAULT_POSTS_SEQUENCE_CACHED_TTL = 5 * AVG_ACTION_TIME
 
-
 POLITIC_FREE_LIFE = "free_life"
 POLITIC_WORK_HARD = "work_hard"
 DEFAULT_POLITIC = POLITIC_FREE_LIFE
-
+POLITICS = [POLITIC_WORK_HARD, POLITIC_FREE_LIFE]
 
 DEFAULT_LIMIT = 500
 # DEFAULT_LIMIT = 20
@@ -127,3 +122,18 @@ logger.info(
         ["%s:\t%s" % (k, v) for k, v in os.environ.iteritems()]))
 
 WORKED_PIDS_QUERY = "python"
+
+if test_mode:
+    mongo_uri = "mongodb://localhost:27017/reddit_people"
+    db_name = "reddit_people"
+
+    ae_mongo_uri = "mongodb://localhost:27017/ae"
+    ae_db_name = "ae"
+
+    comments_mongo_uri = "mongodb://localhost:27017/humans_comments"
+    comments_db_name = "humans_comments"
+    TIME_TO_COMMENT_SPOILED = 3600 * 24 * 30 * 6
+
+    comment_redis_address = states_redis_address = posts_redis_address = process_director_redis_address = "localhost"
+    comment_redis_port = states_redis_port = posts_redis_port = process_director_redis_port = 6379
+    comment_redis_password = states_redis_password = posts_redis_password = process_director_redis_password = "sederfes100500"

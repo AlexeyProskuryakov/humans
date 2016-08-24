@@ -14,14 +14,15 @@ from flask_login import LoginManager, login_user, login_required, logout_user
 from werkzeug.utils import redirect
 
 from wsgi.db import HumanStorage
-from wsgi.properties import want_coefficient_max, POLITIC_WORK_HARD, WEEK
+from wsgi.properties import want_coefficient_max, POLITIC_WORK_HARD, WEEK, AE_GROUPS, AE_DEFAULT_GROUP, DEFAULT_POLITIC, \
+    POLITICS
 from wsgi.rr_people.ae import AuthorsStorage
 from wsgi.rr_people.commenting.connection import CommentHandler
 from wsgi.rr_people.he import HumanOrchestra
 from wsgi.rr_people.human import HumanConfiguration
 from wsgi.rr_people.posting.posts import PostsStorage
 from wsgi.rr_people.posting.posts_important import ImportantYoutubePostSupplier
-from wsgi.rr_people.posting.posts_sequence import PostsSequenceStore
+from wsgi.rr_people.posting.posts_sequence import PostsSequenceStore, PostsSequenceHandler
 from wsgi.rr_people.states.processes import ProcessDirector
 from wsgi.wake_up import WakeUp
 
@@ -324,9 +325,11 @@ def humans_info(name):
                                                   "want_coefficient": want_coefficient_max,
                                                   "channel_id": human_cfg.get("channel_id"),
 
-                                                  "politic": human_cfg.get("politic"),
+                                                  "politic": human_cfg.get("politic", DEFAULT_POLITIC),
+                                                  "politics": POLITICS,
                                                   "post_sequence_config": human_cfg.get("posts_sequence_config"),
-                                                  "ae_group": human_cfg.get("ae_group"),
+                                                  "ae_group": human_cfg.get("ae_group", AE_DEFAULT_GROUP),
+                                                  "ae_groups": AE_GROUPS,
                                                   })
 
 
@@ -347,7 +350,10 @@ def human_config(name):
     return jsonify(**{"ok": False})
 
 
-ips = ImportantYoutubePostSupplier()
+try:
+    ips = ImportantYoutubePostSupplier()
+except Exception as e:
+    pass
 
 
 @app.route("/humans/<name>/channel_id", methods=["POST"])
@@ -365,56 +371,16 @@ def update_channel_id(name):
     return jsonify(**{"ok": True, "loaded": 0})
 
 
-# @app.route("/ae-represent/<name>", methods=["GET"])
-# @login_required
-# def ae_represent(name):
-#     def get_point_x(x):
-#         dt = datetime.utcnow() + timedelta(seconds=x)
-#         return calendar.timegm(dt.timetuple()) * 1000
-#
-#     y = 3
-#     ssteps = author_storage.get_steps(name)
-#     log.info("get sleep steps: %s" % len(ssteps))
-#     sleep_data = []
-#     # sleep_days = defaultdict(list)
-#     for step in ssteps:
-#         sleep_data.append([get_point_x(step["time"]), y, 10000, 10000])
-#         # sleep_days[divmod(step.get("time"), DAY)[0]].append([step['time'], step['end_time']])
-#
-#     # for _, v in sleep_days.iteritems():
-#     #     avg_start = sum(map(lambda x: x[0], v)) / len(v)
-#     #     avg_end = sum(map(lambda x: x[1], v)) / len(v)
-#     #
-#     #     step = (avg_end - avg_start) / 2
-#     #     x = avg_start + step
-#     #     sleep_data.append([get_point_x(x), y, step * 1000, step * 1000])
-#
-#     sleep_data.append([get_point_x(0), y, 0, 0, 500, 500])
-#
-#     result = {"color": "blue",
-#               "data": sleep_data,
-#               "points": {
-#                   "show": True,
-#                   "radius": 2,
-#                   "fillColor": "red",
-#                   "errorbars": "x",
-#                   "xerr": {"show": True, "asymmetric": True, "upperCap": "-", "lowerCap": "-"},
-#               }
-#               }
-#     return jsonify(**{"data": result, "ok": True})
-#
-
 sequence_storage = PostsSequenceStore("server")
 ae_storage = AuthorsStorage("as server")
 
 
-@app.route("/sequences/<name>", methods=["GET"])
+@app.route("/sequences/info/<name>", methods=["GET"])
 @login_required
 def sequences(name):
     def get_point_x(x):
-        # dt = datetime.utcnow() + timedelta(seconds=x)
-        # return calendar.timegm(dt.timetuple()) * 1000
-        return x * 1000
+        dt = datetime.utcnow() + timedelta(seconds=x)
+        return calendar.timegm(dt.timetuple()) * 1000
 
     ae_group = db.get_ae_group(name)
     work_sequence = ae_storage.get_time_sequence(ae_group)
@@ -425,12 +391,31 @@ def sequences(name):
         if start > stop:
             stop += WEEK
 
-        work_result.append([get_point_x(start), 0, get_point_x(stop - start)])
+        work_result.append([get_point_x(start), 0, 1, (stop - start) * 1000])
 
-    posts_sequence = sequence_storage.get_posts_sequence(name) or {}
-    posts = map(lambda x: [get_point_x(x), 1, 0], [int(x) for x in posts_sequence.get("right", [])])
-    passed_posts = map(lambda x: [get_point_x(x), 1, 0], [int(x) for x in posts_sequence.get("left", [])])
-    return jsonify(**{"work": work_result, "posts": posts, "posts_passed": passed_posts})
+    posts_sequence = sequence_storage.get_posts_sequence(name)
+    if posts_sequence:
+        posts = map(lambda x: [get_point_x(x), 0.5, 1, 1], [int(x) for x in posts_sequence.right])
+        passed_posts = map(lambda x: [get_point_x(x), 0.5, 1, 1], [int(x) for x in posts_sequence.left])
+        return jsonify(**{"work": work_result, "posts": posts, "posts_passed": passed_posts,
+                          'metadata': "By days: %s; All: %s" % (posts_sequence.metadata, sum(posts_sequence.metadata))})
+    else:
+        return jsonify(**{"work": work_result})
+
+
+@app.route("/sequences/manage/<name>", methods=["POST"])
+@login_required
+def sequences_manage(name):
+    ae_group = request.form.get("ae-group")
+    min_c = int(request.form.get('min-seq-count'))
+    max_c = int(request.form.get('max-seq-count'))
+
+    db.set_ae_group(name, ae_group)
+    db.set_human_posts_sequence_config(name, min_c, max_c)
+    posts_handler = PostsSequenceHandler(name, ae_store=ae_storage, hs=db, ae_group=ae_group, ps_store=sequence_storage)
+    posts_handler.evaluate_new()
+
+    return redirect(url_for('humans_info', name=name))
 
 
 @app.route("/global_configuration/<name>", methods=["GET", "POST"])

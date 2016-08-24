@@ -42,11 +42,9 @@ function show_sequences(human_name){
     var next = new Date(current.getTime() + 7 * 24 * 60 * 60 * 1000);
 
     $.get(
-        "/sequences/"+human_name,
+        "/sequences/info/"+human_name,
         function(result){
             work_times = result["work"];
-            posts_times = result["posts"];
-            posts_passed_times = result["posts_passed"];
             console.log(result);
 
             var points_cfg = {
@@ -58,30 +56,53 @@ function show_sequences(human_name){
 		    };
 
             var data = [
-                {color:"green", points:points_cfg, data:work_times, label:"Work time"},
-                {color:"red", points:points_cfg, data:posts_times, label:"New posts"},
-                {color:"blue", points:points_cfg, data:posts_passed_times, label:"Old posts"},
+                {color:"green", points:points_cfg, data:work_times, label:"Work time"}
             ];
 
+            posts_times = result["posts"];
+            if (posts_times != undefined){
+                data.push({color:"red", points:points_cfg, data:posts_times, label:"New posts"});
+            }
+
+            posts_passed_times = result["posts_passed"];
+            if (posts_passed_times != undefined){
+                data.push({color:"blue", points:points_cfg, data:posts_passed_times, label:"Old posts"});
+            }
+
+            sequence_metadata = result["metadata"];
+            if (sequence_metadata != undefined){
+                $("#sequence-info").append("<h5>"+sequence_metadata+"</h5>");
+            }
             $("#loader-gif").hide();
-            $("#sequences-represent-container").append("<div id='sequence-flot' class='sequence-represent'></div>");
+
             var plot = $.plot(
-                "#sequences-flot",
+                "#sequence-represent-container",
                 data,
                 {
                         series: {
                             lines: {
                                 show: false
+                            },
+                            points: {
+                                errorbars: "x",
+                                xerr: {
+                                    show: true,
+                                }
                             }
                         },
-                        zoom: {interactive: true},
+                        zoom: {
+                            interactive: true,
+                            trigger: "dblclick", // or "click" for single click
+		                    amount: 1.1,         // 2 = 200% (zoom in), 0.5 = 50% (zoom out)
+                        },
                         pan: {interactive: true},
                         xaxis: {
+                            zoomRange:[1,5],
                             mode: "time",
-                            minTickSize: [1, "hour"],
+                            minTickSize: [1, "minute"],
                             min: current.getTime()-60*60*1000,
                             max: next.getTime()+60*60*1000,
-                            timeformat: "%a %H:%M:%S"
+                            timeformat: "%a %H:%M"
                         }
                  }
             );

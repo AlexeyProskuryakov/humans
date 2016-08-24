@@ -3,7 +3,20 @@
 
 {% block content %}
 <div class="container-fluid">
-
+    <hr>
+    <div class="row">
+        <div class="col-md-6 col-md-offset-4">
+              <label for="politic">Политика постинга:</label>
+              <select class="form-group" name="politic" id="politic">
+                <option>{{politic}}</option>
+                {% for p in politics %}
+                {% if p != politic%}
+                <option id="{{p}}">{{p}}</option>
+                {% endif %}
+                {% endfor %}
+            </select>
+        </div>
+    </div>
     <div class="row">
         <div class="col-md-6 col-md-offset-3">
             <img id='loader-gif' src="{{url_for('static', filename='img/giphy.gif')}}">
@@ -11,27 +24,55 @@
     </div>
 
     <div class="row">
-        <div class="col-md-10 col-md-offset-1">
-
-            <div id="sequences-represent-container">
+        <div class="col-md-2" id="sequence-manage">
+            <div class="container-fluid">
+                <h4>Создай новую последовательность:</h4>
+                <form method="post" action="{{url_for('sequences_manage', name=human_name)}}" class="form-horizontal">
+                    <div class="form-group">
+                        <label for="min-sequence-length">Количество постов от:</label>
+                        <input class="short" type="number" id="min-sequence-length" name="min-seq-count"
+                               value="{{post_sequence_config.get('min_posts', 70)}}">
+                        <br>
+                        <label for="max-sequence-length">До:</label>
+                        <input class="short" type="number" id="max-sequence-length" name="max-seq-count"
+                               value="{{post_sequence_config.get('max_posts',90)}}">
+                        <br>
+                        <label for="ae-group">Тип жизни чувака:</label>
+                        <select class="short" id="ae-group" name="ae-group">
+                            <option>{{ae_group}}</option>
+                            {% for group in ae_groups %}
+                            {% if group != ae_group%}
+                            <option id="{{group}}">{{group}}</option>
+                            {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <input type="submit" class="btn btn-default" value="Сгенерить!">
+                    </div>
+                </form>
             </div>
-
+        </div>
+        <div class="col-md-10" id="sequence-info">
+            <div id="sequence-represent-container">
+            </div>
         </div>
     </div>
+    <hr>
     <div class="row">
         <div class="col-md-6">
             <div class="row">
                 <div class="col-md-3">
                     <form action="{{url_for('humans_info', name=human_name)}}" method="post">
                         <input type="hidden" name="start" value="!">
-                        <input type="submit" value="Start human" class="btn btn-info btn-lg">
+                        <input type="submit" value="Запустить" class="btn btn-info btn-lg">
                     </form>
                 </div>
 
                 <div class="col-md-3">
                     <form action="{{url_for('humans_info', name=human_name)}}" method="post">
                         <input type="hidden" name="stop" value="!">
-                        <input type="submit" value="Stop human" class="btn btn-danger btn-lg">
+                        <input type="submit" value="Остановить" class="btn btn-danger btn-lg">
                     </form>
                 </div>
             </div>
@@ -268,8 +309,12 @@
 <script src="{{url_for('static',filename='js/sequences-script.js')}}"></script>
 <script>
     $(function(){
-        show_sequences('{{ae_group}}');
+        show_sequences('{{human_name}}');
     });
+
+
+
+
 </script>
 {% endblock %}
 

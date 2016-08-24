@@ -27,10 +27,10 @@ table.sortable thead {
     display:none;
 }
 
-#sequences-represent-container {
+#sequence-represent-container {
 	box-sizing: border-box;
-	width: 1750px;
-	height: 250px;
+	width: 1250px;
+	height: 150px;
 	padding: 20px 15px 15px 15px;
 	margin: 15px auto 30px auto;
 }
@@ -52,4 +52,8 @@ table.sortable thead {
 
 .more-opacity{
     opacity:0.4;
+}
+
+.short{
+    width:80px;
 }

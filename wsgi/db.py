@@ -52,7 +52,8 @@ class Cache(object):
     def remove_path(self, path):
         for key in self.pathes[path]:
             _key = Cache.key(key, path)
-            self.remove_key(_key=_key)
+            if _key in self.cache_data:
+                self.remove_key(_key=_key)
 
     def set(self, key, value, path=None, ttl=None):
         _key = Cache.key(key, path)
@@ -81,7 +82,6 @@ def cached(ttl=None):
     def cached_dec(f):
         def wrapped(*args):
             k = "".join([str(a) for a in args])
-            print k
             path = cache_path(f.__name__)
             result = cache.get(k, path=path)
             if not result:
@@ -230,7 +230,7 @@ class HumanStorage(DBHandler):
     def get_ae_group(self, name):
         found = self.human_config.find_one({"user": name}, projection={"ae_group": 1})
         if found:
-            return found["ae_group"]
+            return found.get("ae_group", AE_DEFAULT_GROUP)
         else:
             return AE_DEFAULT_GROUP
 
