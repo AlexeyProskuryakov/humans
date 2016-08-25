@@ -12,132 +12,53 @@
             <hr>
 
             <div class="posts_containers">
-                <div class="accordion" id="queue-accordion">
-                    <div class="accordion-group">
-                        <div class="accordion-heading">
-                            <a class="accordion-toggle" data-toggle="collapse" data-parent="#info-accordion"
-                               href="#queue">
-                                <h3>В очереди
-                                    <small>({{queue | length}})</small>
-                                    :
-                                </h3>
-                            </a>
-                        </div>
-                        <div id="queue" class="accordion-body collapse">
-                            <div class="accordion-inner">
-                                <table class="table table-stripped table-hover table-condensed">
-                                    <thead>
-                                    <tr>
-                                        <td>url</td>
-                                        <td>for sub</td>
-                                        <td>important</td>
-                                        <td>channel id</td>
-                                        <td>when found</td>
-                                    </tr>
-                                    </thead>
-                                    <tbody>
-                                    {% for post in queue %}
-                                    <tr id="{{post['url_hash']}}">
-                                        <td>
-                                            <a href="{{post['url']}}" target="_blank">{{post['title']}}</a>
-                                        </td>
-                                        <td>
-                                            {{post['for_sub']}}
-                                        </td>
-                                        <td>
-                                            {{post['important']}}
-                                        </td>
-                                        <td>
-                                            {{post['channel_id']}}
-                                        </td>
-                                        <td>
-                                            {{post['time'] | tst_to_dt}}
-                                        </td>
 
-                                    </tr>
-                                    {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
+
+                <div class="row">
+                    <div class="col-md-6 col-md-offset-4">
+                        <h3>Всего
+                            <small>({{queue | length}})</small>
+                            :
+                        </h3>
                     </div>
                 </div>
-                <div class="accordion" id="batch-accordion">
-                    <div class="accordion-group">
-                        <div class="accordion-heading">
-                            <a class="accordion-toggle" data-toggle="collapse" data-parent="#batch-accordion"
-                               href="#batch">
-                                <h3>В балансере
-                                    <small>({{batches | length}})</small>
-                                    :
-                                </h3>
-                            </a>
-                        </div>
-                        <div id="batch" class="accordion-body collapse">
-                            <div class="accordion-inner">
 
-                                {% for batch in batches %}
-                                <div class="row">
-                                    <div class="col-md-2">
-                                        Каналы: {{array_to_string(batch['channels'])}}
-                                    </div>
-                                    <div class="col-md-10" id="{{batch['_id']}}">
 
-                                        <div class="accordion" id="batch-post-accordion">
-                                            <div class="accordion-group">
-                                                <div class="accordion-heading">
-                                                    <a class="accordion-toggle" data-toggle="collapse"
-                                                       data-parent="#batch-accordion"
-                                                       href="#batch-{{batch['_id']}}">
-                                                        <h3>В кусочке:</h3>
-                                                    </a>
-                                                </div>
-                                                <div id="batch-{{batch['_id']}}" class="accordion-body collapse">
-                                                    <div class="accordion-inner">
-                                                        <table class="table table-stripped table-hover table-condensed">
-                                                            <thead>
-                                                            <tr>
-                                                                <td>url</td>
-                                                                <td>for sub</td>
-                                                                <td>important</td>
-                                                                <td>channel id</td>
-                                                                <td>when found</td>
-                                                            </tr>
-                                                            </thead>
-                                                            <tbody>
-                                                            {% for post in batch['posts'] %}
-                                                            <tr id="{{post['url_hash']}}">
-                                                                <td>
-                                                                    <a href="{{post['url']}}" target="_blank">{{post['title']}}</a>
-                                                                </td>
-                                                                <td>
-                                                                    {{post['for_sub']}}
-                                                                </td>
-                                                                <td>
-                                                                    {{post['important']}}
-                                                                </td>
-                                                                <td>
-                                                                    {{post['channel_id']}}
-                                                                </td>
-                                                                <td>
-                                                                    {{post['time'] | tst_to_dt}}
-                                                                </td>
-                                                            </tr>
-                                                            {% endfor %}
-                                                            </tbody>
-                                                        </table>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                {% endfor %}
+                <table class="table table-stripped table-hover table-condensed">
+                    <thead>
+                    <tr>
+                        <td>url</td>
+                        <td>for sub</td>
+                        <td>important</td>
+                        <td>channel id</td>
+                        <td>when found</td>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for post in queue %}
+                    <tr id="{{post['url_hash']}}">
+                        <td>
+                            <a href="{{post['url']}}" target="_blank">{{post['title']}}</a>
+                        </td>
+                        <td>
+                            {{post['for_sub']}}
+                        </td>
+                        <td>
+                            {{post['important']}}
+                        </td>
+                        <td>
+                            {{post['channel_id']}}
+                        </td>
+                        <td>
+                            {{post['time'] | tst_to_dt}}
+                        </td>
 
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+
+
             </div>
 
         </div>
