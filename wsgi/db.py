@@ -248,11 +248,11 @@ class HumanStorage(DBHandler):
 
     @cache_refresh
     def set_human_post_politic(self, name, politic):
-        self.human_config.update_one({"user": name}, {"$set": {"posting_politic": politic}})
+        self.human_config.update_one({"user": name}, {"$set": {"posting_politic": politic}}, upsert=True)
 
     @cached(ttl=3600)
     def get_human_post_politic(self, name):
-        found = self.human_config.find_one({"user": name}, projection={"posting_politic"})
+        found = self.human_config.find_one({"user": name}, projection={"posting_politic":1})
         if found:
             return found.get("posting_politic")
         else:

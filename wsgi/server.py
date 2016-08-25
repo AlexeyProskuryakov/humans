@@ -313,6 +313,7 @@ def humans_info(name):
 
     human_cfg = db.get_human_config(name)
     human_state = human_orchestra.get_human_state(name)
+    politic = db.get_human_post_politic(name)
 
     return render_template("humans_info.html", **{"human_name": name,
                                                   "human_stat": stat,
@@ -325,9 +326,9 @@ def humans_info(name):
                                                   "want_coefficient": want_coefficient_max,
                                                   "channel_id": human_cfg.get("channel_id"),
 
-                                                  "politic": human_cfg.get("politic", DEFAULT_POLITIC),
+                                                  "politic": politic,
                                                   "politics": POLITICS,
-                                                  "post_sequence_config": human_cfg.get("posts_sequence_config"),
+                                                  "posts_sequence_config": human_cfg.get("posts_sequence_config", {}),
                                                   "ae_group": human_cfg.get("ae_group", AE_DEFAULT_GROUP),
                                                   "ae_groups": AE_GROUPS,
                                                   })
@@ -339,15 +340,25 @@ def human_state(name):
     return jsonify(**{"state": human_orchestra.get_human_state(name), "human": name})
 
 
-@app.route("/humans/<name>/config", methods=["POST"])
+@app.route("/humans/<name>/config", methods=["GET"])
 @login_required
 def human_config(name):
-    config_data = db.get_human_config(name)
-    if config_data:
-        config_data = dict(config_data)
-        config_data.pop("_id")
-        return jsonify(**{"ok": True, "data": config_data})
+    if request.method == "GET":
+        config_data = db.get_human_config(name)
+        if config_data:
+            config_data = dict(config_data)
+            config_data.pop("_id")
+            return jsonify(**{"ok": True, "data": config_data})
+
     return jsonify(**{"ok": False})
+
+
+@app.route("/humans/<name>/politic", methods=["POST"])
+@login_required
+def human_politic(name):
+    politic_name = request.form.get("politic")
+    db.set_human_post_politic(name, politic_name)
+    return redirect(url_for('humans_info', name=name))
 
 
 try:
