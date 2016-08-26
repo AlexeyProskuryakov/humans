@@ -352,7 +352,7 @@ class Human(RedditHandler):
 
     def do_comment_post(self):
         sub = random.choice(self.db.get_human_subs(self.login))
-        post_fullname = self.comments_handler.pop_comment_post_fullname(sub)
+        post_fullname = self.comments_handler.pop_comment_id(sub)
         if not post_fullname:
             self.comments_handler.need_comment(sub)
         else:

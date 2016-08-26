@@ -466,7 +466,7 @@ def queue_of_comments(name):
     subs = db.get_human_subs(name)
     comments = defaultdict(list)
     for sub in subs:
-        post_fns = comment_handler.get_all_comments_post_ids(sub)
+        post_fns = comment_handler.get_all_comments_ids(sub)
         comments[sub] = list(comment_handler.get_comments_by_ids(post_fns, projection={"_id": False}))
         log.info("load comments for sub %s" % sub)
     return render_template("comments_queue.html", **{"human_name": name, "comments": comments, "subs": subs})

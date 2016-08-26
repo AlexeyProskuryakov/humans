@@ -4,6 +4,8 @@ import time
 from threading import Thread
 from multiprocessing import RLock
 
+from bson.objectid import ObjectId
+
 from wsgi.db import DBHandler
 from wsgi.properties import comment_redis_address, comment_redis_password, comment_redis_port, TIME_TO_COMMENT_SPOILED
 from wsgi.properties import comments_mongo_uri, comments_db_name
@@ -27,7 +29,7 @@ class CommentsStorage(DBHandler):
                 _comments,
             )
             self.comments.drop_indexes()
-
+            self.comments.create_index([("text_hash", 1)], unique=True)
             self.comments.create_index([("fullname", 1)])
             self.comments.create_index([("state", 1)], sparse=True)
             self.comments.create_index([("sub", 1)], sparse=True)
@@ -65,24 +67,15 @@ class CommentsStorage(DBHandler):
                                            "time": time.time()},
                                   "$unset": {"_lock": 1}})
 
-    def get_comment_info(self, post_fullname):
+    def get_comment_info(self, comment_oid):
         with self.mutex:
             found = self.comments.find_one(
-                {"fullname": post_fullname,
+                {"_id": ObjectId(comment_oid),
                  "state": CS_READY_FOR_COMMENT,
                  "_lock": {"$exists": False}})
             if found:
                 self.comments.update_one(found, {"$set": {"_lock": 1}})
                 return found
-
-    def set_comment_info_ready(self, post_fullname, sub, comment_text, permalink):
-        self.comments.insert_one(
-            {"fullname": post_fullname,
-             "state": CS_READY_FOR_COMMENT,
-             "sub": sub,
-             "text": comment_text,
-             "post_url": permalink}
-        )
 
     def get_comments_ready_for_comment(self, sub=None):
         q = {"state": CS_READY_FOR_COMMENT, "sub": sub}
@@ -92,9 +85,9 @@ class CommentsStorage(DBHandler):
         q = {"state": CS_COMMENTED, "sub": sub}
         return list(self.comments.find(q).sort([("time", -1)]))
 
-    def get_comments_by_ids(self, posts_fullnames, projection=None):
+    def get_comments_by_ids(self, comment_ids, projection=None):
         _projection = projection or {"text": True, "fullname": True, "post_url": True}
-        for el in self.comments.find({"fullname": {"$in": posts_fullnames}},
+        for el in self.comments.find({"_id": {"$in": comment_ids}},
                                      projection=_projection):
             yield el
 
@@ -124,12 +117,12 @@ class CommentRedisQueue(RedisHandler):
     def need_comment(self, sbrdt):
         self.redis.publish(NEED_COMMENT, sbrdt)
 
-    def pop_comment_post_fullname(self, sbrdt):
+    def pop_comment_id(self, sbrdt):
         result = self.redis.lpop(QUEUE_CF(sbrdt))
         log.debug("redis: get by %s\nthis: %s" % (sbrdt, result))
         return result
 
-    def get_all_comments_post_ids(self, sbrdt):
+    def get_all_comments_ids(self, sbrdt):
         result = self.redis.lrange(QUEUE_CF(sbrdt), 0, -1)
         return list(result)
 

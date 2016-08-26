@@ -8,7 +8,7 @@ def test_comments_fullname():
     main = HumanStorage()
     rh = RedditHandler()
     for sub in main.get_all_humans_subs():
-        comment_posts_fullnames = ch.get_all_comments_post_ids(sub)
+        comment_posts_fullnames = ch.get_all_comments_ids(sub)
         print "comments for sub: ", sub, "\n", "\n".join(comment_posts_fullnames)
         for fullname in comment_posts_fullnames:
             try:
