@@ -289,6 +289,7 @@ def humans():
     for human in humans_info:
         human['state'] = human_orchestra.get_human_state(human['user'])
 
+
     return render_template("humans_management.html",
                            **{"humans": humans_info})
 
@@ -400,9 +401,10 @@ def sequences(name):
         start = int(w_t[0])
         stop = int(w_t[1])
         if start > stop:
-            stop += WEEK
-
-        work_result.append([get_point_x(start), 0, 1, (stop - start) * 1000])
+            work_result.append([get_point_x(start), 0, 1, (WEEK - start) * 1000])
+            work_result.append([get_point_x(0), 0, 1, (stop)*1000])
+        else:
+            work_result.append([get_point_x(start), 0, 1, (stop - start) * 1000])
 
     posts_sequence = sequence_storage.get_posts_sequence(name)
     if posts_sequence:

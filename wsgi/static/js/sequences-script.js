@@ -69,6 +69,17 @@ function show_sequences(human_name){
                 data.push({color:"blue", points:points_cfg, data:posts_passed_times, label:"Old posts"});
             }
 
+
+            data.push({
+                color:  "black",
+                points: {
+                    show:true,
+                    radius:2,
+                    errorbars:"y",
+                    yerr:{show:true, asymmetric:false, upperCap:"-", lowerCap:"-"}
+                    },
+                data:[[current.getTime(),0.25,0.25,0.25]]
+            });
             sequence_metadata = result["metadata"];
             if (sequence_metadata != undefined){
                 $("#sequence-info").append("<h5>"+sequence_metadata+"</h5>");
@@ -84,7 +95,7 @@ function show_sequences(human_name){
                                 show: false
                             },
                             points: {
-                                errorbars: "x",
+                                errorbars: "xy",
                                 xerr: {
                                     show: true,
                                 }
@@ -95,9 +106,14 @@ function show_sequences(human_name){
                             trigger: "dblclick", // or "click" for single click
 		                    amount: 1.1,         // 2 = 200% (zoom in), 0.5 = 50% (zoom out)
                         },
-                        pan: {interactive: true},
+                        pan: {
+                            interactive: true,
+
+
+                            },
                         xaxis: {
                             zoomRange:[1,5],
+                            //panRange:[0.1,10],
                             mode: "time",
                             minTickSize: [1, "minute"],
                             min: current.getTime()-60*60*1000,

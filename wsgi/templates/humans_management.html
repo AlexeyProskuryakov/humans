@@ -13,14 +13,14 @@
             </h5>
         </div>
         <div class="col-md-6">
-            <h2>Добавление бота. Процедура после добавления информации о приложении и заведении
+            <h2>Добавление чувака. Процедура после добавления информации о приложении и заведении
                 пользователя
                 <a href="{{url_for('human_auth_start')}}"> тут</a>
             </h2>
             <form action="{{ url_for('humans')}}" method="post">
                 <div class="form-group">
                     <label for="for-human-name">Select human name:</label>
-                    <select class="form-control" id="for-human-name" name="human-name">
+                    <select class="form-control" id="for-human-name" name="for-human-name">
                         <option>Выберай чувака</option>
                         {% for human in humans %}
                         <option id="{{human.user}}">{{human.user}}</option>
@@ -61,7 +61,13 @@
                         Subreddits:
                     </td>
                     <td>
-                        Some urls...s
+                        Life template
+                    </td>
+                    <td>
+                        Posting politic
+                    </td>
+                    <td>
+                        ...
                     </td>
                 </tr>
 
@@ -85,11 +91,16 @@
                     <td>
                         {{array_to_string(human.subs)}}
                     </td>
+
                     <td>
-                        <a href="{{url_for('queue_of_posts', name=human.user)}}">Очередь постов {{human.user}}</a>
+                        {{human.ae_group}}
+                    </td>
+
+                    <td>
+                        {{human.posting_politic}}
                     </td>
                     <td>
-                        <a href="{{url_for('queue_of_comments', name=human.user)}}">Очередь комментов {{human.user}}</a>
+                        <a href="{{url_for('queue_of_posts', name=human.user)}}"> Посты {{human.user}}</a>
                     </td>
                 </tr>
                 {% endfor %}
