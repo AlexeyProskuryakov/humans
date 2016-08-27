@@ -23,4 +23,5 @@ stemming
 redis
 imgurpython
 beautifulsoup4
-crypto
+Crypto
+pycrypto

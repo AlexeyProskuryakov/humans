@@ -173,7 +173,6 @@ class Kapellmeister(Process):
 
         while 1:
             try:
-
                 _start = time.time()
                 _prev_step = step
 

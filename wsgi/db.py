@@ -4,6 +4,7 @@ import hashlib
 import logging
 import threading
 import time
+import traceback
 from collections import defaultdict
 from datetime import datetime
 
@@ -155,10 +156,12 @@ class HumanStorage(DBHandler):
             self.human_errors = db.get_collection("human_errors")
 
     def store_error(self, name, error):
-        self.human_errors.insert_one({"human_name": name, "error": error})
+        error_info = ''.join(traceback.format_stack()[:-1])
+        error = str(error)
+        self.human_errors.insert_one({"human_name": name, "error": error, "info": error_info})
 
     def get_errors(self, name):
-        return list(self.human_errors.find({"human_name": name}))
+        return list(self.human_errors.find({"human_name": name}, projection={"error": 1, "info":1}))
 
     def clear_errors(self, name):
         self.human_errors.delete_many({"human_name": name})
@@ -246,15 +249,13 @@ class HumanStorage(DBHandler):
         if found:
             return found.get("posts_sequence_config")
 
-    @cache_refresh
     def set_human_post_politic(self, name, politic):
         self.human_config.update_one({"user": name}, {"$set": {"posting_politic": politic}}, upsert=True)
 
-    @cached(ttl=3600)
     def get_human_post_politic(self, name):
-        found = self.human_config.find_one({"user": name}, projection={"posting_politic":1})
+        found = self.human_config.find_one({"user": name}, projection={"posting_politic": 1})
         if found:
-            return found.get("posting_politic")
+            return found.get("posting_politic", DEFAULT_POLITIC)
         else:
             return DEFAULT_POLITIC
 
@@ -353,4 +354,10 @@ class HumanStorage(DBHandler):
 
 if __name__ == '__main__':
     hs = HumanStorage()
-    hs.save_log_human_row("Shlak2k15", "test", {"info": "test"})
+    # hs.save_log_human_row("Shlak2k15", "test", {"info": "test"})
+    try:
+        raise TypeError("foo bar")
+    except Exception as e:
+        hs.store_error("Shlak2k15", e)
+
+    print hs.get_errors("test")

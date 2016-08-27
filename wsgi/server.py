@@ -289,7 +289,6 @@ def humans():
     for human in humans_info:
         human['state'] = human_orchestra.get_human_state(human['user'])
 
-
     return render_template("humans_management.html",
                            **{"humans": humans_info})
 
@@ -316,6 +315,8 @@ def humans_info(name):
     human_state = human_orchestra.get_human_state(name)
     politic = db.get_human_post_politic(name)
 
+    errors = db.get_errors(name)
+
     return render_template("humans_info.html", **{"human_name": name,
                                                   "human_stat": stat,
                                                   "human_log": human_log,
@@ -332,6 +333,8 @@ def humans_info(name):
                                                   "posts_sequence_config": human_cfg.get("posts_sequence_config", {}),
                                                   "ae_group": human_cfg.get("ae_group", AE_DEFAULT_GROUP),
                                                   "ae_groups": AE_GROUPS,
+
+                                                  "errors": errors,
                                                   })
 
 
@@ -368,6 +371,13 @@ except Exception as e:
     pass
 
 
+@app.route("/humans/<name>/clear_errors", methods=["POST"])
+@login_required
+def human_clear_errors(name):
+    db.clear_errors(name)
+    return jsonify(**{"ok": True})
+
+
 @app.route("/humans/<name>/channel_id", methods=["POST"])
 @login_required
 def update_channel_id(name):
@@ -402,7 +412,7 @@ def sequences(name):
         stop = int(w_t[1])
         if start > stop:
             work_result.append([get_point_x(start), 0, 1, (WEEK - start) * 1000])
-            work_result.append([get_point_x(0), 0, 1, (stop)*1000])
+            work_result.append([get_point_x(0), 0, 1, (stop) * 1000])
         else:
             work_result.append([get_point_x(start), 0, 1, (stop - start) * 1000])
 

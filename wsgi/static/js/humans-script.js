@@ -66,4 +66,16 @@ function update_channel_id(name){
         }
     })
 };
-$("#channel-id-input")
+//$("#channel-id-input")
+
+function clear_errors(name){
+    $.ajax({
+        type:           "post",
+        url:            "/humans/"+name+"/clear_errors",
+        success:        function(data){
+                if (data.ok){
+                    $("#errors-container").addClass("more-opacity");
+                }
+        }
+    });
+}
