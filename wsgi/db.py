@@ -81,12 +81,12 @@ def cache_refresh(f):
 
 def cached(ttl=None):
     def cached_dec(f):
-        def wrapped(*args):
+        def wrapped(*args, **kwargs):
             k = "".join([str(a) for a in args])
             path = cache_path(f.__name__)
             result = cache.get(k, path=path)
             if not result:
-                f_result = f(*args)
+                f_result = f(*args, **kwargs)
                 if f_result:
                     cache.set(k, f_result, path=path, ttl=ttl)
                     result = f_result
@@ -156,7 +156,7 @@ class HumanStorage(DBHandler):
             self.human_errors = db.get_collection("human_errors")
 
     def store_error(self, name, error):
-        error_info = ''.join(traceback.format_stack()[:-1])
+        error_info = ''.join(traceback.format_stack())
         error = str(error)
         self.human_errors.insert_one({"human_name": name, "error": error, "info": error_info})
 

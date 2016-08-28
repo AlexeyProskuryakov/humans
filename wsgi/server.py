@@ -465,13 +465,6 @@ process_director = ProcessDirector("server")
 post_storage = PostsStorage(name="server")
 
 
-@app.route("/queue/posts/<name>", methods=["GET"])
-@login_required
-def queue_of_posts(name):
-    queue_posts = list(post_storage.get_all_queued_posts(name))
-    return render_template("posts_queue.html", **{"human_name": name, "queue": queue_posts})
-
-
 @app.route("/queue/comments/<name>", methods=["GET"])
 @login_required
 def queue_of_comments(name):

@@ -484,7 +484,7 @@ class Human(RedditHandler):
                 log.error("exception at posting %s" % (post))
                 log.exception(e)
                 self.posts.end_post(post_data, PS_ERROR)
-                self.db.store_error(self.name, str(e))
+                self.db.store_error(self.name, e)
                 return PS_ERROR
 
             if isinstance(result, Submission):
@@ -497,7 +497,7 @@ class Human(RedditHandler):
             else:
                 self.posts.end_post(post_data, PS_ERROR)
                 log.info("NOT OK :( result: %s" % (result))
-                self.db.store_error(self.name, str(result))
+                self.db.store_error(self.name, result)
                 return PS_ERROR
 
 

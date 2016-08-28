@@ -213,7 +213,7 @@ class Kapellmeister(Process):
             except Exception as e:
                 log.error("ERROR AT HE! ")
                 log.exception(e)
-                self.db.store_error(self.human_name, str(e))
+                self.db.store_error(self.human_name, e)
                 time.sleep(10)
 
 
