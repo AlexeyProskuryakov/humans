@@ -67,8 +67,9 @@ class PostsStorage(DBHandler):
         if collection_name not in collection_names:
             self.posts = self.db.create_collection(collection_name)
             self.posts.create_index("url_hash", unique=True)
+            self.posts.create_index("human", sparse=True)
             self.posts.create_index("sub")
-            self.posts.create_index("human")
+            self.posts.create_index("important")
             self.posts.create_index("state")
             self.posts.create_index("time")
             self.posts.create_index("_lock", sparse=True)
@@ -110,13 +111,6 @@ class PostsStorage(DBHandler):
                 if human:
                     data["human"] = human
                 return self.posts.insert_one(data)
-
-    def get_posts_for_sub(self, sub, state=PS_READY):
-        return map(lambda x: PostSource.from_dict(x), self.posts.find({"sub": sub, "state": state}))
-
-    def remove_posts_of_sub(self, subname):
-        result = self.posts.delete_many({"sub": subname})
-        return result
 
     def increment_counter(self, human, counter_type):
         self.posts_counters.update_one({"human": human}, {"$inc": {counter_type: 1}}, upsert=True)
@@ -166,9 +160,8 @@ EVERY = 9
 
 
 class PostsBalancer(object):
-    def __init__(self, human_name, post_store=None, human_store=None):
+    def __init__(self, human_name, post_store=None):
         self.post_store = post_store or PostsStorage(name="posts manager")
-        self.human_store = human_store or HumanStorage(name="posts manager")
 
         self.human = human_name
         self._post_type_in_fly = None
@@ -182,14 +175,11 @@ class PostsBalancer(object):
         important = int(counters.get(CNT_IMPORTANT, 0))
 
         if important == 0 or (noise % EVERY == 0 and noise / EVERY >= important):
-            post = self.post_store.get_queued_post(human=self.human,
-                                                   important=True)  # TODO ERROR if queued post will None
+            post = self.post_store.get_queued_post(human=self.human, important=True)
             if post:
                 self._post_type_in_fly = CNT_IMPORTANT
         else:
-            human_subs = self.human_store.get_human_subs(self.human)
-            sub = random.choice(human_subs)
-            post = self.post_store.get_queued_post(sub=sub, important=False)
+            post = self.post_store.get_queued_post(important=False)
             if post:
                 self._post_type_in_fly = CNT_NOISE
 

@@ -17,8 +17,7 @@ def create_posts(ps):
             PostSource("test url %s" % i, "title: huaitle %s" % i, for_sub="funny", important=important),
             sub=_sub,
             important=important,
-            human=human,
-            state=PS_READY
+            human=human
         )
 
 
