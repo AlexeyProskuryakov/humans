@@ -25,6 +25,7 @@ from wsgi.rr_people.posting.posts_sequence import PostsSequenceHandler
 from wsgi.rr_people.states.entity_states import StatesHandler
 from wsgi.rr_people.states.processes import ProcessDirector
 from os import sys
+
 log = logging.getLogger("he")
 
 
@@ -215,7 +216,7 @@ class Kapellmeister(Process):
 
             except Exception as e:
                 log.error("ERROR AT HE! ")
-                _,_,tb = sys.exc_info()
+                _, _, tb = sys.exc_info()
                 log.exception(e)
                 self.db.store_error(self.human_name, e, " ".join(traceback.format_tb(tb)))
                 time.sleep(10)
@@ -250,6 +251,9 @@ class HumanOrchestra():
         human_state = self.states.get_human_state(human_name)
         process_state = self.process_director.get_state(HE_ASPECT(human_name))
         return {"human_state": human_state, "process_state": process_state}
+
+    def delete_human(self, human_name):
+        self.states.delete_human_state(human_name)
 
 
 if __name__ == '__main__':

@@ -328,6 +328,11 @@ class HumanStorage(DBHandler):
     def get_log_of_human_statistics(self, human_name):
         return self.human_statistic.find_one({"human_name": human_name}, projection={"_id": False, "human_name": False})
 
+    def remove_human_data(self, name):
+        self.human_config.delete_one({"user": name})
+        self.clear_errors(name)
+        self.human_statistic.delete_many({"human_name":name})
+
     #######################USERS
     def add_user(self, name, pwd, uid):
         log.info("add user %s %s %s" % (name, pwd, uid))
@@ -352,3 +357,5 @@ class HumanStorage(DBHandler):
             crupt = m.hexdigest()
             if crupt == found.get("pwd"):
                 return found.get("user_id")
+
+

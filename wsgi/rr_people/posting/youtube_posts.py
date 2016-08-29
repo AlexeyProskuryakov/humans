@@ -4,7 +4,7 @@ import re
 from apiclient.discovery import build
 from apiclient.errors import HttpError
 
-from wsgi.properties import YOUTUBE_DEVELOPER_KEY, YOUTUBE_API_VERSION, YOUTUBE_API_SERVICE_NAME
+from wsgi.properties import YOUTUBE_DEVELOPER_KEY, YOUTUBE_API_VERSION, YOUTUBE_API_SERVICE_NAME, YOUTUBE_SUB_TAG
 from wsgi.rr_people.posting.posts import PostsStorage, PostSource
 
 log = logging.getLogger("youtube")
@@ -23,7 +23,7 @@ class YoutubeChannelsHandler(object):
     def _get_sub_on_tags(self, tags):
         for tag in tags:
             if "sub:" in tag:
-                return tag.replace("sub:", "").strip()
+                return tag.replace(YOUTUBE_SUB_TAG, "").strip()
 
     def _form_posts_on_videos_info(self, items):
         result = []

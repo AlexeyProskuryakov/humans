@@ -305,6 +305,11 @@ def humans_info(name):
             human_orchestra.start_human(name)
             return redirect(url_for('humans_info', name=name))
 
+        if request.form.get("delete"):
+            human_orchestra.delete_human(name)
+            db.remove_human_data(name)
+            return redirect(url_for("humans"))
+
         config = HumanConfiguration(request.form)
         db.set_human_live_configuration(name, config)
 
@@ -312,6 +317,7 @@ def humans_info(name):
     stat = db.get_log_of_human_statistics(name)
 
     human_cfg = db.get_human_config(name)
+
     human_state = human_orchestra.get_human_state(name)
     politic = db.get_human_post_politic(name)
 

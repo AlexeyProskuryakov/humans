@@ -121,13 +121,13 @@ class PostsStorage(DBHandler):
 
     def get_queued_post(self, human=None, sub=None, important=False):
         lock_id = time.time()
+
         q = {}
         if human:
             q['human'] = human
         if sub:
             q['sub'] = sub
-        if not q:
-            raise Exception("add argument please human or sub")
+
         q["state"] = PS_READY
         q["_lock"] = {"$exists": False}
         q["important"] = important

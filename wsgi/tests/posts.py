@@ -26,7 +26,7 @@ def test_noise_and_important():
     hs = HumanStorage("test")
     hs.set_human_subs(human, [sub, sub1])
 
-    pb = PostsBalancer(human, ps, hs)
+    pb = PostsBalancer(human, ps)
 
     for i in range(100):
         post = pb.start_post()
