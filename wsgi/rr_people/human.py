@@ -93,7 +93,7 @@ class Human(RedditHandler):
         self.login = login
         self.db = HumanStorage(name="consumer %s" % login)
         self.comments_handler = CommentHandler(name="consumer %s" % login)
-        self.posts = PostsBalancer(PostsStorage("consumer %s" % login), self.db)
+        self.posts = PostsBalancer(self.login)
 
         login_credentials = self.db.get_human_access_credentials(login)
         if not login_credentials:
