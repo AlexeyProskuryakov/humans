@@ -277,7 +277,9 @@ class PostsSequenceHandler(object):
         return x - WEEK if x > WEEK else x
 
     def accept_post_time(self, date_hash=None):
+        date_hash = date_hash or time_hash(datetime.utcnow())
         sequence = self._get_sequence()
+
         if self._accept_count > 0:
             if (abs(self._remain_tst - date_hash) / self._accept_count) < (AVG_ACTION_TIME * 2):
                 self._accept_count -= 1
@@ -286,7 +288,6 @@ class PostsSequenceHandler(object):
             else:
                 return False
 
-        date_hash = date_hash or time_hash(datetime.utcnow())
         position, remained = sequence.get_near_time(date_hash)
 
         if position > 1:

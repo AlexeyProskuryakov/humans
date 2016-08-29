@@ -2,6 +2,8 @@
 import logging
 import random
 import time
+import sys
+import traceback
 from datetime import datetime
 from multiprocessing.process import Process
 from multiprocessing.synchronize import Lock
@@ -22,7 +24,7 @@ from wsgi.rr_people.human import Human
 from wsgi.rr_people.posting.posts_sequence import PostsSequenceHandler
 from wsgi.rr_people.states.entity_states import StatesHandler
 from wsgi.rr_people.states.processes import ProcessDirector
-
+from os import sys
 log = logging.getLogger("he")
 
 
@@ -173,6 +175,7 @@ class Kapellmeister(Process):
 
         while 1:
             try:
+
                 _start = time.time()
                 _prev_step = step
 
@@ -212,8 +215,9 @@ class Kapellmeister(Process):
 
             except Exception as e:
                 log.error("ERROR AT HE! ")
+                _,_,tb = sys.exc_info()
                 log.exception(e)
-                self.db.store_error(self.human_name, e)
+                self.db.store_error(self.human_name, e, " ".join(traceback.format_tb(tb)))
                 time.sleep(10)
 
 

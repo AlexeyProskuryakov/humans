@@ -155,13 +155,15 @@ class HumanStorage(DBHandler):
         else:
             self.human_errors = db.get_collection("human_errors")
 
-    def store_error(self, name, error):
-        error_info = ''.join(traceback.format_stack())
+    def store_error(self, name, error, info=None):
+        if not info:
+            info = ''.join(traceback.format_stack())
+
         error = str(error)
-        self.human_errors.insert_one({"human_name": name, "error": error, "info": error_info})
+        self.human_errors.insert_one({"human_name": name, "error": error, "info": info})
 
     def get_errors(self, name):
-        return list(self.human_errors.find({"human_name": name}, projection={"error": 1, "info":1}))
+        return list(self.human_errors.find({"human_name": name}, projection={"error": 1, "info": 1}))
 
     def clear_errors(self, name):
         self.human_errors.delete_many({"human_name": name})
@@ -350,14 +352,3 @@ class HumanStorage(DBHandler):
             crupt = m.hexdigest()
             if crupt == found.get("pwd"):
                 return found.get("user_id")
-
-
-if __name__ == '__main__':
-    hs = HumanStorage()
-    # hs.save_log_human_row("Shlak2k15", "test", {"info": "test"})
-    try:
-        raise TypeError("foo bar")
-    except Exception as e:
-        hs.store_error("Shlak2k15", e)
-
-    print hs.get_errors("test")
