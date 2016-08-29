@@ -401,9 +401,13 @@ ae_storage = AuthorsStorage("as server")
 @login_required
 def sequences(name):
     def get_point_x(x):
-        dt = datetime.utcnow() + timedelta(seconds=x)
+        now = datetime.utcnow()
+        dt = now - timedelta(days=now.weekday(), hours=now.hour, minutes=now.minute, seconds=now.second) + timedelta(
+            seconds=x)
         return calendar.timegm(dt.timetuple()) * 1000
 
+    w_y = 0.5
+    p_y = 1
     ae_group = db.get_ae_group(name)
     work_sequence = ae_storage.get_time_sequence(ae_group)
     work_result = []
@@ -411,15 +415,15 @@ def sequences(name):
         start = int(w_t[0])
         stop = int(w_t[1])
         if start > stop:
-            work_result.append([get_point_x(start), 0, 1, (WEEK - start) * 1000])
-            work_result.append([get_point_x(0), 0, 1, (stop) * 1000])
+            work_result.append([get_point_x(start), w_y, 1, (WEEK - start) * 1000])
+            work_result.append([get_point_x(0), w_y, 1, (stop) * 1000])
         else:
-            work_result.append([get_point_x(start), 0, 1, (stop - start) * 1000])
+            work_result.append([get_point_x(start), w_y, 1, (stop - start) * 1000])
 
     posts_sequence = sequence_storage.get_posts_sequence(name)
     if posts_sequence:
-        posts = map(lambda x: [get_point_x(x), 0.5, 1, 1], [int(x) for x in posts_sequence.right])
-        passed_posts = map(lambda x: [get_point_x(x), 0.5, 1, 1], [int(x) for x in posts_sequence.left])
+        posts = map(lambda x: [get_point_x(x), p_y, 1, 1], [int(x) for x in posts_sequence.right])
+        passed_posts = map(lambda x: [get_point_x(x), p_y, 1, 1], [int(x) for x in posts_sequence.left])
         return jsonify(**{"work": work_result, "posts": posts, "posts_passed": passed_posts,
                           'metadata': "By days: %s; All: %s" % (posts_sequence.metadata, sum(posts_sequence.metadata))})
     else:

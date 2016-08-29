@@ -206,7 +206,7 @@ class HumanStorage(DBHandler):
 
     def get_human_access_credentials(self, user):
         result = self.human_config.find_one({"user": user})
-        if result.get("info", {}).get("scope"):
+        if result and result.get("info", {}).get("scope"):
             result['info']['scope'] = set(result['info']['scope'])
             return dict(result)
         return None
