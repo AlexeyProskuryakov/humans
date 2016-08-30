@@ -86,8 +86,7 @@ class Kapellmeister(Process):
         self.db = HumanStorage(name="main storage for [%s]" % name)
         self.human_name = name
         self.name = "KPLM [%s]" % (self.human_name)
-        ae_group_name = self.db.get_ae_group(self.human_name)
-        self.ae = ActionGenerator(group_name=ae_group_name)
+        self.ae = ActionGenerator(human_name=self.human_name, human_storage=self.db)
         self.psh = PostsSequenceHandler(human=self.human_name, hs=self.db, ae_store=self.ae._storage)
         self.human = human_class(login=name, db=self.db, reddit=reddit, reddit_class=reddit_class or Reddit)
 
@@ -177,11 +176,11 @@ class Kapellmeister(Process):
 
         while 1:
             try:
-                _start = time.time()
-                _prev_step = step
-
                 if not self._set_state(S_WORK):
                     return
+
+                _start = time.time()
+                _prev_step = step
 
                 self.check_token_refresh(step)
 
@@ -218,8 +217,9 @@ class Kapellmeister(Process):
         politic = self.db.get_human_post_politic(self.human_name)
         action = self.ae.get_action(step)
         if politic == POLITIC_WORK_HARD:
+            log.info("[%s] have WH politic" % self.human_name)
             if self.psh.accept_post_time(step):
-                log.info('[%s] have WH politic and will post' % self.human_name)
+                log.info("and will post")
                 action = A_POST
                 force = True
             elif action == A_POST:

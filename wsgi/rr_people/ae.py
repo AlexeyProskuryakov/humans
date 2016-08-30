@@ -492,8 +492,14 @@ class ActionGenerator(object):
         def __contains__(self, item):
             return item in self.data
 
-    def __init__(self, group_name=None, size=5):
-        self.group_name = group_name
+    def __init__(self, human_name=None, human_storage=None, group_name=None, size=5):
+        if group_name:
+            self.group_name = group_name
+        else:
+            self.human_storage = human_storage
+            self.human_name = human_name
+            self.group_name = group_name
+
         self._storage = AuthorsStorage("author generator")
         self._r = praw.Reddit(user_agent=choice(USER_AGENTS))
         self._action_stack = ActionGenerator.ActionStack(size)
@@ -501,10 +507,12 @@ class ActionGenerator(object):
 
     def get_action(self, for_time, step=5 * MINUTE):
         if not self.group_name:
-            log.error("For action generator group name is not exists")
-            return None
+            group_name = self.human_storage.get_ae_group(self.human_name)
+        else:
+            group_name = self.group_name
+
         pipe = [
-            {"$match": {"used": self.group_name,
+            {"$match": {"used": group_name,
                         "$or": [{"time": {"$gte": for_time, "$lte": for_time + step}},
                                 {"end_time": {"$gte": for_time + step}, "time": {"$lte": for_time}}
                                 ]}
@@ -559,7 +567,7 @@ def renew_sleep_actions():
 
 
 def group_and_visualise_gen(for_time=DAY * 2):
-    ae = ActionGenerator()
+    ae = ActionGenerator() #todo which group name?
     a_s = AuthorsStorage()
 
     g_res = a_s.get_authors_groups()
