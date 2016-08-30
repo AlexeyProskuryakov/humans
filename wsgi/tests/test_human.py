@@ -1,7 +1,13 @@
 import logging
+import random
 
 import praw
 
+from wsgi.db import HumanStorage
+from wsgi.properties import AVG_ACTION_TIME
+from wsgi.properties import WEEK
+from wsgi.rr_people import A_COMMENT, A_POST, A_SLEEP, A_CONSUME, A_VOTE
+from wsgi.rr_people.he import Kapellmeister
 from wsgi.rr_people.human import Human
 
 log = logging.getLogger("HUMAN TEST")
@@ -11,8 +17,12 @@ class FakeRedditHandler(praw.Reddit):
     def __init__(self, *args, **kwargs):
         super(FakeRedditHandler, self).__init__(*args, **kwargs)
 
-    def refresh_access_information(self, **kwargs):
-        log.info("refresh access token %s" % kwargs)
+    def has_oauth_app_info(self):
+        return True
+
+    def refresh_access_information(self, refresh_token):
+        log.info("refresh access token %s" % refresh_token)
+        return {"scope": []}
 
     def get_submission(self, url=None, submission_id=None, comment_limit=0,
                        comment_sort=None, params=None):
@@ -25,19 +35,30 @@ class FakeRedditHandler(praw.Reddit):
     def subscribe(self, subreddit, unsubscribe=False):
         log.info("subscribe %s %s" % subreddit, unsubscribe)
 
+    def set_oauth_app_info(self, client_id, client_secret, redirect_uri):
+        log.info("set oauth app info %s %s %s" % (client_id, client_secret, redirect_uri))
+
+    def set_access_credentials(self, scope, access_token, refresh_token=None,
+                               update_user=True):
+        log.info("set access credentials %s %s %s %s" % (scope, access_token, refresh_token, update_user))
+
 
 class FakeHuman(Human):
     def __init__(self, login, *args, **kwargs):
-        super(FakeHuman, self).__init__(login)
+        super(FakeHuman, self).__init__(login, reddit_class=FakeRedditHandler, reddit=FakeRedditHandler)
 
     def refresh_token(self):
         log.info("REFRESH TOKEN")
 
     def do_post(self):
         log.info("DO POSTING...")
+        self.incr_counter(A_POST)
+        return A_POST
 
     def do_comment_post(self):
-        return super(FakeHuman, self).do_comment_post()
+        log.info("DO COMMENTING...")
+        self.incr_counter(A_COMMENT)
+        return A_COMMENT
 
     def _humanised_comment_post(self, sub, post_fullname):
         log.info("humanised comment post")
@@ -46,9 +67,32 @@ class FakeHuman(Human):
     def do_see_post(self, post):
         log.info("DO SEE POST %s" % post)
 
+
     def do_live_random(self, max_actions=100, posts_limit=500):
         log.info("DO LIVE RANDOM %s %s" % (max_actions, posts_limit))
+        self.incr_counter(random.choice([A_CONSUME, A_VOTE]))
 
+    def __repr__(self):
+        return "".join(["%s:\t%s\n"%(k,v) for k,v in self.counters.iteritems()])
 
 
 def test_kapelmeister():
+    user = "Shlak2k16"
+    db = HumanStorage()
+    db.update_human_access_credentials_info(user, {"scope": ["read"], "access_token": "foo", "refresh_token": "bar"})
+
+    kplm = Kapellmeister(user, human_class=FakeHuman, reddit=FakeRedditHandler, reddit_class=FakeRedditHandler)
+    sleep = 0
+    for step in xrange(0, WEEK, AVG_ACTION_TIME):
+        action, force = kplm.decide(step)
+        if action == A_SLEEP:
+            log.info("SLEEP")
+            sleep += 1
+        else:
+            kplm.do_action(action, step, force)
+
+    print kplm.human, "sleep:", sleep
+
+
+if __name__ == '__main__':
+    test_kapelmeister()

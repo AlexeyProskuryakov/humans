@@ -48,7 +48,6 @@ A_FRIEND = "friend"
 
 A_SLEEP = "sleep"
 
-
 S_BAN = "ban"
 S_WORK = "work"
 S_SLEEP = "sleep"
@@ -99,8 +98,8 @@ class _RedditPostsCache():
 
 
 class RedditHandler(object):
-    def __init__(self, user_agent=None):
-        self.reddit = praw.Reddit(user_agent=user_agent or random.choice(USER_AGENTS))
+    def __init__(self, user_agent=None, reddit=None):
+        self.reddit = reddit or praw.Reddit(user_agent=user_agent or random.choice(USER_AGENTS))
         self.subreddits_cache = {}
         self.posts_cache = _RedditPostsCache()
 
@@ -180,7 +179,6 @@ def tokens_equals(tokens, another_tokens, more_than_perc=50):
     t = set(another_tokens)
     intersection = o.intersection(t)
     return float(len(intersection)) >= ((float(len(o) + len(t)) / 2) * more_than_perc) / 100
-
 
 
 def cmp_by_created_utc(x, y):

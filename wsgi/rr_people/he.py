@@ -2,7 +2,6 @@
 import logging
 import random
 import time
-import sys
 import traceback
 from datetime import datetime
 from multiprocessing.process import Process
@@ -11,6 +10,7 @@ from threading import Thread
 
 import requests
 import requests.auth
+from praw import Reddit
 
 from wsgi import properties
 from wsgi.db import HumanStorage
@@ -19,7 +19,7 @@ from wsgi.rr_people import USER_AGENTS, \
     A_COMMENT, A_POST, A_SLEEP, \
     S_WORK, S_BAN, S_SLEEP, S_SUSPEND, \
     Singleton, A_CONSUME, A_PRODUCE
-from wsgi.rr_people.ae import ActionGenerator, time_hash, delta_info
+from wsgi.rr_people.ae import ActionGenerator, time_hash
 from wsgi.rr_people.human import Human
 from wsgi.rr_people.posting.posts_sequence import PostsSequenceHandler
 from wsgi.rr_people.states.entity_states import StatesHandler
@@ -81,7 +81,7 @@ MIN_TIME_BETWEEN_POSTS = 9 * 60
 
 
 class Kapellmeister(Process):
-    def __init__(self, name, human_class=Human):
+    def __init__(self, name, human_class=Human, reddit=None, reddit_class=None):
         super(Kapellmeister, self).__init__()
         self.db = HumanStorage(name="main storage for [%s]" % name)
         self.human_name = name
@@ -89,7 +89,7 @@ class Kapellmeister(Process):
         ae_group_name = self.db.get_ae_group(self.human_name)
         self.ae = ActionGenerator(group_name=ae_group_name)
         self.psh = PostsSequenceHandler(human=self.human_name, hs=self.db, ae_store=self.ae._storage)
-        self.human = human_class(login=name)
+        self.human = human_class(login=name, db=self.db, reddit=reddit, reddit_class=reddit_class or Reddit)
 
         self.states_handler = StatesHandler(name="kplmtr of [%s]" % name)
         self.process_director = ProcessDirector(name="kplmtr of [%s] " % name)
@@ -124,7 +124,8 @@ class Kapellmeister(Process):
     def _can_post_at_time(self):
         return (time.time() - self._get_previous_post_time()) > MIN_TIME_BETWEEN_POSTS
 
-    def _do_action(self, action, step, _start, force=False):
+    def do_action(self, action, step, force=False):
+        _start = time.time()
         produce = False
         if action == A_COMMENT and self.human.can_do(A_COMMENT):
             self._set_state(WORK_STATE("commenting"))
@@ -132,7 +133,7 @@ class Kapellmeister(Process):
             if comment_result == A_COMMENT:
                 produce = True
 
-        elif action == A_POST and ((self.human.can_do(A_POST) and self._can_post_at_time()) or force):
+        elif action == A_POST and ((self.human.can_do(A_POST) or force) and self._can_post_at_time()):
             self._set_state(WORK_STATE("posting"))
             post_result = self.human.do_post()
             if post_result == A_POST: produce = True
@@ -176,7 +177,6 @@ class Kapellmeister(Process):
 
         while 1:
             try:
-
                 _start = time.time()
                 _prev_step = step
 
@@ -185,19 +185,11 @@ class Kapellmeister(Process):
 
                 self.check_token_refresh(step)
 
-                politic = self.db.get_human_post_politic(self.human_name)
-                action = self.ae.get_action(step)
-                if politic == POLITIC_WORK_HARD and self.psh.accept_post_time():
-                    log.info('[%s] have WH politic and will post')
-                    action = A_POST
-                    force = True
-                else:
-                    force = False
-
+                action, force = self.decide(step)
                 log.info("[%s] decide: %s" % (self.human_name, action))
 
                 if action != A_SLEEP:
-                    step, action_result = self._do_action(action, step, _start, force)
+                    step, action_result = self.do_action(action, step, force)
                 else:
                     self._set_state(S_SLEEP)
                     step += MINUTE
@@ -210,7 +202,8 @@ class Kapellmeister(Process):
 
                 log.info("[%s] step is end. Action: [%s] -> [%s]; time spent: %s; \nnext step after: %s secs." % (
                     self.human_name,
-                    action, action_result,
+                    action,
+                    action_result,
                     time.time() - _start,
                     step - _prev_step))
 
@@ -220,6 +213,24 @@ class Kapellmeister(Process):
                 log.exception(e)
                 self.db.store_error(self.human_name, e, " ".join(traceback.format_tb(tb)))
                 time.sleep(10)
+
+    def decide(self, step):
+        politic = self.db.get_human_post_politic(self.human_name)
+        action = self.ae.get_action(step)
+        if politic == POLITIC_WORK_HARD:
+            if self.psh.accept_post_time(step):
+                log.info('[%s] have WH politic and will post' % self.human_name)
+                action = A_POST
+                force = True
+            elif action == A_POST:
+                action = A_CONSUME
+                force = False
+            else:
+                force = False
+        else:
+            force = False
+
+        return action, force
 
 
 class HumanOrchestra():
@@ -254,8 +265,3 @@ class HumanOrchestra():
 
     def delete_human(self, human_name):
         self.states.delete_human_state(human_name)
-
-
-if __name__ == '__main__':
-    kplm = Kapellmeister("Shlak2k16")
-    print kplm._get_previous_post_time()

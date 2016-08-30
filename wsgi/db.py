@@ -216,22 +216,18 @@ class HumanStorage(DBHandler):
         result = list(found)
         return result
 
-    @cache_refresh
     def set_human_subs(self, name, subreddits):
         self.human_config.update_one({"user": name}, {"$set": {"subs": subreddits}}, upsert=True)
 
-    @cached(ttl=120)
     def get_human_subs(self, name):
         found = self.human_config.find_one({"user": name}, projection={"subs": True})
         if found:
             human_subs = found.get("subs", [])
             return human_subs
 
-    @cache_refresh
     def set_ae_group(self, name, group_name):
         self.human_config.update_one({"user": name}, {"$set": {"ae_group": group_name}})
 
-    @cached()
     def get_ae_group(self, name):
         found = self.human_config.find_one({"user": name}, projection={"ae_group": 1})
         if found:

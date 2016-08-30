@@ -88,10 +88,12 @@ class HumanConfiguration(object):
 
 
 class Human(RedditHandler):
-    def __init__(self, login):
-        super(Human, self).__init__()
+    def __init__(self, login, db=None, reddit=None, reddit_class=Reddit):
+        super(Human, self).__init__(reddit=reddit)
+        self.reddit_class = reddit_class
+
         self.login = login
-        self.db = HumanStorage(name="consumer %s" % login)
+        self.db = db or HumanStorage(name="consumer %s" % login)
         self.comments_handler = CommentHandler(name="consumer %s" % login)
         self.posts = PostsBalancer(self.login)
 
@@ -140,7 +142,7 @@ class Human(RedditHandler):
         self.user_agent = login_credentials.get("user_agent", random.choice(USER_AGENTS))
         self.name = login_credentials["user"]
 
-        r = Reddit(self.user_agent)
+        r = self.reddit_class(self.user_agent)
 
         r.set_oauth_app_info(login_credentials['client_id'], login_credentials['client_secret'],
                              login_credentials['redirect_uri'])
@@ -499,26 +501,3 @@ class Human(RedditHandler):
                 log.info("NOT OK :( result: %s" % (result))
                 self.db.store_error(self.name, result)
                 return PS_ERROR
-
-
-class FakeHuman(Human):
-    def __init__(self, login):
-        super(FakeHuman, self).__init__(login)
-
-    def refresh_token(self):
-        log.info("REFRESH TOKEN")
-
-    def do_post(self):
-        log.info("DO POSTING...")
-
-    def do_comment_post(self):
-        return super(FakeHuman, self).do_comment_post()
-
-    def _humanised_comment_post(self, sub, post_fullname):
-        pass
-
-    def do_see_post(self, post):
-        log.info("DO SEE POST %s" % post)
-
-    def do_live_random(self, max_actions=100, posts_limit=500):
-        log.info("DO LIVE RANDOM %s %s" % (max_actions, posts_limit))
