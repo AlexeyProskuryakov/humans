@@ -60,7 +60,7 @@ class FakeHuman(Human):
         self.incr_counter(A_COMMENT)
         return A_COMMENT
 
-    def _humanised_comment_post(self, sub, post_fullname):
+    def _humanised_comment_post(self, sub, comment_id):
         log.info("humanised comment post")
         pass
 

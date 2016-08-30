@@ -14,7 +14,7 @@ from wsgi.db import HumanStorage
 from wsgi.properties import WEEK
 from wsgi.rr_people import RedditHandler, USER_AGENTS, A_CONSUME, A_VOTE, A_COMMENT, A_POST, A_SUBSCRIBE, A_FRIEND, \
     re_url, cmp_by_created_utc
-from wsgi.rr_people.commenting.connection import CommentHandler
+from wsgi.rr_people.commenting.connection import CommentHandler, CS_COMMENTED
 from wsgi.rr_people.posting.posts import PS_POSTED, PS_ERROR, PS_NO_POSTS, PostsStorage, PostSource, PostsBalancer
 
 log = logging.getLogger("consumer")
@@ -91,15 +91,14 @@ class Human(RedditHandler):
     def __init__(self, login, db=None, reddit=None, reddit_class=Reddit):
         super(Human, self).__init__(reddit=reddit)
         self.reddit_class = reddit_class
-
         self.login = login
         self.db = db or HumanStorage(name="consumer %s" % login)
-        self.comments_handler = CommentHandler(name="consumer %s" % login)
-        self.posts = PostsBalancer(self.login)
-
         login_credentials = self.db.get_human_access_credentials(login)
         if not login_credentials:
             raise Exception("Can not have login credentials at %s", login)
+
+        self.comments_handler = CommentHandler(name="consumer %s" % login)
+        self.posts = PostsBalancer(self.login)
 
         human_configuration = self.db.get_human_config(login)
         self._load_configuration(human_configuration)
@@ -352,45 +351,51 @@ class Human(RedditHandler):
             return wt
         return max_wait_time
 
-    def do_comment_post(self):
-        sub = random.choice(self.db.get_human_subs(self.login))
-        post_fullname = self.comments_handler.pop_comment_id(sub)
-        if not post_fullname:
+    def do_comment_post(self, sub=None):
+        sub = sub or random.choice(self.db.get_human_subs(self.login))
+        comment_id = self.comments_handler.pop_comment_id(sub)
+        if not comment_id:
             self.comments_handler.need_comment(sub)
         else:
-            result = self._humanised_comment_post(sub, post_fullname)
+            result = self._humanised_comment_post(sub, comment_id)
             return result
 
-    def _humanised_comment_post(self, sub, post_fullname):
-        self._load_configuration()
+    def _humanised_comment_post(self, sub, comment_id):
+        post_fullname = self.comments_handler.get_comment_post_fullname(comment_id)
         hot_and_new = self.load_hot_and_new(sub, sort=cmp_by_created_utc)
         # check if post fullname is too old
         all_posts_fns = set(map(lambda x: x.fullname, hot_and_new))
         if post_fullname not in all_posts_fns:
-            log.warning(
-                "post fullname [%s] for comment is too old and not present at hot or new" % post_fullname)
+            log.info("post [%s] for comment is too old and not present at hot or new" % post_fullname)
             try:
                 post = self.reddit.get_submission(submission_id=post_fullname[3:],
-                                                  #:3 because submission id must be without prefix
+                                                  # because submission id must be without prefix
                                                   comment_limit=None)
-
                 if post:
-                    return self._comment_post(post, post_fullname, sub)
-                else:
-                    return
+                    comment_result = self._comment_post(post, comment_id, sub)
+                    if comment_result:
+                        self.register_step(A_COMMENT, {"fullname":post_fullname, "sub":sub})
+                        return A_COMMENT
+                    return PS_ERROR
+
             except Exception as e:
-                log.warning("can not getting submission [%s], because: %s" % (post_fullname, e.message))
+                log.warning("can not getting submission [%s %s], because: %s" % (comment_id, post_fullname, e.message))
                 log.exception(e)
                 return
-
-        for i, _post in enumerate(hot_and_new):
-            if _post.fullname == post_fullname:
-                see_left, see_right = _get_random_near(hot_and_new, i, self.configuration.max_posts_near_commented)
-                self._see_near_posts(see_left)
-                self._see_comments(_post)
-                result = self._comment_post(_post, post_fullname, sub)
-                self._see_near_posts(see_right)
-                return result
+        else:
+            log.info("post [%s] for comment is present at hot and new and will posting")
+            self._load_configuration()
+            for i, _post in enumerate(hot_and_new):
+                if _post.fullname == post_fullname:
+                    see_left, see_right = _get_random_near(hot_and_new, i, self.configuration.max_posts_near_commented)
+                    self._see_near_posts(see_left)
+                    self._see_comments(_post)
+                    comment_result = self._comment_post(_post, comment_id, sub)
+                    if comment_result:
+                        self.register_step(A_COMMENT, {"fullname": post_fullname, "sub": sub})
+                        self._see_near_posts(see_right)
+                        return A_COMMENT
+                    return PS_ERROR
 
     def _see_comments(self, _post):
         try:
@@ -401,21 +406,17 @@ class Human(RedditHandler):
         except Exception as e:
             log.error(e)
 
-    def _comment_post(self, _post, post_fullname, sub):
+    def _comment_post(self, _post, comment_oid, sub):
+        comment = self.comments_handler.start_comment_post(comment_oid)
+        text = comment.get("text")
+        _wait_time_to_write(text)
         try:
-            comment_info = self.comments_handler.get_comment_info(post_fullname)
-            if comment_info:
-                text = comment_info.get("text")
-                _wait_time_to_write(text)
-                response = _post.add_comment(text)
-                self.comments_handler.set_commented(comment_info['_id'], by=self.name)
-                self.register_step(A_COMMENT, info={"fullname": post_fullname,
-                                                    "sub": sub,
-                                                    "result": str(response)})
-                return A_COMMENT
-            return PS_ERROR
+            result = _post.add_comment(text)
+            self.comments_handler.end_comment_post(comment_oid, self.name)
+            return result
         except Exception as e:
             log.exception(e)
+            self.comments_handler.end_comment_post(comment_oid, self.name, e)
 
     def _see_near_posts(self, posts):
         try:
@@ -501,3 +502,5 @@ class Human(RedditHandler):
                 log.info("NOT OK :( result: %s" % (result))
                 self.db.store_error(self.name, result)
                 return PS_ERROR
+
+

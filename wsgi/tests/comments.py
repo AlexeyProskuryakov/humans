@@ -45,7 +45,7 @@ if __name__ == '__main__':
     ch = CommentHandler("test")
 
     cid = ch.pop_comment_id("ts")
-    comment = ch.get_comment_info(cid)
+    comment = ch.start_comment_post(cid)
     assert comment
     assert comment.get("text") == "test_text"
     assert comment.get("fullname") == "test_fn"
@@ -53,7 +53,7 @@ if __name__ == '__main__':
     assert comment.get("sub") == "ts"
 
     cid = ch.pop_comment_id("ts")
-    comment = ch.get_comment_info(cid)
+    comment = ch.start_comment_post(cid)
     assert comment
     assert comment.get("text") == "foo_bar_baz"
     assert comment.get("fullname") == "test_fn"
@@ -61,7 +61,7 @@ if __name__ == '__main__':
     assert comment.get("sub") == "ts"
 
     cid = ch.pop_comment_id("ts")
-    comment = ch.get_comment_info(cid)
+    comment = ch.start_comment_post(cid)
     assert comment
     assert comment.get("text") == "test_text"
     assert comment.get("fullname") == "fuckingfullname"
@@ -69,7 +69,7 @@ if __name__ == '__main__':
     assert comment.get("sub") == "ts"
 
     cid = ch.pop_comment_id("ts")
-    comment = ch.get_comment_info(cid)
+    comment = ch.start_comment_post(cid)
     assert comment
     assert comment.get("text") == "test_text"
     assert comment.get("fullname") == "test_fn"
@@ -77,7 +77,7 @@ if __name__ == '__main__':
     assert comment.get("sub") == "ts"
 
     cid = ch.pop_comment_id("tst")
-    comment = ch.get_comment_info(cid)
+    comment = ch.start_comment_post(cid)
     assert comment
     assert comment.get("text") == "test_text"
     assert comment.get("fullname") == "test_fn"

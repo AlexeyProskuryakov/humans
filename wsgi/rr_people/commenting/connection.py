@@ -15,6 +15,7 @@ log = logging.getLogger("comments")
 
 CS_COMMENTED = "commented"
 CS_READY_FOR_COMMENT = "ready_for_comment"
+CS_ERROR = "error"
 
 _comments = "comments"
 
@@ -60,14 +61,20 @@ class CommentsStorage(DBHandler):
         except Exception as e:
             log.exception(e)
 
-    def set_commented(self, comment_id, by):
-        self.comments.update_one({"_id": comment_id},
-                                 {"$set": {"state": CS_COMMENTED,
-                                           "by": by,
-                                           "time": time.time()},
+    def end_comment_post(self, comment_oid, by, error_info=None):
+        to_set = {"by": by,
+                  "time": time.time()}
+        if error_info:
+            to_set['state'] = CS_ERROR
+            to_set['error_info'] = str(error_info)
+        else:
+            to_set['state'] = CS_COMMENTED
+
+        self.comments.update_one({"_id": ObjectId(comment_oid)},
+                                 {"$set": to_set,
                                   "$unset": {"_lock": 1}})
 
-    def get_comment_info(self, comment_oid):
+    def start_comment_post(self, comment_oid):
         with self.mutex:
             found = self.comments.find_one(
                 {"_id": ObjectId(comment_oid),
@@ -76,6 +83,11 @@ class CommentsStorage(DBHandler):
             if found:
                 self.comments.update_one(found, {"$set": {"_lock": 1}})
                 return found
+
+    def get_comment_post_fullname(self, comment_oid):
+        found = self.comments.find_one({"_id":ObjectId(comment_oid)})
+        if found:
+            return found.get("fullname")
 
     def get_comments_ready_for_comment(self, sub=None):
         q = {"state": CS_READY_FOR_COMMENT, "sub": sub}
@@ -126,6 +138,9 @@ class CommentRedisQueue(RedisHandler):
         result = self.redis.lrange(QUEUE_CF(sbrdt), 0, -1)
         return list(result)
 
+    def put_comment(self, sbrdt, comment_id):
+        log.debug("redis: push to %s %s" % (sbrdt, comment_id))
+        self.redis.rpush(QUEUE_CF(sbrdt), comment_id)
 
 class CommentHandler(CommentsStorage, CommentRedisQueue):
     def __init__(self, name="?"):
