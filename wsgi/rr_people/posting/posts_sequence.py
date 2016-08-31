@@ -73,40 +73,56 @@ class PostsSequence(object):
         self.human = data.get('human')
         self.right = data.get('right')
         self.left = data.get('left')
+        self.middle = data.get('middle', [])
+        self.prev_time = data.get('prev_time', 0)
 
         self.metadata = data.get("metadata")
 
         self.__store = store
 
     def to_dict(self):
-        dict = self.__dict__
-        for k in dict.keys():
-            if str(k).startswith("__"):
-                del dict[k]
-        return dict
-
-    def get_near_time(self, time):
         result = {}
-        for i, n_el in enumerate(self.right, start=1):
-            dt = abs(n_el - time) * pow(i, 3)
-            result[dt] = i
+        for k, v in self.__dict__.iteritems():
+            if not str(k).startswith("_"):
+                result[k] = v
+        return result
 
-        remain = min(result.keys())
-        position = result[remain]
+    def get_post(self, cur_time):
+        self._pop_posts_between(cur_time)
+        if len(self.middle) == 0:
+            self.prev_time = cur_time
+            self._update_prev_time()
+            return
 
-        return position, remain / pow(position, 3)
+        post = self.middle.pop(0)
+        self.left.append(post)
+        self._commit()
+        return post
 
-    def pass_element(self, position):
-        for i in range(position):
-            post = self.right.pop(0)
-            self.left.append(post)
-            self.__store.pass_post(self.human, post)
+    def _commit(self):
+        self.__store.update_sequence(self)
+
+    def _update_prev_time(self):
+        self.__store.set_prev_time(self.human, self.prev_time)
+
+    def _pop_posts_between(self, cur_time):
+        start, stop = None, None
+        for i, post_time in enumerate(self.right):
+            if post_time <= cur_time and post_time >= self.prev_time:
+                if not start:
+                    start = i
+                else:
+                    stop = i
+        if start is None:
+            return
+        if not stop:
+            stop = start + 1
+
+        self.middle.extend(self.right[start:stop])
+        self.right = self.right[:start] + self.right[stop:]
 
     def is_end(self):
         return len(self.right) == 0
-
-    def check(self):
-        return sum(self.metadata) == len(self.right) + len(self.left)
 
 
 class PostsSequenceStore(DBHandler):
@@ -133,9 +149,8 @@ class PostsSequenceStore(DBHandler):
         if result:
             return PostsSequence(result, store=self)
 
-    def pass_post(self, human, post_time):
-        result = self.posts_sequence.update_one({"human": human}, {"$push": {"left": post_time}, "$pop": {"right": -1}})
-        return result
+    def set_prev_time(self, human, prev_time):
+        self.posts_sequence.update_one({"human": human}, {"$set": {"prev_time": prev_time}})
 
     def update_sequence(self, sequence):
         self.posts_sequence.update_one({"human": sequence.human},
@@ -154,9 +169,6 @@ class PostsSequenceHandler(object):
 
         self._sequence_cache = None
         self._sequence_cache_time = None
-
-        self._accept_count = 0
-        self._remain_tst = 0
 
     def __evaluate_posts_time_sequence(self, min_posts, max_posts=None, iterations_count=10, current_datetime=None):
         '''
@@ -205,7 +217,8 @@ class PostsSequenceHandler(object):
                     if time > WEEK: time -= WEEK
                     sequence_data.append(time)
 
-        sequence_data = self._sort_from_current_time(sequence_data, current_datetime=current_datetime)
+        sequence_data.sort()
+
         min, max, avg = self._evaluate_info_counts(sequence_data)
         log.info("\n%s %s: \n%s\n----------\nmin: %s \nmax: %s \navg: %s" % (
             self.human,
@@ -215,20 +228,6 @@ class PostsSequenceHandler(object):
             delta_info(avg),
         ))
         return sequence_data, sequence_meta_data
-
-    def _sort_from_current_time(self, post_time_sequence, current_datetime=None):
-        i_time = current_datetime or time_hash(datetime.utcnow())
-        prev_pt = None
-        position = None
-        for i, pt in enumerate(post_time_sequence):
-            if prev_pt == None:
-                prev_pt = pt
-
-            if i_time < pt and i_time > prev_pt:
-                position = i
-                break
-        result_post_time_sequence = post_time_sequence[position:] + post_time_sequence[:position]
-        return result_post_time_sequence
 
     def _evaluate_info_counts(self, post_time_sequence):
         min_diff = maxint
@@ -265,7 +264,7 @@ class PostsSequenceHandler(object):
     def _get_sequence(self):
         if not self._sequence_cache or time.time() - self._sequence_cache_time > DEFAULT_POSTS_SEQUENCE_CACHED_TTL:
             sequence = self.ps_store.get_posts_sequence(self.human)
-            if not sequence or sequence.is_end() or not sequence.check():
+            if not sequence or sequence.is_end():
                 sequence = self.evaluate_new()
 
             self._sequence_cache = sequence
@@ -277,43 +276,25 @@ class PostsSequenceHandler(object):
         return x - WEEK if x > WEEK else x
 
     def accept_post_time(self, date_hash=None):
-        date_hash = date_hash or time_hash(datetime.utcnow())
+        date_hash = date_hash if date_hash is not None else time_hash(datetime.utcnow())
         sequence = self._get_sequence()
 
-        if self._accept_count > 0:
-            if (abs(self._remain_tst - date_hash) / self._accept_count) < (AVG_ACTION_TIME * 2):
-                self._accept_count -= 1
-                sequence.pass_element(1)
-                return True
-            else:
-                return False
-
-        position, remained = sequence.get_near_time(date_hash)
-
-        if position > 1:
-            self._remain_tst = self.get_remained(remained + date_hash)
-            self._accept_count = position - 1
-            sequence.pass_element(1)
-            return True
-        elif remained < AVG_ACTION_TIME:
-            sequence.pass_element(1)
-            return True
-        else:
-            self._remain_tst = self.get_remained(remained + date_hash)
-            self._accept_count = position
-            return False
+        return sequence.get_post(date_hash) != None
 
 
 if __name__ == '__main__':
     # res = generate_sequence_data(70, pass_count=50)
     # print sum(res), res
+    import random
+
     psh = PostsSequenceHandler("Shlak2k15")
     psh.evaluate_new()
 
-    for dt in range(time_hash(datetime.utcnow()), WEEK, AVG_ACTION_TIME):
-        print psh.accept_post_time(
-            dt), dt, "[", psh._accept_count, psh._remain_tst,  psh._remain_tst-dt, ']\n', psh._sequence_cache.left, '\n', psh._sequence_cache.right, '\n--------------\n\n'
+    step = 0
 
-    for dt in range(0, time_hash(datetime.utcnow()) / 2, random.randint(AVG_ACTION_TIME, AVG_ACTION_TIME * 100)):
-        print psh.accept_post_time(
-            dt), dt, '\n', psh._sequence_cache.left, '\n', psh._sequence_cache.right, '\n--------------\n\n'
+    while step <= WEEK:
+        print psh.accept_post_time(step), \
+            step, '\n(', psh._sequence_cache.prev_time,")\n",  psh._sequence_cache.left, '\n', psh._sequence_cache.middle, '\n', psh._sequence_cache.right, '\n--------------\n\n'
+
+        step += random.randint(AVG_ACTION_TIME, AVG_ACTION_TIME * 5)
+        print "next step: ", step

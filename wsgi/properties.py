@@ -90,10 +90,10 @@ POLITICS = [POLITIC_WORK_HARD, POLITIC_FREE_LIFE]
 DEFAULT_LIMIT = 500
 # DEFAULT_LIMIT = 20
 
-max_consuming = 70
-min_consuming = 60
+max_consuming = 90
+min_consuming = 80
 
-max_voting = 60
+max_voting = 70
 min_voting = 50
 
 st_between_net_request = 60

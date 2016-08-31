@@ -55,7 +55,7 @@ class FakeHuman(Human):
         self.incr_counter(A_POST)
         return A_POST
 
-    def do_comment_post(self):
+    def do_comment_post(self, sub=None):
         log.info("DO COMMENTING...")
         self.incr_counter(A_COMMENT)
         return A_COMMENT
@@ -67,13 +67,15 @@ class FakeHuman(Human):
     def do_see_post(self, post):
         log.info("DO SEE POST %s" % post)
 
-
     def do_live_random(self, max_actions=100, posts_limit=500):
         log.info("DO LIVE RANDOM %s %s" % (max_actions, posts_limit))
-        self.incr_counter(random.choice([A_CONSUME, A_VOTE]))
+        if self.can_do(A_VOTE):
+            self.incr_counter(A_VOTE)
+        else:
+            self.incr_counter(A_CONSUME)
 
     def __repr__(self):
-        return "".join(["%s:\t%s\n"%(k,v) for k,v in self.counters.iteritems()])
+        return "".join(["%s:\t%s\n" % (k, v) for k, v in self.counters.iteritems()])
 
 
 def test_kapelmeister():
@@ -82,14 +84,18 @@ def test_kapelmeister():
     db.update_human_access_credentials_info(user, {"scope": ["read"], "access_token": "foo", "refresh_token": "bar"})
 
     kplm = Kapellmeister(user, human_class=FakeHuman, reddit=FakeRedditHandler, reddit_class=FakeRedditHandler)
+    kplm.psh.evaluate_new()
+
     sleep = 0
     for step in xrange(0, WEEK, AVG_ACTION_TIME):
         action, force = kplm.decide(step)
+        print action, force
         if action == A_SLEEP:
             log.info("SLEEP")
             sleep += 1
         else:
-            kplm.do_action(action, step, force)
+            result = kplm.do_action(action, step, force)
+            print result
 
     print kplm.human, "sleep:", sleep
 

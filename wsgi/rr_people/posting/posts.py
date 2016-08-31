@@ -119,15 +119,10 @@ class PostsStorage(DBHandler):
         found = self.posts_counters.find_one({"human": human}, projection={"_id": False})
         return found or {}
 
-    def get_queued_post(self, human=None, sub=None, important=False):
+    def get_queued_post(self, human, important=False):
         lock_id = time.time()
 
-        q = {}
-        if human:
-            q['human'] = human
-        if sub:
-            q['sub'] = sub
-
+        q = {'human':human}
         q["state"] = PS_READY
         q["_lock"] = {"$exists": False}
         q["important"] = important
@@ -179,7 +174,7 @@ class PostsBalancer(object):
             if post:
                 self._post_type_in_fly = CNT_IMPORTANT
         else:
-            post = self.post_store.get_queued_post(important=False)
+            post = self.post_store.get_queued_post(human=self.human, important=False)
             if post:
                 self._post_type_in_fly = CNT_NOISE
 

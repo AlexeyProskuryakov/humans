@@ -217,9 +217,8 @@ class Kapellmeister(Process):
         politic = self.db.get_human_post_politic(self.human_name)
         action = self.ae.get_action(step)
         if politic == POLITIC_WORK_HARD:
-            log.info("[%s] have WH politic" % self.human_name)
             if self.psh.accept_post_time(step):
-                log.info("and will post")
+                log.info("politic WH and will post")
                 action = A_POST
                 force = True
             elif action == A_POST:
