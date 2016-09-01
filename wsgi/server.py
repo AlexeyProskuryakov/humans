@@ -273,7 +273,7 @@ human_orchestra = HumanOrchestra()
 @login_required
 def humans():
     if request.method == "POST":
-        subreddits_raw = request.form.get("sbrdts")
+        subreddits_raw = request.form.get("human_subs")
         subreddits = subreddits_raw.strip().split()
 
         human_name = request.form.get("for-human-name")
@@ -281,7 +281,7 @@ def humans():
         log.info("Add subreddits: \n%s\n to human with name: %s" % ('\n'.join([el for el in subreddits]), human_name))
 
         db.set_human_subs(human_name, list(set(subreddits)))
-        human_orchestra.start_human(human_name)
+        # human_orchestra.start_human(human_name)
 
         return redirect(url_for('humans_info', name=human_name))
 
