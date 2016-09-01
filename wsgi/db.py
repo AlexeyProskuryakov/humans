@@ -327,8 +327,14 @@ class HumanStorage(DBHandler):
             res = res.limit(limit)
         return list(res)
 
-    def get_log_of_human_statistics(self, human_name):
+    def get_human_statistics(self, human_name):
         return self.human_statistic.find_one({"human_name": human_name}, projection={"_id": False, "human_name": False})
+
+    def clear_human_statistic(self, human_name):
+        stat = dict(self.get_human_statistics(human_name))
+        for k, v in stat.iteritems():
+            stat[k] = 0
+        return self.human_statistic.update_one({"human_name": human_name}, {"$set": stat})
 
     def remove_human_data(self, name):
         self.human_config.delete_one({"user": name})
@@ -359,3 +365,7 @@ class HumanStorage(DBHandler):
             crupt = m.hexdigest()
             if crupt == found.get("pwd"):
                 return found.get("user_id")
+
+if __name__ == '__main__':
+    hs = HumanStorage()
+    hs.clear_human_statistic("Shlak2k15")

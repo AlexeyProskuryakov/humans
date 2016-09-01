@@ -101,7 +101,7 @@
                     </form>
                 </div>
 
-                  <div class="col-md-3">
+                <div class="col-md-3">
                     <form action="{{url_for('humans_info', name=human_name)}}" method="post">
                         <input type="hidden" name="delete" value="!">
                         <input type="submit" value="Удалить нахуй" class="btn btn-danger btn-lg">
@@ -183,11 +183,17 @@
                 <div class="accordion" id="info-accordion">
                     <div class="accordion-group">
                         <div class="accordion-heading">
-                            <a class="accordion-toggle" data-toggle="collapse" data-parent="#info-accordion"
-                               href="#statistic">
-                                <h3> Statistics of human actions:</h3>
-                            </a>
+                            <h3>
+                                <a class="accordion-toggle" data-toggle="collapse" data-parent="#info-accordion"
+                                   href="#statistic">
+                                    Statistics of human actions:
+                                </a>
+                                <button class="btn btn-sm btn-danger" onclick="clear_statistic('{{human_name}}')">
+                                    Почистить
+                                </button>
+                            </h3>
                         </div>
+
                         <div id="statistic" class="accordion-body collapse in">
                             <div class="accordion-inner">
                                 <table class="table table-stripped">
@@ -288,7 +294,8 @@
             <div class="row">
                 <hr>
                 <div class="col-md-10">
-                    <a href="http://generators-shlak0bl0k.rhcloud.com/queue/posts/{{human_name}}">Смотри какие посты в очереди
+                    <a href="http://generators-shlak0bl0k.rhcloud.com/queue/posts/{{human_name}}">Смотри какие посты в
+                        очереди
                     </a>
                 </div>
             </div>
@@ -345,7 +352,6 @@
     $(function(){
         show_sequences('{{human_name}}');
     });
-
 
 
 

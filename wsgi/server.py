@@ -314,7 +314,7 @@ def humans_info(name):
         db.set_human_live_configuration(name, config)
 
     human_log = db.get_log_of_human(name, 100)
-    stat = db.get_log_of_human_statistics(name)
+    stat = db.get_human_statistics(name)
 
     human_cfg = db.get_human_config(name)
 
@@ -323,7 +323,7 @@ def humans_info(name):
 
     errors = db.get_errors(name)
 
-    return render_template("humans_info.html", **{"human_name": name,
+    return render_template("human_info.html", **{"human_name": name,
                                                   "human_stat": stat,
                                                   "human_log": human_log,
                                                   "human_live_state": human_state,
@@ -357,7 +357,6 @@ def human_config(name):
         config_data = db.get_human_config(name)
         if config_data:
             config_data = dict(config_data)
-            config_data.pop("_id")
             return jsonify(**{"ok": True, "data": config_data})
 
     return jsonify(**{"ok": False})
@@ -383,6 +382,13 @@ def human_clear_errors(name):
     db.clear_errors(name)
     return jsonify(**{"ok": True})
 
+@app.route("/humans/<name>/clear_statistic", methods=["POST"])
+@login_required
+def human_clear_statistic(name):
+    result = db.clear_human_statistic(name)
+    if result.modified_count == 1:
+        return jsonify(**{"ok": True})
+    return jsonify(**{"ok": False})
 
 @app.route("/humans/<name>/channel_id", methods=["POST"])
 @login_required
@@ -481,8 +487,8 @@ def queue_of_comments(name):
     subs = db.get_subs_of_human(name)
     comments = defaultdict(list)
     for sub in subs:
-        post_fns = comment_handler.get_all_comments_ids(sub)
-        comments[sub] = list(comment_handler.get_comments_by_ids(post_fns, projection={"_id": False}))
+        comments_ids = comment_handler.get_all_comments_ids(sub)
+        comments[sub] = list(comment_handler.get_comments_by_ids(comments_ids, projection={"_id": False}))
         log.info("load comments for sub %s" % sub)
     return render_template("comments_queue.html", **{"human_name": name, "comments": comments, "subs": subs})
 

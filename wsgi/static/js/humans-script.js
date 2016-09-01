@@ -14,8 +14,8 @@ function get_human_subs(human_name, to){
     });
 };
 
-$("#human-name option").on('click', function(e){
-         var human_name = $(e.target).attr("id");
+$("#for-human-name").change(function(e){
+         var human_name = $("#for-human-name option:selected").attr("id");
          if (human_name != undefined){
             get_human_subs(human_name, $("#human-subs"));
          }
@@ -66,7 +66,6 @@ function update_channel_id(name){
         }
     })
 };
-//$("#channel-id-input")
 
 function clear_errors(name){
     $.ajax({
@@ -79,3 +78,16 @@ function clear_errors(name){
         }
     });
 }
+
+function clear_statistic(name){
+    $.ajax({
+        type:           "post",
+        url:            "/humans/"+name+"/clear_statistic",
+        success:        function(data){
+                if (data.ok){
+                    $("#statistic").addClass("more-opacity");
+                }
+        }
+    });
+}
+
