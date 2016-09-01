@@ -120,8 +120,9 @@ class Kapellmeister(Process):
         except Exception:
             return 0
 
-    def _can_post_at_time(self):
-        return (time.time() - self._get_previous_post_time()) > MIN_TIME_BETWEEN_POSTS
+    def can_post_after(self):
+        time_to_post = time.time() - self._get_previous_post_time()
+        return MIN_TIME_BETWEEN_POSTS - time_to_post
 
     def do_action(self, action, step, force=False):
         _start = time.time()
@@ -132,8 +133,14 @@ class Kapellmeister(Process):
             if comment_result == A_COMMENT:
                 produce = True
 
-        elif action == A_POST and ((self.human.can_do(A_POST) or force) and self._can_post_at_time()):
-            self._set_state(WORK_STATE("posting"))
+        elif action == A_POST and (self.human.can_do(A_POST) or force):
+            after = self.can_post_after()
+            if after < 0:
+                self._set_state(WORK_STATE("posting"))
+            else:
+                self._set_state(WORK_STATE("posting after %s"%after))
+                time.sleep(after)
+
             post_result = self.human.do_post()
             if post_result == A_POST: produce = True
 

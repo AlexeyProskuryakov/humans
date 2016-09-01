@@ -56,7 +56,7 @@ class PostSource(object):
 
 
 class PostsStorage(DBHandler):
-    def __init__(self, name="?", drop=False, **kwargs):
+    def __init__(self, name="?", drop=False, hs=None, **kwargs):
         super(PostsStorage, self).__init__(name=name, **kwargs)
         collection_name = "generated_posts"
         collection_names = self.db.collection_names(include_system_collections=False)
@@ -82,6 +82,8 @@ class PostsStorage(DBHandler):
         else:
             self.posts_counters = self.db.get_collection("posts_counters")
 
+        self.hs = hs or HumanStorage("ps %s"%name)
+
     # posts
     def get_post_state(self, url_hash):
         found = self.posts.find_one({"url_hash": str(url_hash)}, projection={"state": 1})
@@ -95,21 +97,20 @@ class PostsStorage(DBHandler):
             return PostSource.from_dict(found), found
         return None, None
 
-    def add_generated_post(self, post, sub, important=False, channel_id=None, human=None, state=PS_READY):
+    def check_post_hash_exists(self, url_hash):
+        found = self.posts.find_one({"url_hash": url_hash}, projection={"id": 1})
+        if found: return True
+        return False
+
+    def add_generated_post(self, post, sub, important=False, human=None, state=PS_PREPARED):
         if isinstance(post, PostSource):
-            found, _ = self.get_post(post.url_hash, projection={"_id": True})
-            if not found:
+            if not self.check_post_hash_exists(post.url_hash):
                 data = post.to_dict()
                 data['state'] = state
                 data['sub'] = sub
+                data['important'] = important
+                data['human'] = human or random.choice(self.hs.get_humans_of_sub(sub))
                 data['time'] = time.time()
-
-                if important:
-                    data['important'] = important
-                if channel_id:
-                    data["channel_id"] = channel_id
-                if human:
-                    data["human"] = human
                 return self.posts.insert_one(data)
 
     def increment_counter(self, human, counter_type):

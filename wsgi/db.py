@@ -219,11 +219,17 @@ class HumanStorage(DBHandler):
     def set_human_subs(self, name, subreddits):
         self.human_config.update_one({"user": name}, {"$set": {"subs": subreddits}}, upsert=True)
 
-    def get_human_subs(self, name):
+    def get_subs_of_human(self, name):
         found = self.human_config.find_one({"user": name}, projection={"subs": True})
         if found:
             human_subs = found.get("subs", [])
             return human_subs
+
+    def get_humans_of_sub(self, sub):
+        humans = []
+        for el in self.human_config.find({"subs": sub}, projection={"user": 1}):
+            humans.append(el.get("user"))
+        return humans
 
     def set_ae_group(self, name, group_name):
         self.human_config.update_one({"user": name}, {"$set": {"ae_group": group_name}})
@@ -327,7 +333,7 @@ class HumanStorage(DBHandler):
     def remove_human_data(self, name):
         self.human_config.delete_one({"user": name})
         self.clear_errors(name)
-        self.human_statistic.delete_many({"human_name":name})
+        self.human_statistic.delete_many({"human_name": name})
 
     #######################USERS
     def add_user(self, name, pwd, uid):
@@ -353,5 +359,3 @@ class HumanStorage(DBHandler):
             crupt = m.hexdigest()
             if crupt == found.get("pwd"):
                 return found.get("user_id")
-
-
