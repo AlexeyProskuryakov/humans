@@ -4,7 +4,7 @@ from wsgi.db import HumanStorage
 from wsgi.rr_people.posting.posts import PostsStorage, PostsBalancer, PS_POSTED, PostSource, PS_READY
 from wsgi.rr_people.posting.posts_sequence import PostsSequenceHandler
 
-human = "TEST_HUMAN"
+human = "Shlak2k16"
 sub = "test_sub"
 sub1 = sub + "_1"
 

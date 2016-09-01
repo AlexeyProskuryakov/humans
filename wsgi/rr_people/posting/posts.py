@@ -174,10 +174,11 @@ class PostsBalancer(object):
             post = self.post_store.get_queued_post(human=self.human, important=True)
             if post:
                 self._post_type_in_fly = CNT_IMPORTANT
-        else:
-            post = self.post_store.get_queued_post(human=self.human, important=False)
-            if post:
-                self._post_type_in_fly = CNT_NOISE
+                return post
+
+        post = self.post_store.get_queued_post(human=self.human, important=False)
+        if post:
+            self._post_type_in_fly = CNT_NOISE
 
         return post
 
