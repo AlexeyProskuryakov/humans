@@ -478,7 +478,7 @@ post_storage = PostsStorage(name="server")
 @app.route("/queue/comments/<name>", methods=["GET"])
 @login_required
 def queue_of_comments(name):
-    subs = db.get_human_subs(name)
+    subs = db.get_subs_of_human(name)
     comments = defaultdict(list)
     for sub in subs:
         post_fns = comment_handler.get_all_comments_ids(sub)

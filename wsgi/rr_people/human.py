@@ -352,7 +352,7 @@ class Human(RedditHandler):
         return max_wait_time
 
     def do_comment_post(self, sub=None):
-        sub = sub or random.choice(self.db.get_human_subs(self.login))
+        sub = sub or random.choice(self.db.get_subs_of_human(self.login))
         comment_id = self.comments_handler.pop_comment_id(sub)
         if not comment_id:
             self.comments_handler.need_comment(sub)
@@ -433,7 +433,7 @@ class Human(RedditHandler):
             return list(f())
 
         counter = 0
-        subs = self.db.get_human_subs(self.name)
+        subs = self.db.get_subs_of_human(self.name)
         if not subs:
             log.error("For %s not any subs at config :(", self.name)
             return
