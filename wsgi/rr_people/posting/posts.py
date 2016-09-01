@@ -102,7 +102,7 @@ class PostsStorage(DBHandler):
         if found: return True
         return False
 
-    def add_generated_post(self, post, sub, important=False, human=None, state=PS_PREPARED):
+    def add_generated_post(self, post, sub, important=False, human=None, state=PS_READY):
         if isinstance(post, PostSource):
             if not self.check_post_hash_exists(post.url_hash):
                 data = post.to_dict()
