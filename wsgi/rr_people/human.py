@@ -374,7 +374,7 @@ class Human(RedditHandler):
                 if post:
                     comment_result = self._comment_post(post, comment_id, sub)
                     if comment_result:
-                        self.register_step(A_COMMENT, {"fullname":post_fullname, "sub":sub})
+                        self.register_step(A_COMMENT, {"fullname": post_fullname, "sub": sub})
                         return A_COMMENT
                     return PS_ERROR
 
@@ -487,20 +487,18 @@ class Human(RedditHandler):
                 log.error("exception at posting %s" % (post))
                 log.exception(e)
                 self.posts.end_post(post_data, PS_ERROR)
-                self.db.store_error(self.name, e)
+                self.db.store_error(self.name, "Exception at post: %s" % e, post_data)
                 return PS_ERROR
 
-            if isinstance(result, Submission):
-                self.register_step(A_POST,
-                                   {"fullname": result.fullname, "sub": post.for_sub, 'title': post.title,
-                                    'url': post.url})
-                self.posts.end_post(post_data, PS_POSTED)
-                log.info("OK! result: %s" % (result))
-                return PS_POSTED
-            else:
+            if not isinstance(result, Submission):
                 self.posts.end_post(post_data, PS_ERROR)
                 log.info("NOT OK :( result: %s" % (result))
-                self.db.store_error(self.name, result)
+                self.db.store_error(self.name, "Submit error: %s" % result, post_data)
                 return PS_ERROR
 
-
+            self.register_step(A_POST,
+                               {"fullname": result.fullname, "sub": post.for_sub, 'title': post.title,
+                                'url': post.url})
+            self.posts.end_post(post_data, PS_POSTED)
+            log.info("OK! result: %s" % (result))
+            return PS_POSTED

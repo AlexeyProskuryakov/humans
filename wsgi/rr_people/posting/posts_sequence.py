@@ -88,16 +88,20 @@ class PostsSequence(object):
         return result
 
     def get_post(self, cur_time):
-        self._pop_posts_between(cur_time)
+        self._accumulate_posts_between(cur_time)
         if len(self.middle) == 0:
             self.prev_time = cur_time
             self._update_prev_time()
-            return
+            return False
+        return True
 
-        post = self.middle.pop(0)
-        self.left.append(post)
-        self._commit()
-        return post
+    def accept_post(self):
+        if len(self.middle) != 0:
+            post = self.middle.pop(0)
+            self.left.append(post)
+            self._commit()
+        else:
+            log.warning("accept post when middle is empty :(")
 
     def _commit(self):
         self.__store.update_sequence(self)
@@ -105,7 +109,7 @@ class PostsSequence(object):
     def _update_prev_time(self):
         self.__store.set_prev_time(self.human, self.prev_time)
 
-    def _pop_posts_between(self, cur_time):
+    def _accumulate_posts_between(self, cur_time):
         start, stop = None, None
         for i, post_time in enumerate(self.right):
             if post_time <= cur_time and post_time >= self.prev_time:
@@ -275,11 +279,14 @@ class PostsSequenceHandler(object):
     def get_remained(self, x):
         return x - WEEK if x > WEEK else x
 
-    def accept_post_time(self, date_hash=None):
+    def is_post_time(self, date_hash=None):
         date_hash = date_hash if date_hash is not None else time_hash(datetime.utcnow())
         sequence = self._get_sequence()
+        return sequence.get_post(date_hash)
 
-        return sequence.get_post(date_hash) != None
+    def accept_post(self):
+        sequence = self._get_sequence()
+        sequence.accept_post()
 
 
 if __name__ == '__main__':
@@ -293,7 +300,7 @@ if __name__ == '__main__':
     step = 0
 
     while step <= WEEK:
-        print psh.accept_post_time(step), \
+        print psh.is_post_time(step), \
             step, '\n(', psh._sequence_cache.prev_time,")\n",  psh._sequence_cache.left, '\n', psh._sequence_cache.middle, '\n', psh._sequence_cache.right, '\n--------------\n\n'
 
         step += random.randint(AVG_ACTION_TIME, AVG_ACTION_TIME * 5)

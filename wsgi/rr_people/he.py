@@ -142,7 +142,9 @@ class Kapellmeister(Process):
                 time.sleep(after)
 
             post_result = self.human.do_post()
-            if post_result == A_POST: produce = True
+            if post_result == A_POST:
+                self.psh.accept_post()
+                produce = True
 
         if not produce:
             if self.human.can_do(A_CONSUME):
@@ -224,7 +226,7 @@ class Kapellmeister(Process):
         politic = self.db.get_human_post_politic(self.human_name)
         action = self.ae.get_action(step)
         if politic == POLITIC_WORK_HARD:
-            if self.psh.accept_post_time(step):
+            if self.psh.is_post_time(step):
                 log.info("politic WH and will post")
                 action = A_POST
                 force = True
