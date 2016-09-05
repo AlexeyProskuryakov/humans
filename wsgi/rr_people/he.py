@@ -225,19 +225,13 @@ class Kapellmeister(Process):
     def decide(self, step):
         politic = self.db.get_human_post_politic(self.human_name)
         action = self.ae.get_action(step)
+        force = False
         if politic == POLITIC_WORK_HARD:
             if self.psh.is_post_time(step):
-                log.info("politic WH and will post")
                 action = A_POST
                 force = True
             elif action == A_POST:
-                action = A_CONSUME
-                force = False
-            else:
-                force = False
-        else:
-            force = False
-
+                action = random.choice([A_CONSUME, A_COMMENT])
         return action, force
 
 

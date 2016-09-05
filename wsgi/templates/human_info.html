@@ -80,6 +80,9 @@
         <div class="col-md-10" id="sequence-info">
             <div id="sequence-represent-container">
             </div>
+            <div id="sequence-metadata">
+
+            </div>
         </div>
     </div>
     <hr>
@@ -350,7 +353,10 @@
 <script src="{{url_for('static',filename='js/sequences-script.js')}}"></script>
 <script>
     $(function(){
-        show_sequences('{{human_name}}');
+    show_sequences('{{human_name}}', true);
+    setInterval(function() {
+            show_sequences('{{human_name}}', false);
+        }, 5000);
     });
 
 

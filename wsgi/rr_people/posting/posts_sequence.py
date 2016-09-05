@@ -87,12 +87,13 @@ class PostsSequence(object):
                 result[k] = v
         return result
 
-    def get_post(self, cur_time):
+    def can_post(self, cur_time):
         self._accumulate_posts_between(cur_time)
+        log.info("Can post %s <-> %s"%self.prev_time, cur_time)
         if len(self.middle) == 0:
-            self.prev_time = cur_time
-            self._update_prev_time()
             return False
+        self.prev_time = cur_time
+        self._update_prev_time()
         return True
 
     def accept_post(self):
@@ -282,7 +283,7 @@ class PostsSequenceHandler(object):
     def is_post_time(self, date_hash=None):
         date_hash = date_hash if date_hash is not None else time_hash(datetime.utcnow())
         sequence = self._get_sequence()
-        return sequence.get_post(date_hash)
+        return sequence.can_post(date_hash)
 
     def accept_post(self):
         sequence = self._get_sequence()
