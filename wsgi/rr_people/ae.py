@@ -76,7 +76,7 @@ def delta_info(delta):
         h, r = divmod(r, HOUR)
         m, r = divmod(r, MINUTE)
         s = r
-        return "days: %s, hours: %s, minutes: %s, secs: %s" % (d, h, m, s)
+        return "%s %s:%s:%s" % (d, h, m, s)
 
 
 def time_hash(time):

@@ -19,7 +19,7 @@ from wsgi.rr_people import USER_AGENTS, \
     A_COMMENT, A_POST, A_SLEEP, \
     S_WORK, S_BAN, S_SLEEP, S_SUSPEND, \
     Singleton, A_CONSUME, A_PRODUCE
-from wsgi.rr_people.ae import ActionGenerator, time_hash
+from wsgi.rr_people.ae import ActionGenerator, time_hash, delta_info
 from wsgi.rr_people.human import Human
 from wsgi.rr_people.posting.posts_sequence import PostsSequenceHandler
 from wsgi.rr_people.states.entity_states import StatesHandler
@@ -138,7 +138,7 @@ class Kapellmeister(Process):
             if after < 0:
                 self._set_state(WORK_STATE("posting"))
             else:
-                self._set_state(WORK_STATE("posting after %s"%after))
+                self._set_state(WORK_STATE("posting after %s" % after))
                 time.sleep(after)
 
             post_result = self.human.do_post()
@@ -227,11 +227,16 @@ class Kapellmeister(Process):
         action = self.ae.get_action(step)
         force = False
         if politic == POLITIC_WORK_HARD:
+            log.info("trying is post at sequence for step: %s, cur time: %s" % (
+            delta_info(step), delta_info(time_hash(datetime.utcnow()))))
             if self.psh.is_post_time(step):
+                log.info("time is post! ")
                 action = A_POST
                 force = True
             elif action == A_POST:
                 action = random.choice([A_CONSUME, A_COMMENT])
+                log.info("time is %s" % action)
+
         return action, force
 
 
