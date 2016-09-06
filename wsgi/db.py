@@ -121,7 +121,7 @@ class HumanStorage(DBHandler):
             self.human_log = db.create_collection(
                 "human_log",
                 capped=True,
-                size=1024 * 1024 * 50,
+                max=1000,
             )
             self.human_log.create_index([("human_name", 1)])
             self.human_log.create_index([("time", 1)])
@@ -342,7 +342,8 @@ class HumanStorage(DBHandler):
         self.human_statistic.delete_many({"human_name": name})
 
     def get_last_actions(self, name, action_type, since=WEEK):
-        return list(self.human_log.find({"human_name": name, "action": action_type, "time": {"$gte": time.time() - since}}))
+        return list(
+            self.human_log.find({"human_name": name, "action": action_type, "time": {"$gte": time.time() - since}}))
 
     #######################USERS
     def add_user(self, name, pwd, uid):

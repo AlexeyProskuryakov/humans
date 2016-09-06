@@ -25,7 +25,7 @@ def test_noise_and_important():
     ps = PostsStorage("test")
 
     pb = PostsBalancer(human, ps)
-
+    hs.set_human_subs(human, [sub, sub1])
     for i in range(100):
         post = pb.start_post()
         if not post:

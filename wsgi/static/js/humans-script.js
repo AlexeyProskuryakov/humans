@@ -91,3 +91,15 @@ function clear_statistic(name){
     });
 }
 
+function clear_log(name){
+    $.ajax({
+        type:           "post",
+        url:            "/humans/"+name+"/clear_log",
+        success:        function(data){
+                if (data.ok){
+                    $("#log").addClass("more-opacity");
+                }
+        }
+    });
+}
+

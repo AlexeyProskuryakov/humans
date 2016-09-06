@@ -1,3 +1,4 @@
+from wsgi.db import HumanStorage
 from wsgi.rr_people.commenting.connection import CommentsStorage, CS_READY_FOR_COMMENT, CommentRedisQueue
 from wsgi.rr_people.human import Human
 
@@ -15,6 +16,11 @@ def test_human_comment():
     h = Human("Shlak2k15")
     h.do_comment_post(sub="funny")
 
+def add_new_human(name = "testHuman"):
+    hs = HumanStorage()
+    hs.set_human_subs(name, ["funny", "videos"])
+
 if __name__ == '__main__':
     # prepare_comments_queue()
-    test_human_comment()
+    # test_human_comment()
+    add_new_human()

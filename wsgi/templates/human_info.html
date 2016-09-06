@@ -105,10 +105,37 @@
                 </div>
 
                 <div class="col-md-3">
-                    <form action="{{url_for('humans_info', name=human_name)}}" method="post">
-                        <input type="hidden" name="delete" value="!">
-                        <input type="submit" value="Удалить нахуй" class="btn btn-danger btn-lg">
-                    </form>
+
+
+                    <!-- Button trigger modal -->
+                    <button type="button" class="btn btn-danger btn-lg" data-toggle="modal" data-target="#del-modal">
+                        Удалить нахуй
+                    </button>
+
+                    <!-- Modal -->
+                    <div class="modal fade" id="del-modal" tabindex="-1" role="dialog" aria-labelledby="Удалить...">
+                        <div class="modal-dialog" role="document">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h1>Не ну ты че? Серъезно чтоли?
+                                        <small>он же лучше собаки...</small>
+                                    </h1>
+                                </div>
+                                <div class="modal-body">
+                                    <form action="{{url_for('humans_info', name=human_name)}}" method="post" class="form from-vertical">
+                                        <input type="hidden" name="delete" value="!">
+                                        <label for="pwd">Пароль вводи:</label>
+                                        <input id="pwd" type="password" name="pwd">
+                                        <input type="submit"  value="Да, блять!" class="btn btn-danger btn-lg">
+                                    </form>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-default" data-dismiss="modal">Я пошутил</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
             </div>
             <div class="row">
@@ -120,6 +147,7 @@
                         </small>
                     </h2>
                     <form action="{{url_for('humans_info', name=human_name)}}" method="post" class="form-horizontal">
+                        <input type="hidden" name="config" value="!">
                         <div class="form-group">
                             <label for="max_wait_time">Максимальное время ожидания (на любой итерации)</label>
                             <input name="max_wait_time" type="number" value="{{config['max_wait_time']}}"
@@ -314,8 +342,9 @@
     <div class="row">
         <div class="col-md-6 col-md-offset-3">
             <h3>human log (last 100 actions):</h3>
+            <!--<button class="btn btn-danger btn-sm" onclick="clear_log('{{human_name}}')">Почистить</button>-->
         </div>
-        <table class="table table-striped">
+        <table id="log" class="table table-striped">
             <tbody>
             {%for row in human_log%}
             <tr>
@@ -358,6 +387,8 @@
             show_sequences('{{human_name}}', false);
         }, 5000);
     });
+
+
 
 
 

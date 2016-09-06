@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from uuid import uuid4
 
 import praw
-from flask import Flask, logging, request, render_template, session, url_for, g
+from flask import Flask, logging, request, render_template, session, url_for, g, flash
 from flask.json import jsonify
 from flask_debugtoolbar import DebugToolbarExtension
 from flask_login import LoginManager, login_user, login_required, logout_user
@@ -307,12 +307,16 @@ def humans_info(name):
             return redirect(url_for('humans_info', name=name))
 
         if request.form.get("delete"):
-            human_orchestra.delete_human(name)
-            db.remove_human_data(name)
-            return redirect(url_for("humans"))
-
-        config = HumanConfiguration(request.form)
-        db.set_human_live_configuration(name, config)
+            pwd = request.form.get("pwd")
+            if db.check_user(g.user.name, pwd):
+                human_orchestra.delete_human(name)
+                db.remove_human_data(name)
+                return redirect(url_for("humans"))
+            else:
+                flash(u"Идите нахуй! Пароль не верен.")
+        if request.form.get("config"):
+            config = HumanConfiguration(request.form)
+            db.set_human_live_configuration(name, config)
 
     human_log = db.get_log_of_human(name, 100)
     stat = db.get_human_statistics(name)
@@ -392,6 +396,11 @@ def human_clear_statistic(name):
         return jsonify(**{"ok": True})
     return jsonify(**{"ok": False})
 
+@app.route("/humans/<name>/clear_log", methods=["POST"])
+@login_required
+def human_clear_log(name):
+    db.clear_errors(name)
+    return jsonify(**{"ok": True})
 
 @app.route("/humans/<name>/channel_id", methods=["POST"])
 @login_required
