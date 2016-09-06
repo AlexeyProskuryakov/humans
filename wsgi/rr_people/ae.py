@@ -89,7 +89,6 @@ def time_hash(time):
         d = time.weekday()
         return d * DAY + h * HOUR + m * MINUTE + s * SEC
 
-
 def weighted_choice_king(action_weights):
     total = 0
     winner = 0

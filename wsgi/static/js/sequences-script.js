@@ -40,15 +40,26 @@ function show_sequences(human_name, withLoader){
                 {color:"green", points:points_cfg, data:work_times, label:"Work time"}
             ];
 
-            posts_times = result["posts"];
+            var posts_times = result["posts"];
             if (posts_times != undefined){
                 data.push({color:"red", points:points_cfg, data:posts_times, label:"New posts"});
             }
 
-            posts_passed_times = result["posts_passed"];
+            var posts_passed_times = result["posts_passed"];
             if (posts_passed_times != undefined){
                 data.push({color:"blue", points:points_cfg, data:posts_passed_times, label:"Old posts"});
             }
+
+            var real_posted = result["real"];
+            if (real_posted != undefined){
+                data.push({color:"black", points:points_cfg, data:real_posted, label:"Real passed"});
+            }
+
+            var candidates = result["candidates"];
+            if (candidates != undefined){
+                data.push({color:"cyan", points:points_cfg, data:candidates, label:"In buffer"});
+            }
+
 
             var current_point = {
                 color:  "black",
@@ -58,8 +69,7 @@ function show_sequences(human_name, withLoader){
                     errorbars:"y",
                     yerr:{show:true, asymmetric:false, upperCap:"-", lowerCap:"-"}
                     },
-                data:[[current.getTime(), 0.75, 1, 1]],
-                label:"Current time"
+                data:[[current.getTime(), 0.75, 1, 1]]
             };
             console.log(current_point);
             data.push(current_point);

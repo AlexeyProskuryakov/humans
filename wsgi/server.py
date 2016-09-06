@@ -16,7 +16,8 @@ from werkzeug.utils import redirect
 from wsgi.db import HumanStorage
 from wsgi.properties import want_coefficient_max, POLITIC_WORK_HARD, WEEK, AE_GROUPS, AE_DEFAULT_GROUP, DEFAULT_POLITIC, \
     POLITICS
-from wsgi.rr_people.ae import AuthorsStorage
+from wsgi.rr_people import A_POST
+from wsgi.rr_people.ae import AuthorsStorage, time_hash
 from wsgi.rr_people.commenting.connection import CommentHandler
 from wsgi.rr_people.he import HumanOrchestra
 from wsgi.rr_people.human import HumanConfiguration
@@ -324,24 +325,24 @@ def humans_info(name):
     errors = db.get_errors(name)
 
     return render_template("human_info.html", **{"human_name": name,
-                                                  "human_stat": stat,
-                                                  "human_log": human_log,
-                                                  "human_live_state": human_state,
-                                                  "subs": human_cfg.get("subs", []),
-                                                  "config": human_cfg.get("live_config") or HumanConfiguration().data,
-                                                  "ss": human_cfg.get("ss", []),
-                                                  "friends": human_cfg.get("frds", []),
-                                                  "want_coefficient": want_coefficient_max,
-                                                  "channel_id": human_cfg.get("channel_id"),
+                                                 "human_stat": stat,
+                                                 "human_log": human_log,
+                                                 "human_live_state": human_state,
+                                                 "subs": human_cfg.get("subs", []),
+                                                 "config": human_cfg.get("live_config") or HumanConfiguration().data,
+                                                 "ss": human_cfg.get("ss", []),
+                                                 "friends": human_cfg.get("frds", []),
+                                                 "want_coefficient": want_coefficient_max,
+                                                 "channel_id": human_cfg.get("channel_id"),
 
-                                                  "politic": politic,
-                                                  "politics": POLITICS,
-                                                  "posts_sequence_config": human_cfg.get("posts_sequence_config", {}),
-                                                  "ae_group": human_cfg.get("ae_group", AE_DEFAULT_GROUP),
-                                                  "ae_groups": AE_GROUPS,
+                                                 "politic": politic,
+                                                 "politics": POLITICS,
+                                                 "posts_sequence_config": human_cfg.get("posts_sequence_config", {}),
+                                                 "ae_group": human_cfg.get("ae_group", AE_DEFAULT_GROUP),
+                                                 "ae_groups": AE_GROUPS,
 
-                                                  "errors": errors,
-                                                  })
+                                                 "errors": errors,
+                                                 })
 
 
 @app.route("/humans/<name>/state", methods=["post"])
@@ -382,6 +383,7 @@ def human_clear_errors(name):
     db.clear_errors(name)
     return jsonify(**{"ok": True})
 
+
 @app.route("/humans/<name>/clear_statistic", methods=["POST"])
 @login_required
 def human_clear_statistic(name):
@@ -389,6 +391,7 @@ def human_clear_statistic(name):
     if result.modified_count == 1:
         return jsonify(**{"ok": True})
     return jsonify(**{"ok": False})
+
 
 @app.route("/humans/<name>/channel_id", methods=["POST"])
 @login_required
@@ -434,9 +437,17 @@ def sequences(name):
 
     posts_sequence = sequence_storage.get_posts_sequence(name)
     if posts_sequence:
+        real_posted = map(lambda x: [get_point_x(time_hash(datetime.fromtimestamp(x.get("time")))), p_y - 0.25, 1, 1],
+                          db.get_last_actions(name, A_POST))
+        candidates = map(lambda x: [get_point_x(x), p_y, 1, 1], [int(x) for x in posts_sequence.middle])
         posts = map(lambda x: [get_point_x(x), p_y, 1, 1], [int(x) for x in posts_sequence.right])
         passed_posts = map(lambda x: [get_point_x(x), p_y, 1, 1], [int(x) for x in posts_sequence.left])
-        return jsonify(**{"work": work_result, "posts": posts, "posts_passed": passed_posts,
+
+        return jsonify(**{"work": work_result,
+                          "posts": posts,
+                          "posts_passed": passed_posts,
+                          "real": real_posted,
+                          "candidates": candidates,
                           'metadata': "By days: %s; All: %s" % (posts_sequence.metadata, sum(posts_sequence.metadata))})
     else:
         return jsonify(**{"work": work_result})

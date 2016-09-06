@@ -11,7 +11,7 @@ from datetime import datetime
 from pymongo import MongoClient
 from pymongo.errors import CollectionInvalid
 
-from wsgi.properties import mongo_uri, db_name, DEFAULT_POLITIC, AE_DEFAULT_GROUP
+from wsgi.properties import mongo_uri, db_name, DEFAULT_POLITIC, AE_DEFAULT_GROUP, WEEK
 
 __author__ = 'alesha'
 
@@ -341,6 +341,9 @@ class HumanStorage(DBHandler):
         self.clear_errors(name)
         self.human_statistic.delete_many({"human_name": name})
 
+    def get_last_actions(self, name, action_type, since=WEEK):
+        return list(self.human_log.find({"human_name": name, "action": action_type, "time": {"$gte": time.time() - since}}))
+
     #######################USERS
     def add_user(self, name, pwd, uid):
         log.info("add user %s %s %s" % (name, pwd, uid))
@@ -365,6 +368,7 @@ class HumanStorage(DBHandler):
             crupt = m.hexdigest()
             if crupt == found.get("pwd"):
                 return found.get("user_id")
+
 
 if __name__ == '__main__':
     hs = HumanStorage()

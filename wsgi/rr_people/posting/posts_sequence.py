@@ -72,7 +72,7 @@ class PostsSequence(object):
     def __init__(self, data, store):
         self.human = data.get('human')
         self.right = data.get('right')
-        self.left = data.get('left')
+        self.left = data.get('left', [])
         self.middle = data.get('middle', [])
         self.prev_time = data.get('prev_time', 0)
 
@@ -89,26 +89,25 @@ class PostsSequence(object):
 
     def can_post(self, cur_time):
         self._accumulate_posts_between(cur_time)
-        log.info("Can post %s <-> %s"%(delta_info(self.prev_time), delta_info(cur_time)))
-        if len(self.middle) == 0:
-            return False
-        self.prev_time = cur_time
-        self._update_prev_time()
-        return True
+        log.info("Can post %s <-> %s" % (delta_info(self.prev_time), delta_info(cur_time)))
+        return len(self.middle) != 0
 
     def accept_post(self):
         if len(self.middle) != 0:
             post = self.middle.pop(0)
             self.left.append(post)
-            self._commit()
+            self._remove_from_middle(post)
         else:
             log.warning("accept post when middle is empty :(")
 
-    def _commit(self):
-        self.__store.update_sequence(self)
+    def _remove_from_middle(self, post):
+        self.__store.posts_sequence.update_one({"human": self.human}, {"$pop": {"middle": -1}, "$push": {'left', post}})
 
-    def _update_prev_time(self):
-        self.__store.set_prev_time(self.human, self.prev_time)
+    def _update_sequence_middle_state(self, right, middle, prev_time):
+        self.__store.posts_sequence.update_one({"human": self.human},
+                                               {"$set": {"middle": middle,
+                                                         "right": right,
+                                                         "prev_time": prev_time}})
 
     def _accumulate_posts_between(self, cur_time):
         start, stop = None, None
@@ -125,6 +124,8 @@ class PostsSequence(object):
 
         self.middle.extend(self.right[start:stop])
         self.right = self.right[:start] + self.right[stop:]
+        self.prev_time = cur_time
+        self._update_sequence_middle_state(self.right, self.middle, self.prev_time)
 
     def is_end(self):
         return len(self.right) == 0
@@ -141,25 +142,23 @@ class PostsSequenceStore(DBHandler):
         else:
             self.posts_sequence = self.db.get_collection(self.coll_name)
 
-    def create_posts_sequence_data(self, human, sequence_metadata, sequence_data):
+    def set_posts_sequence_data(self, human, sequence_metadata, sequence_data):
         return self.posts_sequence.update_one({"human": human},
                                               {"$set": {"metadata": sequence_metadata,
                                                         "right": sequence_data,
-                                                        "left": [],
-                                                        }},
+                                                        },
+                                               "$unset":{
+                                                   "middle":1,
+                                                   "left":1,
+                                                   "prev_time":1
+
+                                               }},
                                               upsert=True)
 
     def get_posts_sequence(self, human):
         result = self.posts_sequence.find_one({"human": human})
         if result:
             return PostsSequence(result, store=self)
-
-    def set_prev_time(self, human, prev_time):
-        self.posts_sequence.update_one({"human": human}, {"$set": {"prev_time": prev_time}})
-
-    def update_sequence(self, sequence):
-        self.posts_sequence.update_one({"human": sequence.human},
-                                       {"$set": sequence.to_dict()})
 
 
 class PostsSequenceHandler(object):
@@ -263,19 +262,14 @@ class PostsSequenceHandler(object):
                           {"min_posts": DEFAULT_MIN_POSTS_COUNT}
 
         data, metadata = self.__evaluate_posts_time_sequence(**sequence_config)
-        self.ps_store.create_posts_sequence_data(self.human, metadata, data)
+        self.ps_store.set_posts_sequence_data(self.human, metadata, data)
         return self.ps_store.get_posts_sequence(self.human)
 
     def _get_sequence(self):
-        if not self._sequence_cache or time.time() - self._sequence_cache_time > DEFAULT_POSTS_SEQUENCE_CACHED_TTL:
-            sequence = self.ps_store.get_posts_sequence(self.human)
-            if not sequence or sequence.is_end():
-                sequence = self.evaluate_new()
-
-            self._sequence_cache = sequence
-            self._sequence_cache_time = time.time()
-
-        return self._sequence_cache
+        sequence = self.ps_store.get_posts_sequence(self.human)
+        if not sequence or sequence.is_end():
+            sequence = self.evaluate_new()
+        return sequence
 
     def get_remained(self, x):
         return x - WEEK if x > WEEK else x
@@ -302,7 +296,7 @@ if __name__ == '__main__':
 
     while step <= WEEK:
         print psh.is_post_time(step), \
-            step, '\n(', psh._sequence_cache.prev_time,")\n",  psh._sequence_cache.left, '\n', psh._sequence_cache.middle, '\n', psh._sequence_cache.right, '\n--------------\n\n'
+            step, '\n(', psh._sequence_cache.prev_time, ")\n", psh._sequence_cache.left, '\n', psh._sequence_cache.middle, '\n', psh._sequence_cache.right, '\n--------------\n\n'
 
         step += random.randint(AVG_ACTION_TIME, AVG_ACTION_TIME * 5)
         print "next step: ", step
