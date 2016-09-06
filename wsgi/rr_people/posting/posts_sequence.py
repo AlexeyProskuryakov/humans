@@ -74,7 +74,7 @@ class PostsSequence(object):
         self.right = data.get('right')
         self.left = data.get('left', [])
         self.middle = data.get('middle', [])
-        self.prev_time = data.get('prev_time', 0)
+        self.prev_time = data.get('prev_time')
 
         self.metadata = data.get("metadata")
 
@@ -110,9 +110,10 @@ class PostsSequence(object):
                                                          "prev_time": prev_time}})
 
     def _accumulate_posts_between(self, cur_time):
+        prev_time = self.prev_time or cur_time - AVG_ACTION_TIME
         start, stop = None, None
         for i, post_time in enumerate(self.right):
-            if post_time <= cur_time and post_time >= self.prev_time:
+            if post_time <= cur_time and post_time >= prev_time:
                 if not start:
                     start = i
                 else:
