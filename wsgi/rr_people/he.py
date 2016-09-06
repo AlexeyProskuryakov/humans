@@ -202,13 +202,13 @@ class Kapellmeister(Process):
                     self._set_state(S_SLEEP)
                     step += MINUTE
                     action_result = A_SLEEP
-                    time.sleep(AVG_ACTION_TIME)
+                    time.sleep(MINUTE)
 
                 if step > WEEK:
                     step = step - WEEK
                     _prev_step = _prev_step - WEEK
 
-                log.info("[%s] step is end. Action: [%s] -> [%s]; time spent: %s; \nnext step after: %s secs." % (
+                log.info("[%s] step is end. Action: [%s] -> [%s]; time spent: %s; action time spent: %s;" % (
                     self.human_name,
                     action,
                     action_result,
@@ -228,7 +228,7 @@ class Kapellmeister(Process):
         force = False
         if politic == POLITIC_WORK_HARD:
             log.info("trying is post at sequence for step: %s, cur time: %s" % (
-            delta_info(step), delta_info(time_hash(datetime.utcnow()))))
+                delta_info(step), delta_info(time_hash(datetime.utcnow()))))
             if self.psh.is_post_time(step):
                 log.info("time is post! ")
                 action = A_POST
