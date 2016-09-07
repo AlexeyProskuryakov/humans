@@ -229,7 +229,7 @@ class PostsSequenceHandler(object):
         min, max, avg = self._evaluate_info_counts(sequence_data)
         log.info("\n%s %s: \n%s\n----------\nmin: %s \nmax: %s \navg: %s" % (
             self.human,
-            time_hash(datetime.utcnow()), "\n".join([str(t) for t in sequence_data]),
+            time_hash(datetime.now()), "\n".join([str(t) for t in sequence_data]),
             hash_info(min),
             hash_info(max),
             hash_info(avg),
@@ -278,7 +278,7 @@ class PostsSequenceHandler(object):
         return x - WEEK if x > WEEK else x
 
     def is_post_time(self, date_hash=None):
-        date_hash = date_hash if date_hash is not None else time_hash(datetime.utcnow())
+        date_hash = date_hash if date_hash is not None else time_hash(datetime.now())
         sequence = self._get_sequence()
         return sequence.can_post(date_hash)
 

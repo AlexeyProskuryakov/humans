@@ -79,7 +79,7 @@ def time_hash(time):
         return d * DAY + h * HOUR + m * MINUTE + s * SEC
 
 def now_hash():
-    return time_hash(datetime.utcnow())
+    return time_hash(datetime.now())
 
 def weighted_choice_king(action_weights):
     total = 0

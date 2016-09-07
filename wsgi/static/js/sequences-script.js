@@ -20,8 +20,6 @@ function show_sequences(human_name, withLoader){
         $("#loader-gif").show();
     }
 
-    var current = new Date();
-
     $.get(
         "/sequences/info/"+human_name,
         function(result){
@@ -60,19 +58,22 @@ function show_sequences(human_name, withLoader){
                 data.push({color:"cyan", points:points_cfg, data:candidates, label:"In buffer"});
             }
 
+            var current_point_data = result['current'];
+            if (current_point_data != undefined){
+                var current_point = {
+                    color:  "black",
+                    points: {
+                        show:true,
+                        radius:2,
+                        errorbars:"y",
+                        yerr:{show:true, asymmetric:false, upperCap:"-", lowerCap:"-"}
+                        },
+                    data:[current_point_data]
+                };
+                console.log(current_point);
+                data.push(current_point);
+            }
 
-            var current_point = {
-                color:  "black",
-                points: {
-                    show:true,
-                    radius:2,
-                    errorbars:"y",
-                    yerr:{show:true, asymmetric:false, upperCap:"-", lowerCap:"-"}
-                    },
-                data:[[current.getTime(), 0.75, 1, 1]]
-            };
-            console.log(current_point);
-            data.push(current_point);
 
             sequence_metadata = result["metadata"];
             if (sequence_metadata != undefined){

@@ -176,7 +176,7 @@ class Kapellmeister(Process):
             return
 
         log.info("start kappellmeister for [%s]" % self.human_name)
-        self.last_token_refresh_time = time_hash(datetime.utcnow())
+        self.last_token_refresh_time = time_hash(datetime.now())
 
         while 1:
             try:

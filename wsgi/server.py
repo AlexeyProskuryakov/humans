@@ -5,6 +5,7 @@ import os
 from collections import defaultdict
 from datetime import datetime, timedelta
 from uuid import uuid4
+import time
 
 import praw
 from flask import Flask, logging, request, render_template, session, url_for, g, flash
@@ -14,8 +15,7 @@ from flask_login import LoginManager, login_user, login_required, logout_user
 from werkzeug.utils import redirect
 
 from wsgi.db import HumanStorage
-from wsgi.properties import want_coefficient_max, POLITIC_WORK_HARD, WEEK, AE_GROUPS, AE_DEFAULT_GROUP, DEFAULT_POLITIC, \
-    POLITICS
+from wsgi.properties import want_coefficient_max,  WEEK, AE_GROUPS, AE_DEFAULT_GROUP, POLITICS
 from wsgi.rr_people import A_POST
 from wsgi.rr_people.ae import AuthorsStorage, time_hash, hash_info
 from wsgi.rr_people.commenting.connection import CommentHandler
@@ -425,7 +425,7 @@ ae_storage = AuthorsStorage("as server")
 @login_required
 def sequences(name):
     def get_point_x(x):
-        now = datetime.utcnow()
+        now = datetime.now()
         dt = now - timedelta(days=now.weekday(), hours=now.hour, minutes=now.minute, seconds=now.second) + timedelta(
             seconds=x)
         return calendar.timegm(dt.timetuple()) * 1000
@@ -452,7 +452,9 @@ def sequences(name):
         posts = map(lambda x: [get_point_x(x), p_y, 1, 1], [int(x) for x in posts_sequence.right])
         passed_posts = map(lambda x: [get_point_x(x), p_y, 1, 1], [int(x) for x in posts_sequence.left])
 
-        return jsonify(**{"work": work_result,
+        return jsonify(**{
+                          "current":[get_point_x(time_hash(datetime.fromtimestamp(time.time()))), 0.75, 1, 1],
+                          "work": work_result,
                           "posts": posts,
                           "posts_passed": passed_posts,
                           "real": real_posted,
@@ -461,7 +463,7 @@ def sequences(name):
                               posts_sequence.metadata,
                               sum(posts_sequence.metadata),
                               hash_info(posts_sequence.prev_time),
-                              tst_to_dt(float(posts_sequence.generate_time)),
+                              tst_to_dt(float(posts_sequence.generate_time or time.time()) ),
                           )})
     else:
         return jsonify(**{"work": work_result})
