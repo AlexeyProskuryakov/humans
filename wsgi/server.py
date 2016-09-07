@@ -43,7 +43,7 @@ app.config['SESSION_TYPE'] = 'filesystem'
 
 
 def tst_to_dt(value):
-    return datetime.fromtimestamp(value).strftime("%H:%M %d.%m.%Y")
+    return datetime.fromtimtestamp(value).strftime("%H:%M %d.%m.%Y")
 
 
 def array_to_string(array):
@@ -461,7 +461,7 @@ def sequences(name):
                               posts_sequence.metadata,
                               sum(posts_sequence.metadata),
                               hash_info(posts_sequence.prev_time),
-                              tst_to_dt(posts_sequence.generate_time),
+                              tst_to_dt(float(posts_sequence.generate_time)),
                           )})
     else:
         return jsonify(**{"work": work_result})
