@@ -11,6 +11,7 @@ from threading import Thread
 import requests
 import requests.auth
 from praw import Reddit
+from sqlalchemy.sql.functions import current_time
 
 from wsgi import properties
 from wsgi.db import HumanStorage
@@ -19,7 +20,7 @@ from wsgi.rr_people import USER_AGENTS, \
     A_COMMENT, A_POST, A_SLEEP, \
     S_WORK, S_BAN, S_SLEEP, S_SUSPEND, \
     Singleton, A_CONSUME, A_PRODUCE
-from wsgi.rr_people.ae import ActionGenerator, time_hash, delta_info
+from wsgi.rr_people.ae import ActionGenerator, time_hash, delta_info, now_hash
 from wsgi.rr_people.human import Human
 from wsgi.rr_people.posting.posts_sequence import PostsSequenceHandler
 from wsgi.rr_people.states.entity_states import StatesHandler
@@ -124,15 +125,13 @@ class Kapellmeister(Process):
         time_to_post = time.time() - self._get_previous_post_time()
         return MIN_TIME_BETWEEN_POSTS - time_to_post
 
-    def do_action(self, action, step, force=False):
-        _start = time.time()
+    def do_action(self, action, force=False):
         produce = False
         if action == A_COMMENT and self.human.can_do(A_COMMENT):
             self._set_state(WORK_STATE("commenting"))
             comment_result = self.human.do_comment_post()
             if comment_result == A_COMMENT:
                 produce = True
-
         elif action == A_POST and (self.human.can_do(A_POST) or force):
             after = self.can_post_after()
             if after < 0:
@@ -163,9 +162,7 @@ class Kapellmeister(Process):
         else:
             action_result = A_PRODUCE
 
-        _diff = int(time.time() - _start)
-        step += _diff
-        return step, action_result
+        return action_result
 
     def check_token_refresh(self, step):
         if step - self.last_token_refresh_time > HOUR - 100:
@@ -179,41 +176,31 @@ class Kapellmeister(Process):
             return
 
         log.info("start kappellmeister for [%s]" % self.human_name)
-        t_start = time_hash(datetime.utcnow())
-        step = t_start
-        self.last_token_refresh_time = t_start
+        self.last_token_refresh_time = time_hash(datetime.utcnow())
 
         while 1:
             try:
+                step = now_hash()
                 if not self._set_state(S_WORK):
                     return
-
-                _start = time.time()
-                _prev_step = step
-
                 self.check_token_refresh(step)
 
                 action, force = self.decide(step)
                 log.info("[%s] decide: %s" % (self.human_name, action))
 
                 if action != A_SLEEP:
-                    step, action_result = self.do_action(action, step, force)
+                    action_result = self.do_action(action, force)
                 else:
                     self._set_state(S_SLEEP)
-                    step += MINUTE
                     action_result = A_SLEEP
                     time.sleep(MINUTE)
 
-                if step > WEEK:
-                    step = step - WEEK
-                    _prev_step = _prev_step - WEEK
-
-                log.info("[%s] step is end. Action: [%s] -> [%s]; time spent: %s; action time spent: %s;" % (
+                log.info("[%s] step is end. Action: [%s] => %s; time spent: %s;" % (
                     self.human_name,
                     action,
                     action_result,
-                    time.time() - _start,
-                    step - _prev_step))
+                    step - now_hash(),
+                ))
 
             except Exception as e:
                 log.error("ERROR AT HE! ")
@@ -226,16 +213,13 @@ class Kapellmeister(Process):
         politic = self.db.get_human_post_politic(self.human_name)
         action = self.ae.get_action(step)
         force = False
-        if politic == POLITIC_WORK_HARD:
-            log.info("trying is post at sequence for step: %s, cur time: %s" % (
-                delta_info(step), delta_info(time_hash(datetime.utcnow()))))
+        if politic == POLITIC_WORK_HARD and action != A_SLEEP:
+            log.info("Maybe post %s,  %s" % (delta_info(step), delta_info(now_hash())))
             if self.psh.is_post_time(step):
-                log.info("time is post! ")
                 action = A_POST
                 force = True
             elif action == A_POST:
-                action = random.choice([A_CONSUME, A_COMMENT])
-                log.info("time is %s" % action)
+                action = A_CONSUME
 
         return action, force
 
