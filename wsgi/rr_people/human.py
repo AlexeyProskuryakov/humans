@@ -374,7 +374,6 @@ class Human(RedditHandler):
                 if post:
                     comment_result = self._comment_post(post, comment_id, sub)
                     if comment_result:
-                        self.register_step(A_COMMENT, {"fullname": post_fullname, "sub": sub})
                         return A_COMMENT
                     return PS_ERROR
 
@@ -392,7 +391,6 @@ class Human(RedditHandler):
                     self._see_comments(_post)
                     comment_result = self._comment_post(_post, comment_id, sub)
                     if comment_result:
-                        self.register_step(A_COMMENT, {"fullname": post_fullname, "sub": sub})
                         self._see_near_posts(see_right)
                         return A_COMMENT
                     return PS_ERROR
@@ -413,6 +411,7 @@ class Human(RedditHandler):
         try:
             result = _post.add_comment(text)
             self.comments_handler.end_comment_post(comment_oid, self.name)
+            self.register_step(A_COMMENT, {"fullname": _post.fullname, "sub": sub})
             return result
         except Exception as e:
             log.exception(e)
