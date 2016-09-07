@@ -17,7 +17,7 @@ from wsgi.db import HumanStorage
 from wsgi.properties import want_coefficient_max, POLITIC_WORK_HARD, WEEK, AE_GROUPS, AE_DEFAULT_GROUP, DEFAULT_POLITIC, \
     POLITICS
 from wsgi.rr_people import A_POST
-from wsgi.rr_people.ae import AuthorsStorage, time_hash
+from wsgi.rr_people.ae import AuthorsStorage, time_hash, hash_info
 from wsgi.rr_people.commenting.connection import CommentHandler
 from wsgi.rr_people.he import HumanOrchestra
 from wsgi.rr_people.human import HumanConfiguration
@@ -457,7 +457,12 @@ def sequences(name):
                           "posts_passed": passed_posts,
                           "real": real_posted,
                           "candidates": candidates,
-                          'metadata': "By days: %s; All: %s" % (posts_sequence.metadata, sum(posts_sequence.metadata))})
+                          'metadata': "By days: %s; All: %s; Time prev: %s; Generate time: %s" % (
+                              posts_sequence.metadata,
+                              sum(posts_sequence.metadata),
+                              hash_info(posts_sequence.prev_time),
+                              tst_to_dt(posts_sequence.generate_time),
+                          )})
     else:
         return jsonify(**{"work": work_result})
 

@@ -57,18 +57,7 @@ __doc__ = """
     """
 
 
-def hash_string(time_hash):
-    if not isinstance(time_hash, int):
-        return None
-    else:
-        d, r = divmod(time_hash, DAY)
-        h, r = divmod(r, HOUR)
-        m, r = divmod(r, MINUTE)
-        s = r
-        return "%s %s:%s:%s" % (WEEK_DAYS[d], h, m, s)
-
-
-def delta_info(delta):
+def hash_info(delta):
     if not isinstance(delta, int):
         return None
     else:
@@ -76,7 +65,7 @@ def delta_info(delta):
         h, r = divmod(r, HOUR)
         m, r = divmod(r, MINUTE)
         s = r
-        return "%s %s:%s:%s" % (d, h, m, s)
+        return "%s %s:%s:%s" % (WEEK_DAYS[d], h, m, s)
 
 
 def time_hash(time):

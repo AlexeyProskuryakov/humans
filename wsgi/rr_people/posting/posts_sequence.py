@@ -10,7 +10,7 @@ from flask import logging
 
 from wsgi.db import DBHandler, HumanStorage
 from wsgi.properties import WEEK, AVG_ACTION_TIME, DEFAULT_MIN_POSTS_COUNT, DEFAULT_POSTS_SEQUENCE_CACHED_TTL
-from wsgi.rr_people.ae import AuthorsStorage, time_hash, delta_info
+from wsgi.rr_people.ae import AuthorsStorage, time_hash, hash_info
 
 __doc__ = """
 Нужно отправлять посты таким образом:
@@ -75,6 +75,7 @@ class PostsSequence(object):
         self.left = data.get('left', [])
         self.middle = data.get('middle', [])
         self.prev_time = data.get('prev_time')
+        self.generate_time = data.get("time")
 
         self.metadata = data.get("metadata")
 
@@ -89,7 +90,7 @@ class PostsSequence(object):
 
     def can_post(self, cur_time):
         self._accumulate_posts_between(cur_time)
-        log.info("Can post %s <-> %s" % (delta_info(self.prev_time), delta_info(cur_time)))
+        log.info("Can post %s <-> %s" % (hash_info(self.prev_time), hash_info(cur_time)))
         return len(self.middle) != 0
 
     def accept_post(self):
@@ -147,6 +148,7 @@ class PostsSequenceStore(DBHandler):
         return self.posts_sequence.update_one({"human": human},
                                               {"$set": {"metadata": sequence_metadata,
                                                         "right": sequence_data,
+                                                        "time":time.time(),
                                                         },
                                                "$unset":{
                                                    "middle":1,
@@ -228,9 +230,9 @@ class PostsSequenceHandler(object):
         log.info("\n%s %s: \n%s\n----------\nmin: %s \nmax: %s \navg: %s" % (
             self.human,
             time_hash(datetime.utcnow()), "\n".join([str(t) for t in sequence_data]),
-            delta_info(min),
-            delta_info(max),
-            delta_info(avg),
+            hash_info(min),
+            hash_info(max),
+            hash_info(avg),
         ))
         return sequence_data, sequence_meta_data
 

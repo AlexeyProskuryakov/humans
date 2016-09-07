@@ -20,7 +20,7 @@ from wsgi.rr_people import USER_AGENTS, \
     A_COMMENT, A_POST, A_SLEEP, \
     S_WORK, S_BAN, S_SLEEP, S_SUSPEND, \
     Singleton, A_CONSUME, A_PRODUCE
-from wsgi.rr_people.ae import ActionGenerator, time_hash, delta_info, now_hash
+from wsgi.rr_people.ae import ActionGenerator, time_hash, hash_info, now_hash
 from wsgi.rr_people.human import Human
 from wsgi.rr_people.posting.posts_sequence import PostsSequenceHandler
 from wsgi.rr_people.states.entity_states import StatesHandler
@@ -214,7 +214,7 @@ class Kapellmeister(Process):
         action = self.ae.get_action(step)
         force = False
         if politic == POLITIC_WORK_HARD and action != A_SLEEP:
-            log.info("Maybe post %s,  %s" % (delta_info(step), delta_info(now_hash())))
+            log.info("Maybe post %s,  %s" % (hash_info(step), hash_info(now_hash())))
             if self.psh.is_post_time(step):
                 action = A_POST
                 force = True
