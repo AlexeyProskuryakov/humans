@@ -93,8 +93,8 @@ DEFAULT_LIMIT = 500
 max_consuming = 90
 min_consuming = 80
 
-max_voting = 70
-min_voting = 50
+max_voting = 95
+min_voting = 90
 
 st_between_net_request = 60
 tryings_count = 10
