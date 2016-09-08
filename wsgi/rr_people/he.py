@@ -122,7 +122,7 @@ class Kapellmeister(Process):
         time_to_post = time.time() - self._get_previous_post_time(what)
         after = MIN_TIMES_BETWEEN.get(what) - time_to_post
         if randomise:
-            after += random.randint(0, after / 2)
+            after += random.randint(0, int(after / 2))
 
         if after < 0:
             self._set_state(WORK_STATE(what))
