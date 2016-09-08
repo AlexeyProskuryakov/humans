@@ -100,5 +100,11 @@ def test_comments_fullname():
             except Exception as e:
                 print e
 
+
+def test_comment_handler_pop_comment_id():
+    ch = CommentHandler()
+    ch.pop_comment_id("foo")
+
 if __name__ == '__main__':
-    test_comments_fullname()
+    # test_comments_fullname()
+    test_comment_handler_pop_comment_id()

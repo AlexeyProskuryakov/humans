@@ -153,7 +153,8 @@ class CommentHandler(CommentsStorage, CommentRedisQueue):
 
     def pop_comment_id(self, sbrdt):
         while 1:
-            comment_id = self.pop_comment_id(sbrdt)
-            result = self.check_comment_id(comment_id)
-            if result == CS_READY_FOR_COMMENT:
-                return comment_id
+            comment_id = CommentRedisQueue.pop_comment_id(self, sbrdt)
+            if comment_id:
+                result = self.check_comment_id(comment_id)
+                if result == CS_READY_FOR_COMMENT:
+                    return comment_id
