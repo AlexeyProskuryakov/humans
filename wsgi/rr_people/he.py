@@ -15,7 +15,7 @@ from sqlalchemy.sql.functions import current_time
 
 from wsgi import properties
 from wsgi.db import HumanStorage
-from wsgi.properties import WEEK, HOUR, MINUTE, POLITIC_WORK_HARD, AVG_ACTION_TIME
+from wsgi.properties import WEEK, HOUR, MINUTE, POLITIC_WORK_HARD, AVG_ACTION_TIME, MIN_TIMES_BETWEEN
 from wsgi.rr_people import USER_AGENTS, \
     A_COMMENT, A_POST, A_SLEEP, \
     S_WORK, S_BAN, S_SLEEP, S_SUSPEND, \
@@ -77,9 +77,6 @@ WORK_STATE = lambda x: "%s: %s" % (S_WORK, x)
 
 HE_ASPECT = lambda x: "he_%s" % x
 
-MIN_STEP_TIME = 60
-MIN_TIME_BETWEEN_POSTS = 9 * 60
-
 
 class Kapellmeister(Process):
     def __init__(self, name, human_class=Human, reddit=None, reddit_class=None):
@@ -112,8 +109,8 @@ class Kapellmeister(Process):
             self.states_handler.set_human_state(self.human_name, new_state)
             return True
 
-    def _get_previous_post_time(self):
-        cur = self.db.human_log.find({"human_name": self.human_name, "action": A_POST},
+    def _get_previous_post_time(self, action):
+        cur = self.db.human_log.find({"human_name": self.human_name, "action": action},
                                      projection={"time": 1}).sort("time", -1)
         try:
             result = cur.next()
@@ -121,24 +118,29 @@ class Kapellmeister(Process):
         except Exception:
             return 0
 
-    def can_post_after(self):
-        time_to_post = time.time() - self._get_previous_post_time()
-        return MIN_TIME_BETWEEN_POSTS - time_to_post
+    def wait_after_last(self, what, randomise=False):
+        time_to_post = time.time() - self._get_previous_post_time(what)
+        after = MIN_TIMES_BETWEEN.get(what) - time_to_post
+        if randomise:
+            after += random.randint(0, after / 2)
+
+        if after < 0:
+            self._set_state(WORK_STATE(what))
+        else:
+            self._set_state(WORK_STATE("%s after %s" % (what, after)))
+            time.sleep(after)
 
     def do_action(self, action, force=False):
         produce = False
         if action == A_COMMENT and self.human.can_do(A_COMMENT):
-            self._set_state(WORK_STATE("commenting"))
+            self.wait_after_last(A_COMMENT, randomise=True)
+
             comment_result = self.human.do_comment_post()
             if comment_result == A_COMMENT:
                 produce = True
+
         elif action == A_POST and (self.human.can_do(A_POST) or force):
-            after = self.can_post_after()
-            if after < 0:
-                self._set_state(WORK_STATE("posting"))
-            else:
-                self._set_state(WORK_STATE("posting after %s" % after))
-                time.sleep(after)
+            self.wait_after_last(A_POST)
 
             post_result = self.human.do_post()
             if post_result == A_POST:

@@ -99,6 +99,9 @@ min_voting = 90
 st_between_net_request = 60
 tryings_count = 10
 
+MIN_STEP_TIME = 60
+MIN_TIMES_BETWEEN = {"post": 9 * 60, "comment": 3 * 60}
+
 time_step_less_iteration_power = 0.85
 
 want_coefficient_max = 100
