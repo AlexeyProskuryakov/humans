@@ -94,7 +94,7 @@ def test_kapelmeister():
             log.info("SLEEP")
             sleep += 1
         else:
-            result = kplm.do_action(action, step, force)
+            result = kplm.do_action(action, force)
             print result
 
     print kplm.human, "sleep:", sleep

@@ -23,7 +23,7 @@ def create_posts(ps):
 
 def test_noise_and_important():
     ps = PostsStorage("test")
-
+    hs = HumanStorage()
     pb = PostsBalancer(human, ps)
     hs.set_human_subs(human, [sub, sub1])
     for i in range(100):

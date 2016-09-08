@@ -102,7 +102,7 @@ class PostsSequence(object):
             log.warning("accept post when middle is empty :(")
 
     def _remove_from_middle(self, post):
-        self.__store.posts_sequence.update_one({"human": self.human}, {"$pop": {"middle": -1}, "$push": {'left', post}})
+        self.__store.posts_sequence.update_one({"human": self.human}, {"$pop": {"middle": -1}, "$push": {'left': post}})
 
     def _update_sequence_middle_state(self, right, middle, prev_time):
         self.__store.posts_sequence.update_one({"human": self.human},
