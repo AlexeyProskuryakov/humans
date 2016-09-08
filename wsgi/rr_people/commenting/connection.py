@@ -85,7 +85,7 @@ class CommentsStorage(DBHandler):
                 return found
 
     def get_comment_post_fullname(self, comment_oid):
-        found = self.comments.find_one({"_id":ObjectId(comment_oid)})
+        found = self.comments.find_one({"_id": ObjectId(comment_oid)})
         if found:
             return found.get("fullname")
 
@@ -99,9 +99,12 @@ class CommentsStorage(DBHandler):
 
     def get_comments_by_ids(self, comment_ids, projection=None):
         _projection = projection or {"text": True, "fullname": True, "post_url": True}
-        for el in self.comments.find({"_id": {"$in": comment_ids}},
+        for el in self.comments.find({"_id": {"$in": map(lambda x: ObjectId(x), comment_ids)}},
                                      projection=_projection):
             yield el
+
+    def check_comment_id(self, comment_id):
+        return self.comments.find_one({"_id": ObjectId(comment_id)}, projection={"state": 1})
 
 
 NEED_COMMENT = "need_comment"
@@ -142,7 +145,15 @@ class CommentRedisQueue(RedisHandler):
         log.debug("redis: push to %s %s" % (sbrdt, comment_id))
         self.redis.rpush(QUEUE_CF(sbrdt), comment_id)
 
+
 class CommentHandler(CommentsStorage, CommentRedisQueue):
     def __init__(self, name="?"):
         CommentsStorage.__init__(self, "comment handler %s" % name).__init__()
-        CommentRedisQueue.__init__(self, "handler")
+        CommentRedisQueue.__init__(self, "comment handler %s" % name)
+
+    def pop_comment_id(self, sbrdt):
+        while 1:
+            comment_id = self.pop_comment_id(sbrdt)
+            result = self.check_comment_id(comment_id)
+            if result == CS_READY_FOR_COMMENT:
+                return comment_id

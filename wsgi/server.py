@@ -15,7 +15,7 @@ from flask_login import LoginManager, login_user, login_required, logout_user
 from werkzeug.utils import redirect
 
 from wsgi.db import HumanStorage
-from wsgi.properties import want_coefficient_max,  WEEK, AE_GROUPS, AE_DEFAULT_GROUP, POLITICS
+from wsgi.properties import want_coefficient_max, WEEK, AE_GROUPS, AE_DEFAULT_GROUP, POLITICS
 from wsgi.rr_people import A_POST
 from wsgi.rr_people.ae import AuthorsStorage, time_hash, hash_info
 from wsgi.rr_people.commenting.connection import CommentHandler
@@ -396,11 +396,13 @@ def human_clear_statistic(name):
         return jsonify(**{"ok": True})
     return jsonify(**{"ok": False})
 
+
 @app.route("/humans/<name>/clear_log", methods=["POST"])
 @login_required
 def human_clear_log(name):
     db.clear_errors(name)
     return jsonify(**{"ok": True})
+
 
 @app.route("/humans/<name>/channel_id", methods=["POST"])
 @login_required
@@ -453,18 +455,18 @@ def sequences(name):
         passed_posts = map(lambda x: [get_point_x(x), p_y, 1, 1], [int(x) for x in posts_sequence.left])
 
         return jsonify(**{
-                          "current":[get_point_x(time_hash(datetime.fromtimestamp(time.time()))), 0.75, 1, 1],
-                          "work": work_result,
-                          "posts": posts,
-                          "posts_passed": passed_posts,
-                          "real": real_posted,
-                          "candidates": candidates,
-                          'metadata': "By days: %s; All: %s; Time prev: %s; Generate time: %s" % (
-                              posts_sequence.metadata,
-                              sum(posts_sequence.metadata),
-                              hash_info(posts_sequence.prev_time),
-                              tst_to_dt(float(posts_sequence.generate_time or time.time()) ),
-                          )})
+            "current": [get_point_x(time_hash(datetime.fromtimestamp(time.time()))), 0.75, 1, 1],
+            "work": work_result,
+            "posts": posts,
+            "posts_passed": passed_posts,
+            "real": real_posted,
+            "candidates": candidates,
+            'metadata': "By days: %s; All: %s; Time prev: %s; Generate time: %s" % (
+                posts_sequence.metadata,
+                sum(posts_sequence.metadata),
+                hash_info(posts_sequence.prev_time),
+                tst_to_dt(float(posts_sequence.generate_time or time.time())),
+            )})
     else:
         return jsonify(**{"work": work_result})
 
@@ -516,7 +518,7 @@ def queue_of_comments(name):
     for sub in subs:
         comments_ids = comment_handler.get_all_comments_ids(sub)
         comments[sub] = list(comment_handler.get_comments_by_ids(comments_ids, projection={"_id": False}))
-        log.info("load comments for sub %s" % sub)
+        log.info("find %s comments for sub %s" % (len(comments[sub]), sub))
     return render_template("comments_queue.html", **{"human_name": name, "comments": comments, "subs": subs})
 
 

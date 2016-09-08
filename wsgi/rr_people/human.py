@@ -352,12 +352,13 @@ class Human(RedditHandler):
         return max_wait_time
 
     def do_comment_post(self, sub=None):
-        sub = sub or random.choice(self.db.get_subs_of_human(self.login))
+        sub_ = sub or random.choice(self.db.get_subs_of_human(self.login))
         comment_id = self.comments_handler.pop_comment_id(sub)
         if not comment_id:
-            self.comments_handler.need_comment(sub)
+            log.info("Need comment for %s" % sub_)
+            self.comments_handler.need_comment(sub_)
         else:
-            result = self._humanised_comment_post(sub, comment_id)
+            result = self._humanised_comment_post(sub_, comment_id)
             return result
 
     def _humanised_comment_post(self, sub, comment_id):
