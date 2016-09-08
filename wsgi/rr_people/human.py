@@ -157,6 +157,7 @@ class Human(RedditHandler):
         self.access_information = self.reddit.refresh_access_information(self.access_information['refresh_token'])
         self.db.update_human_access_credentials_info(self.name, self.access_information)
         self.reddit.login(self.login_credentials["user"], self.login_credentials["pwd"], disable_warning=True)
+        self.action_function_params = self.init_work_cycle()
 
     def incr_counter(self, name):
         self.counters[name] += 1
