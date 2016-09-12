@@ -44,9 +44,9 @@ class ImportantYoutubePostSupplier(Process, SignalReceiver):
                 human_name, len(new_posts), ' youtube \n'.join([str(post) for post in new_posts])))
 
             for post in new_posts:
-                self.posts_storage.add_generated_post(post, post.for_sub,
+                self.posts_storage.add_generated_post(post,
+                                                      post.for_sub,
                                                       important=True,
-                                                      channel_id=channel_id,
                                                       human=human_name)
 
             return len(new_posts), None

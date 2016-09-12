@@ -28,6 +28,3 @@ class SignalReceiver(object):
     def receive_signal(self, signum, frame):
         log.info("%s have signal to stop" % self.name)
         self.can_work = False
-
-
-Ø
