@@ -11,11 +11,10 @@ from threading import Thread
 import requests
 import requests.auth
 from praw import Reddit
-from sqlalchemy.sql.functions import current_time
 
 from wsgi import properties
 from wsgi.db import HumanStorage
-from wsgi.properties import WEEK, HOUR, MINUTE, POLITIC_WORK_HARD, AVG_ACTION_TIME, MIN_TIMES_BETWEEN
+from wsgi.properties import HOUR, MINUTE, POLITIC_WORK_HARD, MIN_TIMES_BETWEEN
 from wsgi.rr_people import USER_AGENTS, \
     A_COMMENT, A_POST, A_SLEEP, \
     S_WORK, S_BAN, S_SLEEP, S_SUSPEND, \
@@ -26,6 +25,8 @@ from wsgi.rr_people.posting.posts_sequence import PostsSequenceHandler
 from wsgi.rr_people.states.entity_states import StatesHandler
 from wsgi.rr_people.states.processes import ProcessDirector
 from os import sys
+
+from wsgi.rr_people.states.signals import SignalReceiver
 
 log = logging.getLogger("he")
 
@@ -78,9 +79,11 @@ WORK_STATE = lambda x: "%s: %s" % (S_WORK, x)
 HE_ASPECT = lambda x: "he_%s" % x
 
 
-class Kapellmeister(Process):
+class Kapellmeister(Process, SignalReceiver):
     def __init__(self, name, human_class=Human, reddit=None, reddit_class=None):
         super(Kapellmeister, self).__init__()
+        SignalReceiver.__init__(self)
+
         self.db = HumanStorage(name="main storage for [%s]" % name)
         self.human_name = name
         self.name = "KPLM [%s]" % (self.human_name)
@@ -173,14 +176,12 @@ class Kapellmeister(Process):
             self.last_token_refresh_time = step
 
     def run(self):
-        if not self.process_director.can_start_aspect(HE_ASPECT(self.human_name), self.pid).get("started"):
-            log.warning("another kappelmeister for [%s] worked..." % self.human_name)
-            return
+        self.process_director.start_aspect(HE_ASPECT(self.human_name), self.pid)
 
         log.info("start kappellmeister for [%s]" % self.human_name)
         self.last_token_refresh_time = time_hash(datetime.now())
 
-        while 1:
+        while self.can_work:
             try:
                 step = now_hash()
                 if not self._set_state(S_WORK):
@@ -244,7 +245,7 @@ class HumanOrchestra():
                 self.start_human(human_name)
 
     def suspend_human(self, human_name):
-        self.states.set_human_state(human_name, S_SUSPEND, ex=None)
+        self.states.set_human_state(human_name, S_SUSPEND)
 
     def start_human(self, human_name):
         self.states.set_human_state(human_name, S_WORK)

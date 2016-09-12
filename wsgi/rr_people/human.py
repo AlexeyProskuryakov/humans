@@ -107,7 +107,6 @@ class Human(RedditHandler):
         self.last_friend_add = human_configuration.get("last_friend_add") or time.time() - WEEK
 
         self.init_engine(login_credentials)
-        self.action_function_params = self.init_work_cycle()
         log.info("MY [%s] WORK CYCLE: %s" % (self.name, self.action_function_params))
 
         # todo this cache must be persisted at mongo or another
@@ -157,7 +156,8 @@ class Human(RedditHandler):
         self.access_information = self.reddit.refresh_access_information(self.access_information['refresh_token'])
         self.db.update_human_access_credentials_info(self.name, self.access_information)
         self.reddit.login(self.login_credentials["user"], self.login_credentials["pwd"], disable_warning=True)
-        self.action_function_params = self.init_work_cycle()
+
+        self.action_function_params = Human.init_work_cycle()
 
     def incr_counter(self, name):
         self.counters[name] += 1

@@ -7,7 +7,9 @@ import signal
 import redis
 
 from wsgi.properties import process_director_redis_address, process_director_redis_port, process_director_redis_password
+from wsgi.rr_people import Singleton
 from wsgi.rr_people.states import get_worked_pids
+from wsgi.rr_people.states.signals import STOP_SIGNAL
 
 log = logging.getLogger("process_director")
 
@@ -16,8 +18,9 @@ PREFIX_QUERY = "PD_*"
 PREFIX_GET_DATA = lambda x: x.replace("PD_", "") if isinstance(x, (str, unicode)) and x.count("PD_") == 1 else x
 
 
-class ProcessDirector(object):
-    def __init__(self, name="?", clear=False, max_connections=2):
+class ProcessDirector(Singleton):
+    def __init__(self, what, name="?", clear=False, max_connections=2):
+        super(ProcessDirector, self).__init__(what)
         self.redis = redis.StrictRedis(host=process_director_redis_address,
                                        port=process_director_redis_port,
                                        password=process_director_redis_password,
@@ -30,11 +33,11 @@ class ProcessDirector(object):
         self.mutex = Lock()
         log.info("Process director [%s] inited." % name)
 
-    def set_aspect_persist_state(self, aspect, state, ex=None):
-        self.redis.set(aspect, state, ex=ex)
-
-    def get_aspect_persists_state(self, aspect):
-        return self.redis.get(aspect)
+    def _store_aspect_pid(self, aspect, pid):
+        p = self.redis.pipeline()
+        p.delete(PREFIX(aspect))
+        p.set(PREFIX(aspect), pid)
+        p.execute()
 
     def can_start_aspect(self, aspect, pid):
         """
@@ -53,38 +56,24 @@ class ProcessDirector(object):
                 if aspect_pid in get_worked_pids():
                     return {"state": "already work", "by": aspect_pid, "started": False}
                 else:
-                    p = self.redis.pipeline()
-                    p.delete(PREFIX(aspect))
-                    p.set(PREFIX(aspect), pid)
-                    p.execute()
+                    self._store_aspect_pid(aspect, pid)
                     return {"state": "restarted", "started": True}
             else:
                 return {"state": "started", "started": True}
 
-    def must_start_aspect(self, aspect, pid):
+    def start_aspect(self, aspect, pid):
         with self.mutex:
-            log.info("will must start aspect %s for %s" % (aspect, pid))
-            prev_process = self.redis.get(PREFIX(aspect))
-            if prev_process:
-                p_pid = int(prev_process)
-                if p_pid in get_worked_pids():
-                    log.info("will kill previous process: %s" % prev_process)
-                    os.kill(p_pid, signal.SIGUSR2)
+            log.info("will stop another processes of %s" % aspect)
+            result = self.redis.setnx(PREFIX(aspect), pid)
+            if not result:
+                stored_pid = int(self.redis.get(PREFIX(aspect)))
+                if stored_pid in get_worked_pids():
+                    result = os.kill(stored_pid, STOP_SIGNAL)
+                    log.info("stop result is: %s", result)
 
-            self.redis.set(PREFIX(aspect), pid)
+            self._store_aspect_pid(aspect, pid)
 
-    def stop_aspect_signal(self, aspect):
-        return self.redis.delete(PREFIX(aspect))
 
-    def get_states(self):
-        keys = self.redis.keys(PREFIX_QUERY)
-        if keys:
-            result = []
-            worked_pids = get_worked_pids()
-            for key in keys:
-                pid = int(self.redis.get(key))
-                result.append({"aspect": PREFIX_GET_DATA(key), "pid": pid, "work_at_cur_machine": pid in worked_pids})
-            return result
 
     def get_state(self, aspect, worked_pids=None):
         pid_raw = self.redis.get(PREFIX(aspect))

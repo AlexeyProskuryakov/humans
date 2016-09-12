@@ -9,22 +9,26 @@ from wsgi.properties import force_post_manager_sleep_iteration_time
 from wsgi.rr_people.posting.posts import PostsStorage
 from wsgi.rr_people.posting.youtube_posts import YoutubeChannelsHandler
 from wsgi.rr_people.states.processes import ProcessDirector
+from wsgi.rr_people.states.signals import SignalReceiver
 
 log = logging.getLogger("posts")
-
 
 IMPORTANT_POSTS_SUPPLIER_PROCESS_ASPECT = "im_po_su_aspect"
 
 
-class ImportantYoutubePostSupplier(Process):
+class ImportantYoutubePostSupplier(Process, SignalReceiver):
     """
     Process which get humans config and retrieve channel_id, after retrieve new posts from it and
     """
 
+    name = "im po su"
+
     def __init__(self, pq=None, ps=None, ms=None):
         super(ImportantYoutubePostSupplier, self).__init__()
-        self.posts_storage = ps or PostsStorage("im po su")
-        self.main_storage = ms or HumanStorage("im po su")
+        SignalReceiver.__init__(self, self.name)
+
+        self.posts_storage = ps or PostsStorage(self.name)
+        self.main_storage = ms or HumanStorage(self.name)
 
         self.posts_supplier = YoutubeChannelsHandler(self.posts_storage)
 
@@ -53,9 +57,7 @@ class ImportantYoutubePostSupplier(Process):
             return e.message, e
 
     def run(self):
-        if not self.pd.can_start_aspect(IMPORTANT_POSTS_SUPPLIER_PROCESS_ASPECT, self.pid).get("started"):
-            log.info("important posts supplier instance already work")
-            return
+        self.pd.start_aspect(IMPORTANT_POSTS_SUPPLIER_PROCESS_ASPECT, self.pid)
 
         while 1:
             humans_data = self.main_storage.get_humans_info(projection={"user": True, "subs": True, "channel_id": True})

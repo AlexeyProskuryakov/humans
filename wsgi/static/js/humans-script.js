@@ -35,7 +35,7 @@ function show_human_live_state(){
             success:function(x){
 //                 console.log(x);
                  if (x.human == name){
-                    $("#human-live-state").text(x.state.human_state+" [process work: "+x.state.process_state.work+"]");
+                    $("#human-live-state").text(x.state.human_state+" [process work: "+x.state.process_state.work+", pid: "+x.state.process_state.pid+"]");
                  }
             }
         })

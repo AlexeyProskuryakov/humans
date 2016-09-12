@@ -54,10 +54,10 @@ class StatesHandler(object):
                 result[k] = S_STOP
         return result
 
-    def set_human_state(self, human_name, state, ex=3600):
+    def set_human_state(self, human_name, state):
         pipe = self.redis.pipeline()
         pipe.hset(HUMAN_STATES, human_name, state)
-        pipe.set(HUMAN_STATE(human_name), state, ex=ex)
+        pipe.set(HUMAN_STATE(human_name), state)
         pipe.execute()
 
     def get_human_state(self, human_name):

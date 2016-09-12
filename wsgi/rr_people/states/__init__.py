@@ -1,4 +1,5 @@
 import logging
+import os
 from subprocess import check_output
 
 from wsgi.properties import WORKED_PIDS_QUERY
@@ -64,19 +65,28 @@ class HeartBeatTask(object):
 log = logging.getLogger("states")
 
 
-def get_worked_pids():
-    def check_contains(l, s):
-        for el in l:
-            if s in el:
-                return True
+def kill_zombies():
+    command = "kill -9 `ps ajx | grep -w Z | grep -v grep | awk '{print $1}'`"
+    pipe = os.popen(command)
+    pipe.close()
 
+
+def get_command_result(command):
+    pipe = os.popen(command)
+    text = pipe.read()
+    pipe.close()
+    return text
+
+
+def get_worked_pids():
     def get_all_pids():
-        result = check_output(["ps", "aux"]).split('\n')
+        result = get_command_result("ps aux| grep %s | grep -v grep| awk '{print $2}'" % WORKED_PIDS_QUERY).split('\n')
         for el in result:
-            process_info = el.split()
-            if len(process_info) > 10 and check_contains(process_info, WORKED_PIDS_QUERY):
-                yield int(process_info[1])
+            if el: yield int(el)
 
     worked_pids = set(list(get_all_pids()))
-    # log.info("worked pids: \n%s"%worked_pids)
     return worked_pids
+
+
+if __name__ == '__main__':
+    print get_worked_pids()
