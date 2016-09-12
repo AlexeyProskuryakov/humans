@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 import logging
-import signal, time, datetime
+import signal
+import time
 import os
-from functools import partial
+
 from multiprocessing import Process
 
-import psutil
+
 
 log = logging.getLogger("SIGNALS")
 
