@@ -18,9 +18,8 @@ PREFIX_QUERY = "PD_*"
 PREFIX_GET_DATA = lambda x: x.replace("PD_", "") if isinstance(x, (str, unicode)) and x.count("PD_") == 1 else x
 
 
-class ProcessDirector(Singleton):
-    def __init__(self, what, name="?", clear=False, max_connections=2):
-        super(ProcessDirector, self).__init__(what)
+class ProcessDirector(object):
+    def __init__(self, name="?", clear=False, max_connections=2):
         self.redis = redis.StrictRedis(host=process_director_redis_address,
                                        port=process_director_redis_port,
                                        password=process_director_redis_password,
