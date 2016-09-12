@@ -59,7 +59,7 @@ class ImportantYoutubePostSupplier(Process, SignalReceiver):
     def run(self):
         self.pd.start_aspect(IMPORTANT_POSTS_SUPPLIER_PROCESS_ASPECT, self.pid)
 
-        while 1:
+        while self.can_work:
             humans_data = self.main_storage.get_humans_info(projection={"user": True, "subs": True, "channel_id": True})
             for human_data in humans_data:
                 channel_id = human_data.get("channel_id")
