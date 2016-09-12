@@ -87,6 +87,7 @@ class Kapellmeister(Process, SignalReceiver):
         self.db = HumanStorage(name="main storage for [%s]" % name)
         self.human_name = name
         self.name = "KPLM [%s]" % (self.human_name)
+
         self.ae = ActionGenerator(human_name=self.human_name, human_storage=self.db)
         self.psh = PostsSequenceHandler(human=self.human_name, hs=self.db, ae_store=self.ae._storage)
         self.human = human_class(login=name, db=self.db, reddit=reddit, reddit_class=reddit_class or Reddit)

@@ -6,8 +6,6 @@ import os
 
 from multiprocessing import Process
 
-
-
 log = logging.getLogger("SIGNALS")
 
 STOP_SIGNAL = signal.SIGHUP
@@ -25,11 +23,11 @@ class _signalHandler(object):
 
 
 class SignalReceiver(object):
-    def __init__(self):
+    def __init__(self, name="NONAME signal receiver"):
         sh = _signalHandler(self)
         signal.signal(signal.SIGHUP, sh.handle_signal)
         self.can_work = True
-        self.name = ""
+        self.name = name
 
     def receive_signal(self, signum, frame):
         log.info("%s have signal to stop" % self.name)
@@ -43,7 +41,7 @@ class some_process(Process, SignalReceiver):
         self.name = name
 
     def run(self):
-        print("will work %s"%self.pid)
+        print("will work %s" % self.pid)
         while self.can_work:
             time.sleep(1)
             print("work... %s" % self.pid)
