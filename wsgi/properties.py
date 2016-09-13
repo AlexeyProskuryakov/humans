@@ -19,13 +19,17 @@ cacert_file = os.path.join(module_path(), 'cacert.pem')
 logger = logging.getLogger()
 
 logger.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s[%(levelname)s]%(name)s|%(processName)s(%(process)d): %(message)s')
-formatter_process = logging.Formatter('%(asctime)s[%(levelname)s]%(name)s|%(processName)s: %(message)s')
-formatter_human = logging.Formatter('%(asctime)s[%(levelname)s]%(name)s|%(processName)s: %(message)s')
+formatter           = logging.Formatter('%(asctime)s[%(levelname)s]%(name)s|%(processName)s(%(process)d): %(message)s')
+formatter_process   = logging.Formatter('%(asctime)s[%(levelname)s]%(name)s|%(processName)s: %(message)s')
+formatter_human     = logging.Formatter('%(asctime)s[%(levelname)s]%(name)s|%(processName)s: %(message)s')
 
 sh = logging.StreamHandler()
 sh.setFormatter(formatter)
 logger.addHandler(sh)
+
+fh = logging.FileHandler(os.path.join(module_path(), "humans.log"))
+fh.setFormatter(formatter)
+logger.addHandler(fh)
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 logging.getLogger("requests").setLevel(logging.WARNING)
