@@ -78,8 +78,10 @@ def time_hash(time):
         d = time.weekday()
         return d * DAY + h * HOUR + m * MINUTE + s * SEC
 
+
 def now_hash():
     return time_hash(datetime.now())
+
 
 def weighted_choice_king(action_weights):
     total = 0
@@ -124,7 +126,7 @@ class AuthorsStorage(DBHandler):
                                       upsert=True)
 
     def get_time_sequence(self, used):
-        found = self.time_sequence.find_one({"used":used}, projection={"sequence":1})
+        found = self.time_sequence.find_one({"used": used}, projection={"sequence": 1})
         if found:
             return found.get("sequence")
 
@@ -520,9 +522,12 @@ class ActionGenerator(object):
         getted_action = weighted_choice_king(action_weights)
         self._action_stack.push(getted_action)
         if A_SLEEP in self._action_stack:
-            return self._action_stack.get_prevailing_action()
+            action = self._action_stack.get_prevailing_action()
         else:
-            return self._action_stack.get_not_repeatable_action()
+            action = self._action_stack.get_not_repeatable_action()
+
+        log.info("forming action in [%s] is: %s" % (group_name, action))
+        return action
 
 
 def visualise_steps(groups, authors_steps):
@@ -558,7 +563,7 @@ def renew_sleep_actions():
 
 
 def group_and_visualise_gen(for_time=DAY * 2):
-    ae = ActionGenerator() #todo which group name?
+    ae = ActionGenerator()  # todo which group name?
     a_s = AuthorsStorage()
 
     g_res = a_s.get_authors_groups()

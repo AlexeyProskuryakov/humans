@@ -62,13 +62,12 @@ class ProcessDirector(object):
 
     def start_aspect(self, aspect, pid):
         with self.mutex:
-            log.info("will stop another processes of %s" % aspect)
             result = self.redis.setnx(PREFIX(aspect), pid)
             if not result:
                 stored_pid = int(self.redis.get(PREFIX(aspect)))
+                log.info("for %s will stop another processes (%s) and store %s" % (aspect, stored_pid, pid))
                 if stored_pid in get_worked_pids():
-                    result = os.kill(stored_pid, STOP_SIGNAL)
-                    log.info("stop result is: %s", result)
+                    os.kill(stored_pid, STOP_SIGNAL)
 
             self._store_aspect_pid(aspect, pid)
 

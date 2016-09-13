@@ -82,11 +82,12 @@ HE_ASPECT = lambda x: "he_%s" % x
 class Kapellmeister(Process, SignalReceiver):
     def __init__(self, name, human_class=Human, reddit=None, reddit_class=None):
         super(Kapellmeister, self).__init__()
-        SignalReceiver.__init__(self)
-
-        self.db = HumanStorage(name="main storage for [%s]" % name)
         self.human_name = name
         self.name = "KPLM [%s]" % (self.human_name)
+
+        SignalReceiver.__init__(self, self.name)
+
+        self.db = HumanStorage(name="main storage for [%s]" % name)
 
         self.ae = ActionGenerator(human_name=self.human_name, human_storage=self.db)
         self.psh = PostsSequenceHandler(human=self.human_name, hs=self.db, ae_store=self.ae._storage)
@@ -218,7 +219,6 @@ class Kapellmeister(Process, SignalReceiver):
         action = self.ae.get_action(step)
         force = False
         if politic == POLITIC_WORK_HARD and action != A_SLEEP:
-            log.info("Maybe post %s,  %s" % (hash_info(step), hash_info(now_hash())))
             if self.psh.is_post_time(step):
                 action = A_POST
                 force = True
