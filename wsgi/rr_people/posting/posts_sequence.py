@@ -104,23 +104,31 @@ class PostsSequence(object):
     def _remove_from_middle(self, post):
         self.__store.posts_sequence.update_one({"human": self.human}, {"$pop": {"middle": -1}, "$push": {'left': post}})
 
-    def _update_sequence_middle_state(self, right, middle, prev_time):
+    def _update_sequence_middle_state(self):
         self.__store.posts_sequence.update_one({"human": self.human},
-                                               {"$set": {"middle": middle,
-                                                         "right": right,
-                                                         "prev_time": prev_time}})
+                                               {"$set": {"middle": self.middle,
+                                                         "right": self.right,
+                                                         "prev_time": self.prev_time}})
+
+    def _store_prev_time(self):
+        self.__store.posts_sequence.update_one({"human": self.human}, {"$set": {"prev_time": self.prev_time}})
 
     def _accumulate_posts_between(self, cur_time):
-        prev_time = self.prev_time or cur_time - AVG_ACTION_TIME
+        if self.prev_time is None:
+            self.prev_time = cur_time - AVG_ACTION_TIME
+            self._store_prev_time()
+
         start, stop = None, None
         for i, post_time in enumerate(self.right):
-            if post_time <= cur_time and post_time >= prev_time:
+            if post_time <= cur_time and post_time >= self.prev_time:
                 if not start:
                     start = i
                 else:
                     stop = i
+
         if start is None:
             return
+
         if not stop:
             stop = start + 1
 
@@ -148,12 +156,12 @@ class PostsSequenceStore(DBHandler):
         return self.posts_sequence.update_one({"human": human},
                                               {"$set": {"metadata": sequence_metadata,
                                                         "right": sequence_data,
-                                                        "time":time.time(),
+                                                        "time": time.time(),
                                                         },
-                                               "$unset":{
-                                                   "middle":1,
-                                                   "left":1,
-                                                   "prev_time":1
+                                               "$unset": {
+                                                   "middle": 1,
+                                                   "left": 1,
+                                                   "prev_time": 1
 
                                                }},
                                               upsert=True)

@@ -4,7 +4,7 @@ from multiprocessing import Process
 from wsgi.db import HumanStorage
 from wsgi.properties import test_mode
 from wsgi.rr_people import Singleton, S_SUSPEND, S_WORK
-from wsgi.rr_people.he import Kapellmeister
+from wsgi.rr_people.he import Kapellmeister, HE_ASPECT
 from wsgi.rr_people.states.entity_states import StatesHandler
 from wsgi.rr_people.states.processes import ProcessDirector
 
