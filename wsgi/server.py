@@ -19,7 +19,7 @@ from wsgi.properties import want_coefficient_max, WEEK, AE_GROUPS, AE_DEFAULT_GR
 from wsgi.rr_people import A_POST
 from wsgi.rr_people.ae import AuthorsStorage, time_hash, hash_info
 from wsgi.rr_people.commenting.connection import CommentHandler
-from wsgi.rr_people.he import HumanOrchestra
+from wsgi.rr_people.he_manage import HumanOrchestra
 from wsgi.rr_people.human import HumanConfiguration
 from wsgi.rr_people.posting.posts import PostsStorage
 from wsgi.rr_people.posting.posts_important import ImportantYoutubePostSupplier

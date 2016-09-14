@@ -28,7 +28,7 @@ class SignalReceiver(object):
         signal.signal(signal.SIGHUP, sh.handle_signal)
         self.can_work = True
         self.name = name
-        log.info("%s init signal receiver")
+        log.info("%s init signal receiver" % self.name)
 
     def receive_signal(self, signum, frame):
         log.info("%s have signal to stop" % self.name)

@@ -150,6 +150,7 @@ class Human(RedditHandler):
         self.access_information = login_credentials.get("info")
         self.login_credentials = {"user": self.name, "pwd": login_credentials["pwd"]}
         self.reddit = r
+
         self.refresh_token()
 
     def refresh_token(self):
@@ -167,11 +168,11 @@ class Human(RedditHandler):
 
     @property
     def action_function_params(self):
-        return self.__action_function_params
+        return self._action_function_params
 
     @action_function_params.setter
     def action_function_params(self, val):
-        self.__action_function_params = val
+        self._action_function_params = val
         self.counters = {A_CONSUME: 0, A_VOTE: 0, A_COMMENT: 0, A_POST: 0}
 
     @staticmethod

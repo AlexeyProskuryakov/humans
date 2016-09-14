@@ -6,7 +6,6 @@ import traceback
 from datetime import datetime
 from multiprocessing.process import Process
 from multiprocessing.synchronize import Lock
-from threading import Thread
 
 import requests
 import requests.auth
@@ -14,7 +13,7 @@ from praw import Reddit
 
 from wsgi import properties
 from wsgi.db import HumanStorage
-from wsgi.properties import HOUR, MINUTE, POLITIC_WORK_HARD, MIN_TIMES_BETWEEN
+from wsgi.properties import HOUR, MINUTE, POLITIC_WORK_HARD, MIN_TIMES_BETWEEN, test_mode
 from wsgi.rr_people import USER_AGENTS, \
     A_COMMENT, A_POST, A_SLEEP, \
     S_WORK, S_BAN, S_SLEEP, S_SUSPEND, \
@@ -112,6 +111,7 @@ class Kapellmeister(Process, SignalReceiver):
             return False
         else:
             self.states_handler.set_human_state(self.human_name, new_state)
+            log.info("%s now state %s" % (self.human_name, new_state))
             return True
 
     def _get_previous_post_time(self, action):
@@ -204,7 +204,7 @@ class Kapellmeister(Process, SignalReceiver):
                     self.human_name,
                     action,
                     action_result,
-                    step - now_hash(),
+                    now_hash() - step,
                 ))
 
             except Exception as e:
@@ -226,37 +226,3 @@ class Kapellmeister(Process, SignalReceiver):
                 action = A_CONSUME
 
         return action, force
-
-
-class HumanOrchestra():
-    __metaclass__ = Singleton
-
-    def __init__(self):
-        self.__humans = {}
-        self.db = HumanStorage(name="human orchestra")
-        self.states = StatesHandler(name="human orchestra")
-        self.process_director = ProcessDirector(name="human orchestra")
-
-        Thread(target=self._auto_start_humans, name="Orchestra Human Starter").start()
-
-    def _auto_start_humans(self):
-        log.info("Will auto start humans")
-        for human_name, state in self.states.get_all_humans_states().iteritems():
-            if state != S_SUSPEND:
-                self.start_human(human_name)
-
-    def suspend_human(self, human_name):
-        self.states.set_human_state(human_name, S_SUSPEND)
-
-    def start_human(self, human_name):
-        self.states.set_human_state(human_name, S_WORK)
-        kplmtr = Kapellmeister(human_name)
-        kplmtr.start()
-
-    def get_human_state(self, human_name):
-        human_state = self.states.get_human_state(human_name)
-        process_state = self.process_director.get_state(HE_ASPECT(human_name))
-        return {"human_state": human_state, "process_state": process_state}
-
-    def delete_human(self, human_name):
-        self.states.delete_human_state(human_name)

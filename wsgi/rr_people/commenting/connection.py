@@ -1,8 +1,8 @@
 # coding=utf-8
 import logging
 import time
-from threading import Thread
-from multiprocessing import RLock
+
+from multiprocessing import RLock, Process
 
 from bson.objectid import ObjectId
 
@@ -38,7 +38,7 @@ class CommentsStorage(DBHandler):
             self.comments = self.db.get_collection(_comments)
 
         self.remover_stop = False
-        self.remover = Thread(target=self._remove_old)
+        self.remover = Process(target=self._remove_old)
         self.remover.start()
 
         self.mutex = RLock()

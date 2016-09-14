@@ -2,7 +2,9 @@ import logging
 import random
 
 import praw
+import time
 
+from wsgi import properties
 from wsgi.db import HumanStorage
 from wsgi.properties import AVG_ACTION_TIME
 from wsgi.properties import WEEK
@@ -49,15 +51,18 @@ class FakeHuman(Human):
 
     def refresh_token(self):
         log.info("REFRESH TOKEN")
+        self.action_function_params = Human.init_work_cycle()
 
     def do_post(self):
         log.info("DO POSTING...")
         self.incr_counter(A_POST)
+        time.sleep(random.randint(0, AVG_ACTION_TIME))
         return A_POST
 
     def do_comment_post(self, sub=None):
         log.info("DO COMMENTING...")
         self.incr_counter(A_COMMENT)
+        time.sleep(random.randint(0, AVG_ACTION_TIME))
         return A_COMMENT
 
     def _humanised_comment_post(self, sub, comment_id):
@@ -66,6 +71,7 @@ class FakeHuman(Human):
 
     def do_see_post(self, post):
         log.info("DO SEE POST %s" % post)
+        time.sleep(random.randint(0, AVG_ACTION_TIME))
 
     def do_live_random(self, max_actions=100, posts_limit=500):
         log.info("DO LIVE RANDOM %s %s" % (max_actions, posts_limit))
@@ -73,6 +79,10 @@ class FakeHuman(Human):
             self.incr_counter(A_VOTE)
         else:
             self.incr_counter(A_CONSUME)
+        time.sleep(random.randint(0,AVG_ACTION_TIME))
+
+    def load_hot_and_new(self, subreddit_name, sort=None, limit=properties.DEFAULT_LIMIT):
+        return []
 
     def __repr__(self):
         return "".join(["%s:\t%s\n" % (k, v) for k, v in self.counters.iteritems()])

@@ -90,7 +90,7 @@ class PostsSequence(object):
 
     def can_post(self, cur_time):
         self._accumulate_posts_between(cur_time)
-        log.info("Can post %s <-> %s" % (hash_info(self.prev_time), hash_info(cur_time)))
+        log.info("post %s <-> %s" % (hash_info(self.prev_time), hash_info(cur_time)))
         return len(self.middle) != 0
 
     def accept_post(self):
