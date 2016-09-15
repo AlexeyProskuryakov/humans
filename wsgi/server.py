@@ -31,6 +31,12 @@ __author__ = '4ikist'
 
 import sys
 
+process_director = ProcessDirector("server")
+if not process_director.can_start_aspect("server", os.getpid()).get("started"):
+    print "can not start this server. fuck you."
+    sys.exit(0)
+
+
 reload(sys)
 sys.setdefaultencoding('utf-8')
 
@@ -506,7 +512,7 @@ def configuration(name):
 
 # posts & comments
 comment_handler = CommentHandler("server")
-process_director = ProcessDirector("server")
+
 post_storage = PostsStorage(name="server")
 
 
@@ -524,4 +530,10 @@ def queue_of_comments(name):
 
 if __name__ == '__main__':
     print os.path.dirname(__file__)
-    app.run(port=65010)
+    port = 65010
+    while 1:
+        try:
+            app.run(port=port)
+        except Exception as e:
+            log.exception(e)
+            port += 1
