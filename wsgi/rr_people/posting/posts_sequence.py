@@ -135,7 +135,7 @@ class PostsSequence(object):
         self.middle.extend(self.right[start:stop])
         self.right = self.right[:start] + self.right[stop:]
         self.prev_time = cur_time
-        self._update_sequence_middle_state(self.right, self.middle, self.prev_time)
+        self._update_sequence_middle_state()
 
     def is_end(self):
         return len(self.right) == 0
