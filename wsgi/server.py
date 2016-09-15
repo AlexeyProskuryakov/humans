@@ -30,17 +30,17 @@ from wsgi.wake_up import WakeUp
 __author__ = '4ikist'
 
 import sys
-
+log = logging.getLogger("web")
 process_director = ProcessDirector("server")
 if not process_director.can_start_aspect("server", os.getpid()).get("started"):
-    print "can not start this server. fuck you."
-    sys.exit(0)
+    log.error( "can not start this server. fuck you.")
+    sys.exit(-1)
 
 
 reload(sys)
 sys.setdefaultencoding('utf-8')
 
-log = logging.getLogger("web")
+
 cur_dir = os.path.dirname(__file__)
 app = Flask("Humans", template_folder=cur_dir + "/templates", static_folder=cur_dir + "/static")
 
