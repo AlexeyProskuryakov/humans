@@ -68,6 +68,8 @@ log = logging.getLogger("states")
 def kill_zombies():
     command = "kill -9 `ps ajx | grep -w Z | grep -v grep | awk '{print $1}'`"
     pipe = os.popen(command)
+    result = pipe.read()
+    log.info("KILL ZOMBIES: %s" % result)
     pipe.close()
 
 
@@ -79,6 +81,8 @@ def get_command_result(command):
 
 
 def get_worked_pids():
+    kill_zombies()
+
     def get_all_pids():
         result = get_command_result("ps aux| grep %s | grep -v grep| awk '{print $2}'" % WORKED_PIDS_QUERY).split('\n')
         for el in result:
@@ -86,6 +90,7 @@ def get_worked_pids():
 
     worked_pids = set(list(get_all_pids()))
     return worked_pids
+
 
 
 if __name__ == '__main__':

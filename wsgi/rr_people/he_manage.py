@@ -14,13 +14,14 @@ log = logging.getLogger("orchestra")
 class HumanOrchestra():
     __metaclass__ = Singleton
 
-    def __init__(self):
+    def __init__(self, auto_start=True):
         self.__humans = {}
         self.db = HumanStorage(name="human orchestra")
         self.states = StatesHandler(name="human orchestra")
         self.process_director = ProcessDirector(name="human orchestra")
 
-        Process(target=self._auto_start_humans, name="Orchestra Human Starter").start()
+        if auto_start:
+            Process(target=self._auto_start_humans, name="Orchestra Human Starter").start()
 
     def _auto_start_humans(self):
         log.info("Will auto start humans")

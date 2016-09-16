@@ -33,7 +33,7 @@ import sys
 log = logging.getLogger("web")
 process_director = ProcessDirector("server")
 if not process_director.can_start_aspect("server", os.getpid()).get("started"):
-    log.error( "can not start this server. fuck you.")
+    human_orchestra = HumanOrchestra()
     sys.exit(-1)
 
 
@@ -272,8 +272,6 @@ def human_auth_end():
     db.update_human_access_credentials_info(user.name, info)
     return render_template("authorize_callback.html", **{"user": user.name, "state": state, "info": info, "code": code})
 
-
-human_orchestra = HumanOrchestra()
 
 
 @app.route("/humans", methods=["POST", "GET"])

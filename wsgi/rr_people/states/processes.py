@@ -37,6 +37,10 @@ class ProcessDirector(object):
         p.set(PREFIX(aspect), pid)
         p.execute()
 
+    def is_aspect_worked(self, aspect):
+        aspect_pid = self.redis.get(PREFIX(aspect))
+        return aspect_pid in get_worked_pids()
+
     def can_start_aspect(self, aspect, pid):
         """
         starting or returning False if aspect already started
@@ -72,10 +76,10 @@ class ProcessDirector(object):
 
 
 
-    def get_state(self, aspect, worked_pids=None):
+    def get_state(self, aspect):
         pid_raw = self.redis.get(PREFIX(aspect))
         result = {"aspect": aspect,}
-        wp = worked_pids or get_worked_pids()
+        wp = get_worked_pids()
         if pid_raw:
             pid = int(pid_raw)
             result = dict(result, **{"pid": pid, "work": pid in wp})
