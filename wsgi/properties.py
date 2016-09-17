@@ -19,9 +19,9 @@ cacert_file = os.path.join(module_path(), 'cacert.pem')
 logger = logging.getLogger()
 
 logger.setLevel(logging.INFO)
-formatter           = logging.Formatter('%(asctime)s[%(levelname)s]%(name)s|%(processName)s(%(process)d): %(message)s')
-formatter_process   = logging.Formatter('%(asctime)s[%(levelname)s]%(name)s|%(processName)s: %(message)s')
-formatter_human     = logging.Formatter('%(asctime)s[%(levelname)s]%(name)s|%(processName)s: %(message)s')
+formatter = logging.Formatter('%(asctime)s[%(levelname)s]%(name)s|%(processName)s(%(process)d): %(message)s')
+formatter_process = logging.Formatter('%(asctime)s[%(levelname)s]%(name)s|%(processName)s: %(message)s')
+formatter_human = logging.Formatter('%(asctime)s[%(levelname)s]%(name)s|%(processName)s: %(message)s')
 
 sh = logging.StreamHandler()
 sh.setFormatter(formatter)
@@ -94,11 +94,14 @@ POLITICS = [POLITIC_WORK_HARD, POLITIC_FREE_LIFE]
 DEFAULT_LIMIT = 500
 # DEFAULT_LIMIT = 20
 
-max_consuming = 90
-min_consuming = 80
-
-max_voting = 95
-min_voting = 90
+counters_thresholds = {"consuming": {"min": 80, "max": 90},
+                       "voting": {"min": 80, "max": 85}
+                       }
+# max_consuming = 90
+# min_consuming = 80
+#
+# max_voting = 95
+# min_voting = 90
 
 st_between_net_request = 60
 tryings_count = 10

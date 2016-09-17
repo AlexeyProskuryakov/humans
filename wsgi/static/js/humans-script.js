@@ -103,3 +103,43 @@ function clear_log(name){
     });
 }
 
+function set_counter(name, result, result_perc, threshold){
+    if (result != undefined){
+        $("#"+name+"-result").css("width", result_perc+"%");
+        $("#"+name+"-result").text(result+" ("+result_perc+"%)");
+    }
+    if (threshold != undefined){
+        $("#"+name+"-threshold").css("width", threshold+"%");
+        $("#"+name+"-threshold").text(threshold + "%");
+    }
+
+}
+
+function recreate_counters(name){
+        $.ajax({
+        type:           "post",
+        url:            "/humans/"+name+"/counters/recreate",
+        success:        function(data){
+                if (data.ok){
+                    for (var key in data.counters) {
+                        set_counter(key, data.counters[key], data.percents[key], data.threshold[key]);
+                    }
+                }
+        }
+    });
+}
+
+function refresh_counters(name){
+        $.ajax({
+        type:           "post",
+        url:            "/humans/"+name+"/counters",
+        success:        function(data){
+                if (data.ok){
+                    for (var key in data.counters) {
+                        set_counter(key, data.counters[key], data.percents[key], data.threshold[key]);
+                    }
+                }
+        }
+    });
+}
+

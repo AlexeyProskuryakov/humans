@@ -107,7 +107,7 @@ class Human(RedditHandler):
         self.last_friend_add = human_configuration.get("last_friend_add") or time.time() - WEEK
 
         self.init_engine(login_credentials)
-        log.info("MY [%s] WORK CYCLE: %s" % (self.name, self.action_function_params))
+        log.info("MY [%s] WORK CYCLE: %s" % (self.name, self.counters_thresholds))
 
         # todo this cache must be persisted at mongo or another
         self._used = set()
@@ -158,7 +158,9 @@ class Human(RedditHandler):
         self.db.update_human_access_credentials_info(self.name, self.access_information)
         self.reddit.login(self.login_credentials["user"], self.login_credentials["pwd"], disable_warning=True)
 
-        self.action_function_params = Human.init_work_cycle()
+    def reload_counters(self):
+        self.counters_thresholds = self.calculate_counters()
+        self.db.update_human_internal_state(self.name, state=self.state)
 
     def incr_counter(self, name):
         self.counters[name] += 1
@@ -167,20 +169,20 @@ class Human(RedditHandler):
         self.counters[name] -= by
 
     @property
-    def action_function_params(self):
-        return self._action_function_params
+    def counters_thresholds(self):
+        return self._counters_thresholds
 
-    @action_function_params.setter
-    def action_function_params(self, val):
-        self._action_function_params = val
+    @counters_thresholds.setter
+    def counters_thresholds(self, val):
+        self._counters_thresholds = val
         self.counters = {A_CONSUME: 0, A_VOTE: 0, A_COMMENT: 0, A_POST: 0}
 
-    @staticmethod
-    def init_work_cycle():
-        consuming = random.randint(properties.min_consuming, properties.max_consuming)
+    def calculate_counters(self):
+        cth = self.db.get_human_counters_thresholds_min_max(self.name) or properties.counters_thresholds
+        consuming = random.randint(cth.get('consuming').get('min'), cth.get('consuming').get('max'))
         production = 100. - consuming
 
-        prod_voting = random.randint(properties.min_voting, properties.max_voting)
+        prod_voting = random.randint(cth.get('voting').get('min'), cth.get('voting').get('max'))
         prod_commenting = 100. - prod_voting
 
         # prod_posting = prod_commenting / random.randint(2, 4)
@@ -191,13 +193,13 @@ class Human(RedditHandler):
         commenting = (prod_commenting * production) / 100.
         posting = (prod_posting * production) / 100.
 
-        action_function_params = {A_CONSUME: consuming,
-                                  A_VOTE: voting,
-                                  A_COMMENT: commenting,
-                                  A_POST: posting
-                                  }
+        thresholds = {A_CONSUME: consuming,
+                      A_VOTE: voting,
+                      A_COMMENT: commenting,
+                      A_POST: posting
+                      }
 
-        return action_function_params
+        return thresholds
 
     def can_do(self, action):
         """
@@ -207,14 +209,14 @@ class Human(RedditHandler):
         """
         summ = sum(self.counters.values())
         action_count = self.counters[action]
-        granted_perc = self.action_function_params.get(action)
+        granted_perc = self.counters_thresholds.get(action)
         current_perc = (float(action_count) / (summ if summ else 100)) * 100
 
         return current_perc <= granted_perc
 
     def must_do(self, action):
         result = True
-        for another_action in self.action_function_params.keys():
+        for another_action in self.counters_thresholds.keys():
             if another_action == action:
                 continue
             result = result and not self.can_do(another_action)
@@ -229,13 +231,12 @@ class Human(RedditHandler):
 
         if step_type == A_FRIEND:
             self.last_friend_add = time.time()
-            self.db.update_human_internal_state(self.name, state=self.state)
 
         if step_type != A_CONSUME:
             self.db.save_log_human_row(self.name, step_type, info or {})
+            self.db.update_human_internal_state(self.name, state=self.state)
         else:
             self.db.add_to_statistic(self.name, A_CONSUME, 1)
-
         log.info("step by [%s] |%s|: %s", self.name, step_type, info)
 
         if info and info.get("fullname"):
@@ -243,9 +244,25 @@ class Human(RedditHandler):
 
     @property
     def state(self):
+        def get_actions_percent(counters):
+            summ = sum(counters.values())
+            result = {}
+            for action, count in counters.items():
+                current_perc = (float(count) / (summ if summ else 100)) * 100
+                result[action] = current_perc
+            return result
+
+        def to_int(threhsold):
+            return dict([(k, int(v)) for k, v in threhsold.items()])
+
         return {"ss": list(self.subscribed_subreddits),
                 "frds": list(self.friends),
-                "last_friend_add": self.last_friend_add
+                "last_friend_add": self.last_friend_add,
+                "counters": {
+                    "counters": self.counters,
+                    "percents": get_actions_percent(self.counters),
+                    "threshold": self.counters_thresholds,
+                }
                 }
 
     def can_friendship_create(self, friend_name):

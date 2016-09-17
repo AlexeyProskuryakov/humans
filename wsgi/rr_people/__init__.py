@@ -54,7 +54,7 @@ S_SLEEP = "sleep"
 S_UNKNOWN = "unknown"
 S_STOP = "stop"
 S_SUSPEND = "suspend"
-
+S_RELOAD_COUNTERS = "reload counters"
 re_url = re.compile("https?://[^\s/$.?#].[^\s]*")
 re_crying_chars = re.compile("[A-Z!]{2,}")
 

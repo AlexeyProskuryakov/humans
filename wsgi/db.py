@@ -275,15 +275,20 @@ class HumanStorage(DBHandler):
         return result
 
     def update_human_internal_state(self, name, state):
-        update = {}
-        if state.get("ss"):
-            update["ss"] = {"$each": state['ss']}
-        if state.get("frds"):
-            update["frds"] = {"$each": state['frds']}
-        if update:
-            update = {"$addToSet": update}
-            result = self.human_config.update_one({"user": name}, update)
-            return result
+        update = {"$set": state}
+        result = self.human_config.update_one({"user": name}, update)
+        return result
+
+    def get_human_counters(self, name):
+        counters =  self.human_config.find_one({"user": name}, projection={"counters": 1, "_id":False})
+        if counters:
+            return counters.get("counters")
+
+    def set_human_counters_thresholds_min_max(self, name, counter_th_mm):
+        self.human_config.update_one({"user": name}, {"$set": {"counters_thresholds": counter_th_mm}})
+
+    def get_human_counters_thresholds_min_max(self, name):
+        return self.human_config.find_one({"user": name}, projection={'counters_thresholds': 1, "_id": False})
 
     def get_human_internal_state(self, name):
         found = self.human_config.find_one({"user": name}, projection={"ss": True, "frds": True})
@@ -301,7 +306,6 @@ class HumanStorage(DBHandler):
             live_config = found.get("live_config")
             return live_config
 
-    @cached(ttl=120)
     def get_human_config(self, name, projection=None):
         proj = projection or {"_id": False}
         return self.human_config.find_one({"user": name}, projection=proj)
@@ -334,6 +338,8 @@ class HumanStorage(DBHandler):
         stat = dict(self.get_human_statistics(human_name))
         for k, v in stat.iteritems():
             stat[k] = 0
+
+        stat["last_clear"] = time.time()
         return self.human_statistic.update_one({"human_name": human_name}, {"$set": stat})
 
     def remove_human_data(self, name):

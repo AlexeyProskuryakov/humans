@@ -51,10 +51,11 @@ class FakeHuman(Human):
 
     def refresh_token(self):
         log.info("REFRESH TOKEN")
-        self.action_function_params = Human.init_work_cycle()
+        self.counters_thresholds = self.calculate_counters()
 
     def do_post(self):
         self.incr_counter(A_POST)
+        self.db.update_human_internal_state(self.name, state=self.state)
         count = random.randint(0, AVG_ACTION_TIME / 10)
         log.info("DO POSTING...(%s)" % count)
         time.sleep(count)
@@ -62,9 +63,11 @@ class FakeHuman(Human):
 
     def do_comment_post(self, sub=None):
         self.incr_counter(A_COMMENT)
+        self.db.update_human_internal_state(self.name, state=self.state)
         count = random.randint(0, AVG_ACTION_TIME / 10)
         log.info("DO COMMENT...(%s)" % count)
         time.sleep(count)
+
         return A_COMMENT
 
     def _humanised_comment_post(self, sub, comment_id):
@@ -81,11 +84,10 @@ class FakeHuman(Human):
             self.incr_counter(A_VOTE)
         else:
             self.incr_counter(A_CONSUME)
-        count = random.randint(0, AVG_ACTION_TIME/10)
+        self.db.update_human_internal_state(self.name, state=self.state)
+        count = random.randint(0, AVG_ACTION_TIME / 10)
         log.info("DO LIVE RANDOM...(%s)" % count)
         time.sleep(count)
-
-
 
     def load_hot_and_new(self, subreddit_name, sort=None, limit=properties.DEFAULT_LIMIT):
         return []

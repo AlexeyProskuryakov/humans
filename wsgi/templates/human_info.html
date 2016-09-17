@@ -122,15 +122,17 @@
                                     </h1>
                                 </div>
                                 <div class="modal-body">
-                                    <form action="{{url_for('humans_info', name=human_name)}}" method="post" class="form from-vertical">
+                                    <form action="{{url_for('humans_info', name=human_name)}}" method="post"
+                                          class="form from-vertical">
                                         <input type="hidden" name="delete" value="!">
                                         <label for="pwd">Пароль вводи:</label>
                                         <input id="pwd" type="password" name="pwd">
-                                        <input type="submit"  value="Да, блять!" class="btn btn-danger btn-lg">
+                                        <input type="submit" value="Да, блять!" class="btn btn-danger btn-lg">
                                     </form>
                                 </div>
                                 <div class="modal-footer">
-                                    <button type="button" class="btn btn-default" data-dismiss="modal">Я пошутил</button>
+                                    <button type="button" class="btn btn-default" data-dismiss="modal">Я пошутил
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -211,6 +213,31 @@
                         {{human_live_state['process_state']}}]
                     </small>
                 </h2>
+                <div class="counters">
+                    {%for name, count in counters_percents.items()%}
+                    <div class="counter {%if name=='post' and politic == 'work_hard' %} more-opacity {%endif%}">
+                        {{name}}
+
+                        <div class="progress">
+                            <div id = "{{name}}-result" class="progress-bar progress-bar-success progress-bar-striped active"
+                                 role="progressbar"
+                                 aria-valuenow="{{ count }}" aria-valuemin="0" aria-valuemax="100"
+                                 style="width:{{count}}%">
+                                {{counters[name]}} ({{count}}%)
+                            </div>
+                        </div><div class="progress">
+                            <div id = "{{name}}-threshold" class="progress-bar progress-bar-danger progress-bar-striped" role="progressbar"
+                                 aria-valuenow="{{ counters_threshold[name] }}" aria-valuemin="0" aria-valuemax="100"
+                                 style="width:{{counters_threshold[name]}}%">
+                                {{counters_threshold[name]}} %
+                            </div>
+
+                        </div>
+                    </div>
+                    {%endfor%}
+                    <button class="btn btn-info btn-sm" onclick="recreate_counters('{{human_name}}')">Перезагрузить</button>
+                </div>
+
                 <div class="accordion" id="info-accordion">
                     <div class="accordion-group">
                         <div class="accordion-heading">
@@ -222,6 +249,7 @@
                                 <button class="btn btn-sm btn-danger" onclick="clear_statistic('{{human_name}}')">
                                     Почистить
                                 </button>
+                                <small>Последний раз чистили: {{human_stat['last_clear'] | tst_to_dt }}</small>
                             </h3>
                         </div>
 
@@ -230,6 +258,7 @@
                                 <table class="table table-stripped">
                                     {%if human_stat %}
                                     {% for k,v in human_stat.iteritems() %}
+                                    {% if k != 'last_clear'%}
                                     <tr>
                                         <th>
                                             {{k}}
@@ -238,6 +267,7 @@
                                             {{v}}
                                         </th>
                                     </tr>
+                                    {% endif %}
                                     {% endfor %}
                                     {%else%}
                                     Нет покамест, жди.
@@ -384,7 +414,16 @@
     $(function(){
     show_sequences('{{human_name}}', true);
     setInterval(function() {
+
+            refresh_counters('{{human_name}}');
+        }, 5000);
+    });
+
+     $(function(){
+    show_sequences('{{human_name}}', true);
+    setInterval(function() {
             show_sequences('{{human_name}}', false);
+            refresh_counters('{{human_name}}');
         }, 60000);
     });
 

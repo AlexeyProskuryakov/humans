@@ -19,7 +19,7 @@ from wsgi.properties import HOUR, MINUTE, POLITIC_WORK_HARD, MIN_TIMES_BETWEEN, 
 from wsgi.rr_people import USER_AGENTS, \
     A_COMMENT, A_POST, A_SLEEP, \
     S_WORK, S_BAN, S_SLEEP, S_SUSPEND, \
-    Singleton, A_CONSUME, A_PRODUCE
+    Singleton, A_CONSUME, A_PRODUCE, S_RELOAD_COUNTERS
 from wsgi.rr_people.ae import ActionGenerator, time_hash, hash_info, now_hash
 from wsgi.rr_people.human import Human
 from wsgi.rr_people.posting.posts_sequence import PostsSequenceHandler
@@ -112,15 +112,19 @@ class Kapellmeister(Process, SignalReceiver, Child):
             self.states_handler.set_human_state(self.human_name, S_BAN)
         return ok
 
-    def _set_state(self, new_state):
+    def check_state(self, new_state):
         state = self.states_handler.get_human_state(self.human_name)
         if state == S_SUSPEND:
             log.info("%s is suspended, will stop" % self.human_name)
             return False
-        else:
-            self.states_handler.set_human_state(self.human_name, new_state)
-            log.info("%s now state %s" % (self.human_name, new_state))
-            return True
+
+        if state == S_RELOAD_COUNTERS:
+            log.info("%s reload counters" % self.human_name)
+            self.human.reload_counters()
+
+        self.states_handler.set_human_state(self.human_name, new_state)
+        log.info("%s now state %s" % (self.human_name, new_state))
+        return True
 
     def _get_previous_post_time(self, action):
         cur = self.db.human_log.find({"human_name": self.human_name, "action": action},
@@ -135,12 +139,12 @@ class Kapellmeister(Process, SignalReceiver, Child):
         time_to_post = time.time() - self._get_previous_post_time(what)
         after = MIN_TIMES_BETWEEN.get(what) - time_to_post
         if after < 0:
-            self._set_state(WORK_STATE(what))
+            self.check_state(WORK_STATE(what))
         else:
             if randomise:
                 after += random.randint(0, int(after / 2))
 
-            self._set_state(WORK_STATE("%s after %s" % (what, after)))
+            self.check_state(WORK_STATE("%s after %s" % (what, after)))
             time.sleep(after)
 
     def do_action(self, action, force=False):
@@ -162,11 +166,11 @@ class Kapellmeister(Process, SignalReceiver, Child):
 
         if not produce:
             if self.human.can_do(A_CONSUME):
-                self._set_state(WORK_STATE("live random"))
+                self.check_state(WORK_STATE("live random"))
                 self.human.do_live_random(max_actions=random.randint(5, 20), posts_limit=random.randint(25, 50))
                 action_result = A_CONSUME
             else:
-                self._set_state(WORK_STATE("sleeping because can not consume"))
+                self.check_state(WORK_STATE("sleeping because can not consume"))
                 self.human.decr_counter(A_CONSUME)
                 self.human.decr_counter(A_POST, 2)
                 self.human.decr_counter(A_COMMENT, 2)
@@ -184,6 +188,7 @@ class Kapellmeister(Process, SignalReceiver, Child):
             log.info("will refresh token for [%s]" % self.human_name)
             self.human.refresh_token()
             self.last_token_refresh_time = step
+            self.human.reload_counters()
 
     def run(self):
         log.info("kapelmiester [%s] starts..." % self.human_name)
@@ -194,7 +199,7 @@ class Kapellmeister(Process, SignalReceiver, Child):
         while self.can_work:
             try:
                 step = now_hash()
-                if not self._set_state(S_WORK):
+                if not self.check_state(S_WORK):
                     log.info("state is suspend. I will stop. My pid is: %s" % self.pid)
                     break
 
@@ -206,7 +211,7 @@ class Kapellmeister(Process, SignalReceiver, Child):
                 if action != A_SLEEP:
                     action_result = self.do_action(action, force)
                 else:
-                    self._set_state(S_SLEEP)
+                    self.check_state(S_SLEEP)
                     action_result = A_SLEEP
                     time.sleep(MINUTE)
 

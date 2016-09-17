@@ -16,8 +16,8 @@ from flask_login import LoginManager, login_user, login_required, logout_user
 from werkzeug.utils import redirect
 
 from wsgi.db import HumanStorage
-from wsgi.properties import want_coefficient_max, WEEK, AE_GROUPS, AE_DEFAULT_GROUP, POLITICS
-from wsgi.rr_people import A_POST
+from wsgi.properties import want_coefficient_max, WEEK, AE_GROUPS, AE_DEFAULT_GROUP, POLITICS, counters_thresholds
+from wsgi.rr_people import A_POST, S_RELOAD_COUNTERS
 from wsgi.rr_people.ae import AuthorsStorage, time_hash, hash_info
 from wsgi.rr_people.commenting.connection import CommentHandler
 from wsgi.rr_people.he_manage import HumanOrchestra
@@ -66,6 +66,7 @@ wu = WakeUp()
 wu.store.add_url(url)
 wu.daemon = True
 wu.start()
+
 
 @app.route("/wake_up/<salt>", methods=["POST"])
 def wake_up(salt):
@@ -336,6 +337,9 @@ def humans_info(name):
                                                  "config": human_cfg.get("live_config") or HumanConfiguration().data,
                                                  "ss": human_cfg.get("ss", []),
                                                  "friends": human_cfg.get("frds", []),
+                                                 "counters":human_cfg.get("counters").get("counters"),
+                                                 "counters_percents": human_cfg.get("counters").get("percents"),
+                                                 "counters_threshold": human_cfg.get("counters").get("threshold", {}),
                                                  "want_coefficient": want_coefficient_max,
                                                  "channel_id": human_cfg.get("channel_id"),
 
@@ -379,6 +383,34 @@ try:
     ips = ImportantYoutubePostSupplier()
 except Exception as e:
     pass
+
+
+@app.route("/humans/<name>/counters/recreate", methods=["POST"])
+@login_required
+def human_refresh_counters(name):
+    human_orchestra.states.set_human_state(name, S_RELOAD_COUNTERS)
+    counters = db.get_human_counters(name) or {}
+    return jsonify(**dict({"ok": True}, **counters))
+
+
+@app.route("/humans/<name>/counters/set_thresholds", methods=["POST"])
+@login_required
+def human_set_threshold_counters(name):
+    data = json.loads(request.data)
+    counters_thresh = {
+        "consuming": {"min": int(data.get("consuming", {}).get("max", counters_thresholds["consuming"]["max"])),
+                      "max": int(data.get("consuming", {}).get("min", counters_thresholds["consuming"]["min"]))},
+        "voting": {"min": int(data.get("voting", {}).get("max", counters_thresholds["voting"]["max"])),
+                   "max": int(data.get("voting", {}).get("min", counters_thresholds["voting"]["min"]))},
+    }
+    db.set_human_counters_thresholds_min_max(name, counters_thresh)
+
+
+@app.route("/humans/<name>/counters", methods=["POST"])
+@login_required
+def human_get_counters(name):
+    counters = db.get_human_counters(name) or {}
+    return jsonify(**dict({"ok": True}, **counters))
 
 
 @app.route("/humans/<name>/clear_errors", methods=["POST"])
