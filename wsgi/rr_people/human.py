@@ -96,6 +96,7 @@ class Human(RedditHandler):
         login_credentials = self.db.get_human_access_credentials(login)
         if not login_credentials:
             raise Exception("Can not have login credentials at %s", login)
+
         self.reload_counters()
 
         self.comments_handler = CommentHandler(name="consumer %s" % login)
@@ -109,6 +110,7 @@ class Human(RedditHandler):
 
         self.init_engine(login_credentials)
         log.info("MY [%s] WORK CYCLE: %s" % (self.name, self.counters_thresholds))
+
 
         # todo this cache must be persisted at mongo or another
         self._used = set()
@@ -161,7 +163,7 @@ class Human(RedditHandler):
 
     def reload_counters(self):
         self.counters_thresholds = self.calculate_counters()
-        self.db.update_human_internal_state(self.name, state=self.state)
+        self.db.update_human_internal_state(self.login, state=self.state)
 
     def incr_counter(self, name):
         self.counters[name] += 1
