@@ -237,33 +237,31 @@ class Human(RedditHandler):
 
         if step_type != A_CONSUME:
             self.db.save_log_human_row(self.name, step_type, info or {})
-            self.db.update_human_internal_state(self.name, state=self.state)
         else:
             self.db.add_to_statistic(self.name, A_CONSUME, 1)
+
+        self.db.update_human_internal_state(self.name, state=self.state)
         log.info("step by [%s] |%s|: %s", self.name, step_type, info)
 
         if info and info.get("fullname"):
             self._used.add(info.get("fullname"))
 
+    def get_actions_percent(self, counters):
+        summ = sum(counters.values())
+        result = {}
+        for action, count in counters.items():
+            current_perc = (float(count) / (summ if summ else 100)) * 100
+            result[action] = current_perc
+        return result
+
     @property
     def state(self):
-        def get_actions_percent(counters):
-            summ = sum(counters.values())
-            result = {}
-            for action, count in counters.items():
-                current_perc = (float(count) / (summ if summ else 100)) * 100
-                result[action] = current_perc
-            return result
-
-        def to_int(threhsold):
-            return dict([(k, int(v)) for k, v in threhsold.items()])
-
         return {"ss": list(self.subscribed_subreddits),
                 "frds": list(self.friends),
                 "last_friend_add": self.last_friend_add,
                 "counters": {
                     "counters": self.counters,
-                    "percents": get_actions_percent(self.counters),
+                    "percents": self.get_actions_percent(self.counters),
                     "threshold": self.counters_thresholds,
                 }
                 }
