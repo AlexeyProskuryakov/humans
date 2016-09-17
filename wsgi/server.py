@@ -46,7 +46,7 @@ app.config['SESSION_TYPE'] = 'filesystem'
 def tst_to_dt(value):
     dt_format = "%H:%M:%S"
     dt = datetime.fromtimestamp(value)
-    if ((dt - datetime.now()).seconds / DAY) > 1:
+    if (datetime.now()-dt).days > 1:
         dt_format += " %d.%m.%Y"
     return dt.strftime(dt_format)
 
@@ -567,3 +567,4 @@ if __name__ == '__main__':
         except Exception as e:
             port += 1
             print "fuck i try to: %s" % port
+
