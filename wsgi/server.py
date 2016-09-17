@@ -16,7 +16,7 @@ from flask_login import LoginManager, login_user, login_required, logout_user
 from werkzeug.utils import redirect
 
 from wsgi.db import HumanStorage
-from wsgi.properties import want_coefficient_max, WEEK, AE_GROUPS, AE_DEFAULT_GROUP, POLITICS, counters_thresholds
+from wsgi.properties import want_coefficient_max, WEEK, AE_GROUPS, AE_DEFAULT_GROUP, POLITICS, counters_thresholds, DAY
 from wsgi.rr_people import A_POST, S_RELOAD_COUNTERS
 from wsgi.rr_people.ae import AuthorsStorage, time_hash, hash_info
 from wsgi.rr_people.commenting.connection import CommentHandler
@@ -44,7 +44,11 @@ app.config['SESSION_TYPE'] = 'filesystem'
 
 
 def tst_to_dt(value):
-    return datetime.fromtimestamp(value).strftime("%H:%M %d.%m.%Y")
+    dt_format = "%H:%M:%S"
+    dt = datetime.fromtimestamp(value)
+    if ((dt - datetime.now()).seconds / DAY) > 1:
+        dt_format += " %d.%m.%Y"
+    return dt.strftime(dt_format)
 
 
 def array_to_string(array):
@@ -337,7 +341,7 @@ def humans_info(name):
                                                  "config": human_cfg.get("live_config") or HumanConfiguration().data,
                                                  "ss": human_cfg.get("ss", []),
                                                  "friends": human_cfg.get("frds", []),
-                                                 "counters":human_cfg.get("counters").get("counters"),
+                                                 "counters": human_cfg.get("counters").get("counters"),
                                                  "counters_percents": human_cfg.get("counters").get("percents"),
                                                  "counters_threshold": human_cfg.get("counters").get("threshold", {}),
                                                  "want_coefficient": want_coefficient_max,
