@@ -171,13 +171,12 @@ class Kapellmeister(Process, SignalReceiver, Child):
                 action_result = A_CONSUME
             else:
                 self.check_state(WORK_STATE("sleeping because can not consume"))
-                self.human.decr_counter(A_CONSUME)
-                self.human.decr_counter(A_POST, 2)
-                self.human.decr_counter(A_COMMENT, 2)
+                self.human.decr_counter(A_POST)
+                self.human.decr_counter(A_COMMENT)
                 self.human.load_hot_and_new(random.choice(self.human.db.get_subs_of_human(self.human_name)),
                                             limit=random.randint(500, 1000))
-                time.sleep((random.randint(1, 2) * MINUTE) / random.randint(1, 8))
-                action_result = A_SLEEP
+                time.sleep(MINUTE / random.randint(1, 10))
+                action_result = A_SLEEP + " can not consume."
         else:
             action_result = A_PRODUCE
 
