@@ -10,7 +10,6 @@ from wsgi.rr_people.he import Kapellmeister, HE_ASPECT
 from wsgi.rr_people.states.entity_states import StatesHandler
 from wsgi.rr_people.states.processes import ProcessDirector
 
-
 log = logging.getLogger("orchestra")
 
 HUMAN_ORCHESTRA_ASPECT = "orchestra"
@@ -25,6 +24,7 @@ class HumanOrchestra():
         self.states = StatesHandler(name="human orchestra")
         self.process_director = ProcessDirector(name="human orchestra")
 
+        self.childs_results = Queue()
         self._kappelmeisters = {}
         self.mu = RLock()
 
@@ -35,7 +35,6 @@ class HumanOrchestra():
         else:
             log.info("Another orchestra work.")
 
-        self.childs_results = Queue()
         Thread(target=self.kappelmeister_destruct).start()
         log.info("Human Orchestra inited")
 
@@ -58,6 +57,7 @@ class HumanOrchestra():
             log.info("received that %s want to stop..." % to_join)
             if to_join in self.kappelmeisters:
                 self.kappelmeisters[to_join].join()
+                log.info("was end %s", to_join)
 
     def _auto_start_humans(self):
         log.info("Will auto start humans")
