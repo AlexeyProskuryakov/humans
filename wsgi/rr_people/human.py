@@ -179,7 +179,7 @@ class Human(RedditHandler):
         self.counters = {A_CONSUME: 0, A_VOTE: 0, A_COMMENT: 0, A_POST: 0}
 
     def calculate_counters(self):
-        cth = self.db.get_human_counters_thresholds_min_max(self.name) or properties.counters_thresholds
+        cth = self.db.get_human_counters_thresholds_min_max(self.login) or properties.counters_thresholds
         consuming = random.randint(cth.get('consuming').get('min'), cth.get('consuming').get('max'))
         production = 100. - consuming
 
