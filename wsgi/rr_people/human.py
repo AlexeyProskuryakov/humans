@@ -96,6 +96,7 @@ class Human(RedditHandler):
         login_credentials = self.db.get_human_access_credentials(login)
         if not login_credentials:
             raise Exception("Can not have login credentials at %s", login)
+        self.reload_counters()
 
         self.comments_handler = CommentHandler(name="consumer %s" % login)
         self.posts = PostsBalancer(self.login)
