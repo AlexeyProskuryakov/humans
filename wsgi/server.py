@@ -12,6 +12,7 @@ from flask import Flask, logging, request, render_template, session, url_for, g,
 from flask.json import jsonify
 from flask_debugtoolbar import DebugToolbarExtension
 from flask_login import LoginManager, login_user, login_required, logout_user
+
 from werkzeug.utils import redirect
 
 from wsgi.db import HumanStorage
@@ -24,22 +25,16 @@ from wsgi.rr_people.human import HumanConfiguration
 from wsgi.rr_people.posting.posts import PostsStorage
 from wsgi.rr_people.posting.posts_important import ImportantYoutubePostSupplier
 from wsgi.rr_people.posting.posts_sequence import PostsSequenceStore, PostsSequenceHandler
-from wsgi.rr_people.states.processes import ProcessDirector
 from wsgi.wake_up import WakeUp
 
 __author__ = '4ikist'
 
 import sys
-log = logging.getLogger("web")
-process_director = ProcessDirector("server")
-if not process_director.can_start_aspect("server", os.getpid()).get("started"):
-    human_orchestra = HumanOrchestra()
-    sys.exit(-1)
 
+log = logging.getLogger("web")
 
 reload(sys)
 sys.setdefaultencoding('utf-8')
-
 
 cur_dir = os.path.dirname(__file__)
 app = Flask("Humans", template_folder=cur_dir + "/templates", static_folder=cur_dir + "/static")
@@ -71,6 +66,58 @@ wu = WakeUp()
 wu.store.add_url(url)
 wu.daemon = True
 wu.start()
+
+import signal
+
+
+def signal_logger(signal, frame):
+    log.info("have signal %s" % signal)
+
+
+signals = [
+    6
+    , 14
+    , 10
+    , 20
+    , 19
+    , 7
+    , 8
+    , 1
+    , 4
+    , 29
+    , 2
+    , 23
+    , 6
+    , 9
+    , 13
+    , 27
+    , 3
+    , 11
+    , 17
+    , 12
+    , 15
+    , 5
+    , 18
+    , 21
+    , 22
+    , 16
+    , 30
+    , 31
+    , 26
+    , 28
+    , 24
+    , 25]
+
+
+def init_signals():
+    for s in signals:
+        try:
+            signal.signal(s, signal_logger)
+        except Exception as e:
+            log.info("%s: signal: %s" % (e, s))
+
+
+init_signals()
 
 
 @app.route("/wake_up/<salt>", methods=["POST"])
@@ -272,6 +319,8 @@ def human_auth_end():
     db.update_human_access_credentials_info(user.name, info)
     return render_template("authorize_callback.html", **{"user": user.name, "state": state, "info": info, "code": code})
 
+
+human_orchestra = HumanOrchestra()
 
 
 @app.route("/humans", methods=["POST", "GET"])
@@ -533,5 +582,5 @@ if __name__ == '__main__':
         try:
             app.run(port=port)
         except Exception as e:
-            log.exception(e)
             port += 1
+            print "fuck i try to: %s" % port

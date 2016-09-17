@@ -54,15 +54,17 @@ class FakeHuman(Human):
         self.action_function_params = Human.init_work_cycle()
 
     def do_post(self):
-        log.info("DO POSTING...")
         self.incr_counter(A_POST)
-        time.sleep(random.randint(0, AVG_ACTION_TIME))
+        count = random.randint(0, AVG_ACTION_TIME / 10)
+        log.info("DO POSTING...(%s)" % count)
+        time.sleep(count)
         return A_POST
 
     def do_comment_post(self, sub=None):
-        log.info("DO COMMENTING...")
         self.incr_counter(A_COMMENT)
-        time.sleep(random.randint(0, AVG_ACTION_TIME))
+        count = random.randint(0, AVG_ACTION_TIME / 10)
+        log.info("DO COMMENT...(%s)" % count)
+        time.sleep(count)
         return A_COMMENT
 
     def _humanised_comment_post(self, sub, comment_id):
@@ -70,16 +72,20 @@ class FakeHuman(Human):
         pass
 
     def do_see_post(self, post):
-        log.info("DO SEE POST %s" % post)
-        time.sleep(random.randint(0, AVG_ACTION_TIME))
+        count = random.randint(0, AVG_ACTION_TIME / 10)
+        log.info("DO SEEE POST...(%s)" % count)
+        time.sleep(count)
 
     def do_live_random(self, max_actions=100, posts_limit=500):
-        log.info("DO LIVE RANDOM %s %s" % (max_actions, posts_limit))
         if self.can_do(A_VOTE):
             self.incr_counter(A_VOTE)
         else:
             self.incr_counter(A_CONSUME)
-        time.sleep(random.randint(0,AVG_ACTION_TIME))
+        count = random.randint(0, AVG_ACTION_TIME/10)
+        log.info("DO LIVE RANDOM...(%s)" % count)
+        time.sleep(count)
+
+
 
     def load_hot_and_new(self, subreddit_name, sort=None, limit=properties.DEFAULT_LIMIT):
         return []

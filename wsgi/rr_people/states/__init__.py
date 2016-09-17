@@ -65,14 +65,6 @@ class HeartBeatTask(object):
 log = logging.getLogger("states")
 
 
-def kill_zombies():
-    command = "kill -9 `ps ajx | grep -w Z | grep -v grep | awk '{print $1}'`"
-    pipe = os.popen(command)
-    result = pipe.read()
-    log.info("KILL ZOMBIES: %s" % result)
-    pipe.close()
-
-
 def get_command_result(command):
     pipe = os.popen(command)
     text = pipe.read()
@@ -81,7 +73,6 @@ def get_command_result(command):
 
 
 def get_worked_pids():
-    kill_zombies()
 
     def get_all_pids():
         result = get_command_result("ps aux| grep %s | grep -v grep| awk '{print $2}'" % WORKED_PIDS_QUERY).split('\n')

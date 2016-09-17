@@ -1,5 +1,7 @@
+from multiprocessing import Queue
 import logging
-from multiprocessing import Process
+import os
+from threading import Thread, RLock
 
 from wsgi.db import HumanStorage
 from wsgi.properties import test_mode
@@ -7,21 +9,50 @@ from wsgi.rr_people import Singleton, S_SUSPEND, S_WORK
 from wsgi.rr_people.he import Kapellmeister, HE_ASPECT
 from wsgi.rr_people.states.entity_states import StatesHandler
 from wsgi.rr_people.states.processes import ProcessDirector
+from wsgi.rr_people.states.signals import SignalReceiver
 
 log = logging.getLogger("orchestra")
+
+HUMAN_ORCHESTRA_ASPECT = "orchestra"
 
 
 class HumanOrchestra():
     __metaclass__ = Singleton
 
-    def __init__(self, auto_start=True):
+    def __init__(self):
         self.__humans = {}
         self.db = HumanStorage(name="human orchestra")
         self.states = StatesHandler(name="human orchestra")
         self.process_director = ProcessDirector(name="human orchestra")
 
-        if auto_start:
-            Process(target=self._auto_start_humans, name="Orchestra Human Starter").start()
+        self._kappelmeisters = {}
+        self.mu = RLock()
+
+        if not self.process_director.is_aspect_worked(HUMAN_ORCHESTRA_ASPECT):
+            log.info("Will auto start humans because i am first:)")
+            self._auto_start_humans()
+            self.process_director.start_aspect(HUMAN_ORCHESTRA_ASPECT, os.getpid())
+        else:
+            log.info("Another orchestra work.")
+
+        self.childs_results = Queue()
+        Thread(target=self.kappelmeister_destruct).start()
+        log.info("Human Orchestra inited")
+
+    @property
+    def kappelmeisters(self):
+        self.mu.acquire()
+        result = self._kappelmeisters
+        self.mu.release()
+        return result
+
+    def kappelmeister_destruct(self):
+        log.info("will destruct zombies...")
+        while 1:
+            to_join = self.childs_results.get()
+            log.info("received that %s want to stop..." % to_join)
+            if to_join in self.kappelmeisters:
+                self.kappelmeisters[to_join].join()
 
     def _auto_start_humans(self):
         log.info("Will auto start humans")
@@ -33,16 +64,24 @@ class HumanOrchestra():
         self.states.set_human_state(human_name, S_SUSPEND)
 
     def start_human(self, human_name):
+        if self.process_director.is_aspect_worked(HE_ASPECT(human_name)):
+            log.warn("Trying start [%s] but he is work now" % HE_ASPECT(human_name))
+            return
+
         self.states.set_human_state(human_name, S_WORK)
         if test_mode:
             from wsgi.tests.test_human import FakeHuman, FakeRedditHandler
-            kplm = Kapellmeister(human_name,
+            kplm = Kapellmeister(human_name, self.childs_results,
                                  human_class=FakeHuman,
                                  reddit=FakeRedditHandler,
                                  reddit_class=FakeRedditHandler)
         else:
-            kplm = Kapellmeister(human_name)
+            kplm = Kapellmeister(human_name, self.childs_results)
         kplm.start()
+
+        self.mu.acquire()
+        self._kappelmeisters[kplm.pid] = kplm
+        self.mu.release()
 
     def get_human_state(self, human_name):
         human_state = self.states.get_human_state(human_name)

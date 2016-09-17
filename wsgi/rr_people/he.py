@@ -1,11 +1,13 @@
 # coding=utf-8
 import logging
+import os
 import random
 import time
 import traceback
 from datetime import datetime
 from multiprocessing.process import Process
 from multiprocessing.synchronize import Lock
+from threading import Thread
 
 import requests
 import requests.auth
@@ -25,7 +27,7 @@ from wsgi.rr_people.states.entity_states import StatesHandler
 from wsgi.rr_people.states.processes import ProcessDirector
 from os import sys
 
-from wsgi.rr_people.states.signals import SignalReceiver
+from wsgi.rr_people.states.signals import SignalReceiver, STOP_SIGNAL
 
 log = logging.getLogger("he")
 
@@ -78,13 +80,19 @@ WORK_STATE = lambda x: "%s: %s" % (S_WORK, x)
 HE_ASPECT = lambda x: "he_%s" % x
 
 
-class Kapellmeister(Process, SignalReceiver):
-    def __init__(self, name, human_class=Human, reddit=None, reddit_class=None):
+class Child():
+    def __init__(self, result_queue):
+        self.result_queue = result_queue
+
+
+class Kapellmeister(Process, SignalReceiver, Child):
+    def __init__(self, name, result_queue, human_class=Human, reddit=None, reddit_class=None, ):
         super(Kapellmeister, self).__init__()
         self.human_name = name
         self.name = "KPLM [%s]" % (self.human_name)
 
         SignalReceiver.__init__(self, self.name)
+        Child.__init__(self, result_queue)
 
         self.db = HumanStorage(name="main storage for [%s]" % name)
 
@@ -178,16 +186,18 @@ class Kapellmeister(Process, SignalReceiver):
             self.last_token_refresh_time = step
 
     def run(self):
+        log.info("kapelmiester [%s] starts..." % self.human_name)
         self.process_director.start_aspect(HE_ASPECT(self.human_name), self.pid)
 
-        log.info("start kappellmeister for [%s]" % self.human_name)
         self.last_token_refresh_time = time_hash(datetime.now())
 
         while self.can_work:
             try:
                 step = now_hash()
                 if not self._set_state(S_WORK):
-                    return
+                    log.info("state is suspend. I will stop. My pid is: %s" % self.pid)
+                    break
+
                 self.check_token_refresh(step)
 
                 action, force = self.decide(step)
@@ -213,6 +223,11 @@ class Kapellmeister(Process, SignalReceiver):
                 log.exception(e)
                 self.db.store_error(self.human_name, e, " ".join(traceback.format_tb(tb)))
                 time.sleep(10)
+
+        self.end()
+
+    def end(self):
+        self.result_queue.put(self.pid)
 
     def decide(self, step):
         politic = self.db.get_human_post_politic(self.human_name)

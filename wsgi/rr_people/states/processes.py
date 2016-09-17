@@ -39,7 +39,7 @@ class ProcessDirector(object):
 
     def is_aspect_worked(self, aspect):
         aspect_pid = self.redis.get(PREFIX(aspect))
-        return aspect_pid in get_worked_pids()
+        return int(aspect_pid) in get_worked_pids()
 
     def can_start_aspect(self, aspect, pid):
         """
@@ -65,16 +65,15 @@ class ProcessDirector(object):
 
     def start_aspect(self, aspect, pid):
         with self.mutex:
-            result = self.redis.setnx(PREFIX(aspect), pid)
-            if not result:
-                stored_pid = int(self.redis.get(PREFIX(aspect)))
-                log.info("for %s will stop another processes (%s) and store %s" % (aspect, stored_pid, pid))
+            aspect_pid_raw = self.redis.get(PREFIX(aspect))
+            if aspect_pid_raw:
+                stored_pid = int(aspect_pid_raw)
                 if stored_pid in get_worked_pids():
+                    log.info("will kill stored pid: %s", stored_pid)
                     os.kill(stored_pid, STOP_SIGNAL)
 
+            log.info("will store new pid %s [%s]" % (aspect, pid))
             self._store_aspect_pid(aspect, pid)
-
-
 
     def get_state(self, aspect):
         pid_raw = self.redis.get(PREFIX(aspect))
