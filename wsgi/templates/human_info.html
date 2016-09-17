@@ -249,9 +249,9 @@
                                 <button class="btn btn-sm btn-danger" onclick="clear_statistic('{{human_name}}')">
                                     Почистить
                                 </button>
-                                {%if "last_clear" in human_stat%}
+                                {% if "last_clear" in human_stat %}
                                 <small>Последний раз чистили: {{human_stat['last_clear'] | tst_to_dt }}</small>
-                                {{%endif%}}
+                                {% endif %}
                             </h3>
                         </div>
 
