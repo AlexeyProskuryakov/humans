@@ -39,7 +39,7 @@ class ProcessDirector(object):
 
     def is_aspect_worked(self, aspect):
         aspect_pid = self.redis.get(PREFIX(aspect))
-        if aspect is not None:
+        if aspect_pid is not None:
             return int(aspect_pid) in get_worked_pids()
         else:
             return False
