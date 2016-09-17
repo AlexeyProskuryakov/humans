@@ -9,7 +9,7 @@ from wsgi.rr_people import Singleton, S_SUSPEND, S_WORK
 from wsgi.rr_people.he import Kapellmeister, HE_ASPECT
 from wsgi.rr_people.states.entity_states import StatesHandler
 from wsgi.rr_people.states.processes import ProcessDirector
-from wsgi.rr_people.states.signals import SignalReceiver
+
 
 log = logging.getLogger("orchestra")
 
@@ -49,7 +49,12 @@ class HumanOrchestra():
     def kappelmeister_destruct(self):
         log.info("will destruct zombies...")
         while 1:
-            to_join = self.childs_results.get()
+            try:
+                to_join = self.childs_results.get()
+            except Exception as e:
+                log.info("Queue is broken")
+                return
+
             log.info("received that %s want to stop..." % to_join)
             if to_join in self.kappelmeisters:
                 self.kappelmeisters[to_join].join()

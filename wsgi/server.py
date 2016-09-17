@@ -67,59 +67,6 @@ wu.store.add_url(url)
 wu.daemon = True
 wu.start()
 
-import signal
-
-
-def signal_logger(signal, frame):
-    log.info("have signal %s" % signal)
-
-
-signals = [
-    6
-    , 14
-    , 10
-    , 20
-    , 19
-    , 7
-    , 8
-    , 1
-    , 4
-    , 29
-    , 2
-    , 23
-    , 6
-    , 9
-    , 13
-    , 27
-    , 3
-    , 11
-    , 17
-    , 12
-    , 15
-    , 5
-    , 18
-    , 21
-    , 22
-    , 16
-    , 30
-    , 31
-    , 26
-    , 28
-    , 24
-    , 25]
-
-
-def init_signals():
-    for s in signals:
-        try:
-            signal.signal(s, signal_logger)
-        except Exception as e:
-            log.info("%s: signal: %s" % (e, s))
-
-
-init_signals()
-
-
 @app.route("/wake_up/<salt>", methods=["POST"])
 def wake_up(salt):
     return jsonify(**{"result": salt})
