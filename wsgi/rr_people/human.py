@@ -97,8 +97,6 @@ class Human(RedditHandler):
         if not login_credentials:
             raise Exception("Can not have login credentials at %s", login)
 
-        self.reload_counters()
-
         self.comments_handler = CommentHandler(name="consumer %s" % login)
         self.posts = PostsBalancer(self.login)
 
@@ -107,6 +105,8 @@ class Human(RedditHandler):
         self.subscribed_subreddits = set(human_configuration.get("ss", [])) or set()
         self.friends = set(human_configuration.get("frds", [])) or set()
         self.last_friend_add = human_configuration.get("last_friend_add") or time.time() - WEEK
+
+        self.reload_counters()
 
         self.init_engine(login_credentials)
         log.info("MY [%s] WORK CYCLE: %s" % (self.name, self.counters_thresholds))
