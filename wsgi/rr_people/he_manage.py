@@ -21,7 +21,7 @@ class HumanOrchestra():
     def __init__(self):
         self.__humans = {}
         self.db = HumanStorage(name="human orchestra")
-        self.states = StatesHandler(name="human orchestra")
+        self.states = StatesHandler(name="human orchestra", hs=self.db)
         self.process_director = ProcessDirector(name="human orchestra")
 
         self.childs_results = Queue()

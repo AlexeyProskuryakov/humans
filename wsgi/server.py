@@ -46,7 +46,7 @@ app.config['SESSION_TYPE'] = 'filesystem'
 def tst_to_dt(value):
     dt_format = "%H:%M:%S"
     dt = datetime.fromtimestamp(value)
-    if (datetime.now()-dt).days > 1:
+    if (datetime.now() - dt).days > 1:
         dt_format += " %d.%m.%Y"
     return dt.strftime(dt_format)
 
@@ -324,6 +324,7 @@ def humans_info(name):
             db.set_human_live_configuration(name, config)
 
     human_log = db.get_log_of_human(name, 100)
+    human_state_log = db.get_human_state_log(name)
     stat = db.get_human_statistics(name)
 
     human_cfg = db.get_human_config(name)
@@ -336,6 +337,7 @@ def humans_info(name):
     return render_template("human_info.html", **{"human_name": name,
                                                  "human_stat": stat,
                                                  "human_log": human_log,
+                                                 "human_state_log": human_state_log,
                                                  "human_live_state": human_state,
                                                  "subs": human_cfg.get("subs", []),
                                                  "config": human_cfg.get("live_config") or HumanConfiguration().data,
@@ -354,6 +356,7 @@ def humans_info(name):
                                                  "ae_groups": AE_GROUPS,
 
                                                  "errors": errors,
+
                                                  })
 
 
@@ -567,4 +570,3 @@ if __name__ == '__main__':
         except Exception as e:
             port += 1
             print "fuck i try to: %s" % port
-

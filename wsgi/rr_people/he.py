@@ -98,7 +98,7 @@ class Kapellmeister(Process, SignalReceiver, Child):
         self.psh = PostsSequenceHandler(human=self.human_name, hs=self.db, ae_store=self.ae._storage)
         self.human = human_class(login=name, db=self.db, reddit=reddit, reddit_class=reddit_class or Reddit)
 
-        self.states_handler = StatesHandler(name="kplmtr of [%s]" % name)
+        self.states_handler = StatesHandler(name="kplmtr of [%s]" % name, hs=self.db)
         self.process_director = ProcessDirector(name="kplmtr of [%s] " % name)
 
         self.lock = Lock()

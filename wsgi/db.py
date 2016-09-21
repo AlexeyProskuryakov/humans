@@ -280,7 +280,7 @@ class HumanStorage(DBHandler):
         return result
 
     def get_human_counters(self, name):
-        counters =  self.human_config.find_one({"user": name}, projection={"counters": 1, "_id":False})
+        counters = self.human_config.find_one({"user": name}, projection={"counters": 1, "_id": False})
         if counters:
             return counters.get("counters")
 
@@ -326,7 +326,7 @@ class HumanStorage(DBHandler):
         self.human_statistic.update_one({"human_name": human_name}, {"$inc": {action_name: inc}}, upsert=True)
 
     def get_log_of_human(self, human_name, limit=None):
-        res = self.human_log.find({"human_name": human_name}).sort("time", -1)
+        res = self.human_log.find({"human_name": human_name, "action": {"$exists": True}}).sort("time", -1)
         if limit:
             res = res.limit(limit)
         return list(res)
@@ -347,9 +347,20 @@ class HumanStorage(DBHandler):
         self.clear_errors(name)
         self.human_statistic.delete_many({"human_name": name})
 
+    def set_human_state_log(self, name, from_state, to_state):
+        self.human_log.insert_one(
+            {"human_name": name, "from_state": from_state, "to_state": to_state, "time": time.time()})
+
+    def get_human_state_log(self, name):
+        return list(self.human_log.find({"human_name": name,
+                                         "from_state": {"$exists": True},
+                                         "to_state": {"$exists": True}
+                                         }).sort("time", -1))
+
     def get_last_actions(self, name, action_type, since=WEEK):
-        return list(
-            self.human_log.find({"human_name": name, "action": action_type, "time": {"$gte": time.time() - since}}))
+        return list(self.human_log.find({"human_name": name,
+                                         "action": action_type,
+                                         "time": {"$gte": time.time() - since}}))
 
     #######################USERS
     def add_user(self, name, pwd, uid):

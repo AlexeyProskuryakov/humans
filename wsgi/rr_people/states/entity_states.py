@@ -3,6 +3,7 @@ import logging
 
 import redis
 
+from wsgi.db import HumanStorage
 from wsgi.properties import states_redis_address, states_redis_port, states_redis_password, redis_max_connections
 from wsgi.rr_people import S_STOP
 
@@ -18,7 +19,7 @@ log = logging.getLogger("states")
 
 
 class StatesHandler(object):
-    def __init__(self, name="?", clear=False, max_connections=redis_max_connections):
+    def __init__(self, name="?", clear=False, max_connections=redis_max_connections, hs=None):
         self.redis = redis.StrictRedis(host=states_redis_address,
                                        port=states_redis_port,
                                        password=states_redis_password,
@@ -29,36 +30,18 @@ class StatesHandler(object):
         if clear:
             self.redis.flushdb()
 
+        self.db = hs or HumanStorage("states handler %s"%name)
         log.info("States handler inited for [%s]" % name)
 
-    def set_posts_generator_state(self, sbrdt, state, ex=None):
-        pipe = self.redis.pipeline()
-        pipe.hset(HASH_STATES_PG, sbrdt, state)
-        pipe.set(STATE_PG(sbrdt), state, ex=ex or 3600)
-        pipe.execute()
-
-    def get_posts_generator_state(self, sbrdt):
-        return self.redis.get(STATE_PG(sbrdt))
-
-    def remove_post_generator(self, sbrdt):
-        pipe = self.redis.pipeline()
-        pipe.hdel(HASH_STATES_PG, sbrdt)
-        pipe.delete(STATE_PG(sbrdt))
-        pipe.execute()
-
-    def get_posts_generator_states(self):
-        result = self.redis.hgetall(HASH_STATES_PG)
-        for k, v in result.iteritems():
-            ks = self.get_posts_generator_state(k)
-            if v is None or ks is None:
-                result[k] = S_STOP
-        return result
-
     def set_human_state(self, human_name, state):
+        old_state = self.get_human_state(human_name)
+        self.db.set_human_state_log(human_name, old_state, state)
+
         pipe = self.redis.pipeline()
         pipe.hset(HUMAN_STATES, human_name, state)
         pipe.set(HUMAN_STATE(human_name), state)
         pipe.execute()
+
 
     def get_human_state(self, human_name):
         state = self.redis.get(HUMAN_STATE(human_name))

@@ -208,25 +208,60 @@
         <div class="col-md-6">
             <div class="row">
                 <h2>Information of <big id="human-name">{{human_name}}</big>
-                    <br>
-                    <small id="human-live-state">{{human_live_state['human_state']}} [process:
-                        {{human_live_state['process_state']}}]
-                    </small>
                 </h2>
+                <div class="accordion" id="states-log-accordion">
+                    <div class="accordion-group">
+                        <div class="accordion-heading">
+                            <h2>
+                                <a class="accordion-toggle" data-toggle="collapse" data-parent="#states-log-accordion"
+                                   href="#states-log">
+                                    <small id="human-live-state">{{human_live_state['human_state']}} [process:
+                                        {{human_live_state['process_state']}}]
+                                    </small>
+
+                                </a></h2>
+
+                        </div>
+                        <div id="states-log" class="accordion-body collapse">
+                            <div class="accordion-inner">
+                                <table class="table table-striped">
+                                    <tbody>
+                                    {%for state in human_state_log%}
+                                    <tr>
+                                        <td>{{human_state_log | length - loop.index}}</td>
+                                        <td>{{state.from_state}}</td>
+                                        <td> &gt </td>
+                                        <td>{{state.to_state}}</td>
+                                        <td>
+                                            {{state.time | tst_to_dt}}
+                                        </td>
+                                    </tr>
+                                    {%endfor%}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+
                 <div class="counters">
                     {%for name, count in counters_percents.items()%}
                     <div class="counter {%if name=='post' and politic == 'work_hard' %} more-opacity {%endif%}">
                         {{name}}
 
                         <div class="progress">
-                            <div id = "{{name}}-result" class="progress-bar progress-bar-success progress-bar-striped active"
+                            <div id="{{name}}-result"
+                                 class="progress-bar progress-bar-success progress-bar-striped active"
                                  role="progressbar"
                                  aria-valuenow="{{ count }}" aria-valuemin="0" aria-valuemax="100"
                                  style="width:{{count}}%">
                                 {{counters[name]}} ({{count}}%)
                             </div>
-                        </div><div class="progress">
-                            <div id = "{{name}}-threshold" class="progress-bar progress-bar-danger progress-bar-striped" role="progressbar"
+                        </div>
+                        <div class="progress">
+                            <div id="{{name}}-threshold" class="progress-bar progress-bar-danger progress-bar-striped"
+                                 role="progressbar"
                                  aria-valuenow="{{ counters_threshold[name] }}" aria-valuemin="0" aria-valuemax="100"
                                  style="width:{{counters_threshold[name]}}%">
                                 {{counters_threshold[name]}} %
@@ -235,7 +270,8 @@
                         </div>
                     </div>
                     {%endfor%}
-                    <button class="btn btn-info btn-sm" onclick="recreate_counters('{{human_name}}')">Перезагрузить</button>
+                    <button class="btn btn-info btn-sm" onclick="recreate_counters('{{human_name}}')">Перезагрузить
+                    </button>
                 </div>
 
                 <div class="accordion" id="info-accordion">
@@ -257,7 +293,7 @@
 
                         <div id="statistic" class="accordion-body collapse in">
                             <div class="accordion-inner">
-                                <table class="table table-stripped">
+                                <table class="table table-striped">
                                     {%if human_stat %}
                                     {% for k,v in human_stat.iteritems() %}
                                     {% if k != 'last_clear'%}
@@ -428,6 +464,8 @@
             refresh_counters('{{human_name}}');
         }, 60000);
     });
+
+
 
 
 
