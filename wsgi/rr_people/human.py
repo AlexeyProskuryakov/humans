@@ -486,7 +486,7 @@ class Human(RedditHandler):
         post_data = self.posts.start_post()
         if not post_data:
             log.warn("no posts for me [%s] :(" % self.name)
-            return PS_NO_POSTS
+            raise Exception("For %s is %s"%(self.name, PS_NO_POSTS))
 
         post = PostSource.from_dict(post_data)
         while 1:

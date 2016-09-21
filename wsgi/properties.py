@@ -27,7 +27,7 @@ sh = logging.StreamHandler()
 sh.setFormatter(formatter)
 logger.addHandler(sh)
 
-fh = logging.FileHandler(os.path.join(module_path(), "humans.log"))
+fh = logging.FileHandler(os.path.join(module_path(), "humans.log"), mode="w")
 fh.setFormatter(formatter)
 logger.addHandler(fh)
 
