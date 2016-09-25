@@ -69,17 +69,16 @@ def generate_sequence_days_metadata(n_min, n_max=None, iterations_count=10, coun
 
 
 class PostsSequence(object):
-    def __init__(self, data, store):
+    def __init__(self, data):
         self.human = data.get('human')
+
         self.right = data.get('right')
         self.left = data.get('left', [])
-        self.middle = data.get('middle', [])
+
         self.prev_time = data.get('prev_time')
-        self.generate_time = data.get("time")
+        self.generate_time = data.get("generate_time")
 
         self.metadata = data.get("metadata")
-
-        self.__store = store
 
     def to_dict(self):
         result = {}
@@ -88,36 +87,12 @@ class PostsSequence(object):
                 result[k] = v
         return result
 
-    def can_post(self, cur_time):
-        self._accumulate_posts_between(cur_time)
-        log.info("post %s <-> %s" % (hash_info(self.prev_time), hash_info(cur_time)))
-        return len(self.middle) != 0
+    def is_have_elements_between_prev_time_and(self, cur_time):
+        if len(self.find_posts_between(cur_time)) > 0:
+            self.prev_time = cur_time
+            return True
 
-    def accept_post(self):
-        if len(self.middle) != 0:
-            post = self.middle.pop(0)
-            self.left.append(post)
-            self._remove_from_middle(post)
-        else:
-            log.warning("accept post when middle is empty :(")
-
-    def _remove_from_middle(self, post):
-        self.__store.posts_sequence.update_one({"human": self.human}, {"$pop": {"middle": -1}, "$push": {'left': post}})
-
-    def _update_sequence_middle_state(self):
-        self.__store.posts_sequence.update_one({"human": self.human},
-                                               {"$set": {"middle": self.middle,
-                                                         "right": self.right,
-                                                         "prev_time": self.prev_time}})
-
-    def _store_prev_time(self):
-        self.__store.posts_sequence.update_one({"human": self.human}, {"$set": {"prev_time": self.prev_time}})
-
-    def _accumulate_posts_between(self, cur_time):
-        if self.prev_time is None:
-            self.prev_time = cur_time - AVG_ACTION_TIME
-            self._store_prev_time()
-
+    def find_posts_between(self, cur_time):
         start, stop = None, None
         for i, post_time in enumerate(self.right):
             if post_time <= cur_time and post_time >= self.prev_time:
@@ -127,15 +102,17 @@ class PostsSequence(object):
                     stop = i
 
         if start is None:
-            return
+            log.info("Not found posts in [%s .. %s]" % (self.prev_time, cur_time))
+            return []
 
         if stop is None:
             stop = start + 1
 
-        self.middle.extend(self.right[start:stop])
+        found = self.right[start:stop]
+        log.info("Found %s posts in [%s .. %s]" % (len(found), self.prev_time, cur_time))
+        self.left.extend(found)
         self.right = self.right[:start] + self.right[stop:]
-        self.prev_time = cur_time
-        self._update_sequence_middle_state()
+        return found
 
     def is_end(self):
         return len(self.right) == 0
@@ -152,24 +129,24 @@ class PostsSequenceStore(DBHandler):
         else:
             self.posts_sequence = self.db.get_collection(self.coll_name)
 
-    def set_posts_sequence_data(self, human, sequence_metadata, sequence_data):
+    def add_posts_sequence_initial_state(self, human, sequence_metadata, sequence_data):
         return self.posts_sequence.update_one({"human": human},
                                               {"$set": {"metadata": sequence_metadata,
                                                         "right": sequence_data,
-                                                        "time": time.time(),
-                                                        },
-                                               "$unset": {
-                                                   "middle": 1,
-                                                   "left": 1,
-                                                   "prev_time": 1
-
-                                               }},
+                                                        "generate_time": time.time(),
+                                                        "middle": [],
+                                                        "left": [],
+                                                        "prev_time": time_hash(datetime.now())
+                                                        }},
                                               upsert=True)
 
     def get_posts_sequence(self, human):
         result = self.posts_sequence.find_one({"human": human})
         if result:
-            return PostsSequence(result, store=self)
+            return PostsSequence(result)
+
+    def update_post_sequence(self, sequence):
+        self.posts_sequence.update_one({"human": sequence.human}, {"$set": sequence.to_dict()})
 
 
 class PostsSequenceHandler(object):
@@ -182,8 +159,7 @@ class PostsSequenceHandler(object):
         self.hs = hs or HumanStorage(self.name)
         self.ae_group = ae_group or self.hs.get_ae_group(self.human)
 
-        self._sequence_cache = None
-        self._sequence_cache_time = None
+        self.sequence = None
 
     def __evaluate_posts_time_sequence(self, min_posts, max_posts=None, iterations_count=10, current_datetime=None):
         '''
@@ -273,7 +249,7 @@ class PostsSequenceHandler(object):
                           {"min_posts": DEFAULT_MIN_POSTS_COUNT}
 
         data, metadata = self.__evaluate_posts_time_sequence(**sequence_config)
-        self.ps_store.set_posts_sequence_data(self.human, metadata, data)
+        self.ps_store.add_posts_sequence_initial_state(self.human, metadata, data)
         return self.ps_store.get_posts_sequence(self.human)
 
     def _get_sequence(self):
@@ -288,11 +264,9 @@ class PostsSequenceHandler(object):
     def is_post_time(self, date_hash=None):
         date_hash = date_hash if date_hash is not None else time_hash(datetime.now())
         sequence = self._get_sequence()
-        return sequence.can_post(date_hash)
-
-    def accept_post(self):
-        sequence = self._get_sequence()
-        sequence.accept_post()
+        if sequence.is_have_elements_between_prev_time_and(date_hash):
+            self.ps_store.update_post_sequence(sequence)
+            return True
 
 
 if __name__ == '__main__':

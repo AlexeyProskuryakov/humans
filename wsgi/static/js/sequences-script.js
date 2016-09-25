@@ -53,11 +53,6 @@ function show_sequences(human_name, withLoader){
                 data.push({color:"black", points:points_cfg, data:real_posted, label:"Real passed"});
             }
 
-            var candidates = result["candidates"];
-            if (candidates != undefined){
-                data.push({color:"cyan", points:points_cfg, data:candidates, label:"In buffer"});
-            }
-
             var current_point_data = result['current'];
             if (current_point_data != undefined){
                 var current_point = {

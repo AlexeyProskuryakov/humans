@@ -489,7 +489,6 @@ def sequences(name):
     if posts_sequence:
         real_posted = map(lambda x: [get_point_x(time_hash(datetime.fromtimestamp(x.get("time")))), p_y - 0.25, 1, 1],
                           db.get_last_actions(name, A_POST))
-        candidates = map(lambda x: [get_point_x(x), p_y, 1, 1], [int(x) for x in posts_sequence.middle])
         posts = map(lambda x: [get_point_x(x), p_y, 1, 1], [int(x) for x in posts_sequence.right])
         passed_posts = map(lambda x: [get_point_x(x), p_y, 1, 1], [int(x) for x in posts_sequence.left])
 
@@ -499,7 +498,6 @@ def sequences(name):
             "posts": posts,
             "posts_passed": passed_posts,
             "real": real_posted,
-            "candidates": candidates,
             'metadata': "By days: %s; All: %s; Time prev: %s; Generate time: %s" % (
                 posts_sequence.metadata,
                 sum(posts_sequence.metadata),

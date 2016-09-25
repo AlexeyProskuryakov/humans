@@ -136,10 +136,8 @@ class Kapellmeister(Process, SignalReceiver, Child):
     def wait_after_last(self, what, randomise=False):
         time_to_post = time.time() - self._get_previous_post_time(what)
         after = MIN_TIMES_BETWEEN.get(what) - time_to_post
-        log.info("[%s] waiting after last %s is %s random?: %s" % (self.human_name, what, after, randomise))
-        if after < 0:
-            self.check_state(WORK_STATE(what))
-        else:
+        if after > 0:
+            log.info("[%s] waiting after last %s is %s random?: %s" % (self.human_name, what, after, randomise))
             if randomise:
                 after += random.randint(0, int(after / 2))
 
@@ -165,12 +163,12 @@ class Kapellmeister(Process, SignalReceiver, Child):
 
         if not produce:
             if self.human.can_do(A_CONSUME):
-                log.info("[%s] will consuming")
+                log.info("[%s] will consuming" % self.human_name)
                 self.check_state(WORK_STATE("live random"))
                 self.human.do_live_random(max_actions=random.randint(5, 20), posts_limit=random.randint(25, 50))
                 action_result = A_CONSUME
             else:
-                log.info("[%s] will decrementing counters and caching warming up")
+                log.info("[%s] will decrementing counters and caching warming up" % self.human_name)
                 self.check_state(WORK_STATE("sleeping because can not consume"))
                 self.human.decr_counter(A_POST)
                 self.human.decr_counter(A_COMMENT)

@@ -101,7 +101,7 @@ def test_kapelmeister():
     db = HumanStorage()
     db.update_human_access_credentials_info(user, {"scope": ["read"], "access_token": "foo", "refresh_token": "bar"})
 
-    kplm = Kapellmeister(user, human_class=FakeHuman, reddit=FakeRedditHandler, reddit_class=FakeRedditHandler)
+    kplm = Kapellmeister(user, None, human_class=FakeHuman, reddit=FakeRedditHandler, reddit_class=FakeRedditHandler)
     kplm.psh.evaluate_new()
 
     sleep = 0
