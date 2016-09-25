@@ -54,20 +54,17 @@ class FakeHuman(Human):
         self.counters_thresholds = self.calculate_counters()
 
     def do_post(self):
-        self.incr_counter(A_POST)
-        self.db.update_human_internal_state(self.name, state=self.state)
         count = random.randint(0, AVG_ACTION_TIME / 10)
         log.info("DO POSTING...(%s)" % count)
         time.sleep(count)
+        self.register_step(A_POST)
         return A_POST
 
     def do_comment_post(self, sub=None):
-        self.incr_counter(A_COMMENT)
-        self.db.update_human_internal_state(self.name, state=self.state)
         count = random.randint(0, AVG_ACTION_TIME / 10)
         log.info("DO COMMENT...(%s)" % count)
         time.sleep(count)
-
+        self.register_step(A_COMMENT)
         return A_COMMENT
 
     def _humanised_comment_post(self, sub, comment_id):
@@ -79,12 +76,13 @@ class FakeHuman(Human):
         log.info("DO SEEE POST...(%s)" % count)
         time.sleep(count)
 
+
     def do_live_random(self, max_actions=100, posts_limit=500):
         if self.can_do(A_VOTE):
-            self.incr_counter(A_VOTE)
+            self.register_step(A_VOTE)
         else:
-            self.incr_counter(A_CONSUME)
-        self.db.update_human_internal_state(self.name, state=self.state)
+            self.register_step(A_CONSUME)
+
         count = random.randint(0, AVG_ACTION_TIME / 10)
         log.info("DO LIVE RANDOM...(%s)" % count)
         time.sleep(count)

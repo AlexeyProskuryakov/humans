@@ -94,9 +94,9 @@ POLITICS = [POLITIC_WORK_HARD, POLITIC_FREE_LIFE]
 DEFAULT_LIMIT = 500
 # DEFAULT_LIMIT = 20
 
-counters_thresholds = {"consuming": {"min": 80, "max": 90},
+default_counters_thresholds = {"consuming": {"min": 80, "max": 90},
                        "voting": {"min": 80, "max": 85}
-                       }
+                               }
 # max_consuming = 90
 # min_consuming = 80
 #

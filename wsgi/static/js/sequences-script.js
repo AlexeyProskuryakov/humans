@@ -94,7 +94,7 @@ function show_sequences(human_name, withLoader){
                         zoom: {
                             interactive: true,
                             trigger: "dblclick", // or "click" for single click
-		                    amount: 1.1,         // 2 = 200% (zoom in), 0.5 = 50% (zoom out)
+		                    amount: 1.5,         // 2 = 200% (zoom in), 0.5 = 50% (zoom out)
                         },
                         pan: {
                             interactive: true,
@@ -105,7 +105,7 @@ function show_sequences(human_name, withLoader){
                             mode: "time",
                             minTickSize: [1, "minute"],
                             min: getInitTimestamp(),
-                            max: getInitTimestamp() + week,
+                            max: getInitTimestamp() + week + hour * 5,
                             timeformat: "%a %H:%M"
                         },
                         yaxis:{
