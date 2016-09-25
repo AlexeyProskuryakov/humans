@@ -111,7 +111,6 @@ class Human(RedditHandler):
         self.init_engine(login_credentials)
         log.info("MY [%s] WORK CYCLE: %s" % (self.name, self.counters_thresholds))
 
-
         # todo this cache must be persisted at mongo or another
         self._used = set()
         self.cache_last_loads = {}
@@ -372,13 +371,16 @@ class Human(RedditHandler):
         return max_wait_time
 
     def do_comment_post(self, sub=None):
-        sub_ = sub or random.choice(self.db.get_subs_of_human(self.login))
-        comment_id = self.comments_handler.pop_comment_id(sub)
+        _sub = sub or random.choice(self.db.get_subs_of_human(self.login))
+        comment_id = self.comments_handler.pop_comment_id(_sub)
+        log.info("[%s] comment id: %s" % (self.login, comment_id))
         if not comment_id:
-            log.info("Need comment for %s" % sub_)
-            self.comments_handler.need_comment(sub_)
+            log.info("[%s] need comment for %s" % (self.login, _sub))
+            self.comments_handler.need_comment(_sub)
         else:
-            result = self._humanised_comment_post(sub_, comment_id)
+            log.info("[%s] comment: %s" % (self.login, comment_id))
+            result = self._humanised_comment_post(_sub, comment_id)
+            log.info("[%s] comment result: %s" % (self.login, result))
             return result
 
     def _humanised_comment_post(self, sub, comment_id):
@@ -401,7 +403,7 @@ class Human(RedditHandler):
             except Exception as e:
                 log.warning("can not getting submission [%s %s], because: %s" % (comment_id, post_fullname, e.message))
                 log.exception(e)
-                return
+                return PS_ERROR
         else:
             log.info("post [%s] for comment is present at hot and new and will posting")
             self._load_configuration()
@@ -486,7 +488,7 @@ class Human(RedditHandler):
         post_data = self.posts.start_post()
         if not post_data:
             log.warn("no posts for me [%s] :(" % self.name)
-            raise Exception("For %s is %s"%(self.name, PS_NO_POSTS))
+            raise Exception("For %s is %s" % (self.name, PS_NO_POSTS))
 
         post = PostSource.from_dict(post_data)
         while 1:

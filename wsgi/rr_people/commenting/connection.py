@@ -37,22 +37,10 @@ class CommentsStorage(DBHandler):
         else:
             self.comments = self.db.get_collection(_comments)
 
-        self.remover_stop = False
-        self.remover = Process(target=self._remove_old)
-        self.remover.start()
-
         self.mutex = RLock()
 
     def __del__(self):
         self.remover_stop = True
-
-    def _remove_old(self):
-        while 1:
-            if self.remover_stop: break
-            time.sleep(3600)
-            result = self.comments.delete_many({"time": {"$lte": time.time() - TIME_TO_COMMENT_SPOILED}})
-            if result.deleted_count != 0:
-                log.info("old comments removed %s, ok? %s" % (result.deleted_count, result.acknowledged))
 
     def _clear(self):
         try:
@@ -158,3 +146,5 @@ class CommentHandler(CommentsStorage, CommentRedisQueue):
                 result = self.check_comment_id(comment_id)
                 if result == CS_READY_FOR_COMMENT:
                     return comment_id
+            else:
+                return

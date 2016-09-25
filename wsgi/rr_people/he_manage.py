@@ -33,7 +33,7 @@ class HumanOrchestra():
             self._auto_start_humans()
             self.process_director.start_aspect(HUMAN_ORCHESTRA_ASPECT, os.getpid())
         else:
-            log.info("Another orchestra work.")
+            log.info("Another orchestra autostarted humans.")
 
         Thread(target=self.kappelmeister_destruct).start()
         log.info("Human Orchestra inited")
@@ -46,7 +46,6 @@ class HumanOrchestra():
         return result
 
     def kappelmeister_destruct(self):
-        log.info("will destruct zombies...")
         while 1:
             try:
                 to_join = self.childs_results.get()

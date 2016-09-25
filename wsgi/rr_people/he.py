@@ -121,7 +121,7 @@ class Kapellmeister(Process, SignalReceiver, Child):
             self.human.reload_counters()
 
         self.states_handler.set_human_state(self.human_name, new_state)
-        log.info("%s now state %s" % (self.human_name, new_state))
+        log.info("[%s] now is %s" % (self.human_name, new_state))
         return True
 
     def _get_previous_post_time(self, action):
@@ -136,6 +136,7 @@ class Kapellmeister(Process, SignalReceiver, Child):
     def wait_after_last(self, what, randomise=False):
         time_to_post = time.time() - self._get_previous_post_time(what)
         after = MIN_TIMES_BETWEEN.get(what) - time_to_post
+        log.info("[%s] waiting after last %s is %s random?: %s" % (self.human_name, what, after, randomise))
         if after < 0:
             self.check_state(WORK_STATE(what))
         else:
@@ -143,32 +144,33 @@ class Kapellmeister(Process, SignalReceiver, Child):
                 after += random.randint(0, int(after / 2))
 
             self.check_state(WORK_STATE("%s after %s" % (what, after)))
+            log.info("[%s] will wait: %s" % (self.human_name, after))
             time.sleep(after)
 
     def do_action(self, action, force=False):
         produce = False
         if action == A_COMMENT and self.human.can_do(A_COMMENT):
             self.wait_after_last(A_COMMENT, randomise=True)
-
+            log.info("[%s] will commenting" % self.human_name)
             comment_result = self.human.do_comment_post()
             if comment_result == A_COMMENT:
                 produce = True
 
         elif action == A_POST and (self.human.can_do(A_POST) or force):
             self.wait_after_last(A_POST)
-
+            log.info("[%s] will posting" % self.human_name)
             post_result = self.human.do_post()
             if post_result == A_POST:
                 produce = True
 
-            self.psh.accept_post()
-
         if not produce:
             if self.human.can_do(A_CONSUME):
+                log.info("[%s] will consuming")
                 self.check_state(WORK_STATE("live random"))
                 self.human.do_live_random(max_actions=random.randint(5, 20), posts_limit=random.randint(25, 50))
                 action_result = A_CONSUME
             else:
+                log.info("[%s] will decrementing counters and caching warming up")
                 self.check_state(WORK_STATE("sleeping because can not consume"))
                 self.human.decr_counter(A_POST)
                 self.human.decr_counter(A_COMMENT)

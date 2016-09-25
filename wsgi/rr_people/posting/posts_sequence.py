@@ -129,7 +129,7 @@ class PostsSequence(object):
         if start is None:
             return
 
-        if not stop:
+        if stop is None:
             stop = start + 1
 
         self.middle.extend(self.right[start:stop])
