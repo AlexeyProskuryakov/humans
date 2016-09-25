@@ -16,7 +16,8 @@ from flask_login import LoginManager, login_user, login_required, logout_user
 from werkzeug.utils import redirect
 
 from wsgi.db import HumanStorage
-from wsgi.properties import want_coefficient_max, WEEK, AE_GROUPS, AE_DEFAULT_GROUP, POLITICS, default_counters_thresholds, DAY
+from wsgi.properties import want_coefficient_max, WEEK, AE_GROUPS, AE_DEFAULT_GROUP, POLITICS, \
+    default_counters_thresholds, DAY
 from wsgi.rr_people import A_POST, S_RELOAD_COUNTERS
 from wsgi.rr_people.ae import AuthorsStorage, time_hash, hash_info
 from wsgi.rr_people.commenting.connection import CommentHandler
@@ -51,12 +52,17 @@ def tst_to_dt(value):
     return dt.strftime(dt_format)
 
 
+def dt_now():
+    return tst_to_dt(time.time())
+
+
 def array_to_string(array):
     return " ".join([str(el) for el in array])
 
 
 app.jinja_env.filters["tst_to_dt"] = tst_to_dt
 app.jinja_env.globals.update(array_to_string=array_to_string)
+app.jinja_env.globals.update(dt_now=dt_now())
 
 if os.environ.get("test", False):
     log.info("will run at test mode")
@@ -70,6 +76,11 @@ wu = WakeUp()
 wu.store.add_url(url)
 wu.daemon = True
 wu.start()
+
+
+@app.route("/time-now")
+def time_now():
+    return dt_now()
 
 
 @app.route("/wake_up/<salt>", methods=["POST"])
@@ -407,7 +418,8 @@ def human_set_threshold_counters(name):
     data = json.loads(request.data)
     counters_thresh = {
         "consuming": {"min": int(data.get("consuming", {}).get("max", default_counters_thresholds["consuming"]["max"])),
-                      "max": int(data.get("consuming", {}).get("min", default_counters_thresholds["consuming"]["min"]))},
+                      "max": int(
+                          data.get("consuming", {}).get("min", default_counters_thresholds["consuming"]["min"]))},
         "voting": {"min": int(data.get("voting", {}).get("max", default_counters_thresholds["voting"]["max"])),
                    "max": int(data.get("voting", {}).get("min", default_counters_thresholds["voting"]["min"]))},
     }

@@ -47,6 +47,9 @@
             <div class="col-md-8 col-md-offset-3">
                 <h1 class="green">FUCKING HUMAN MANAGEMENT</h1>
             </div>
+            <div class="col-md-1">
+                <h5><small id="time-now">{{dt_now}}</small></h5>
+            </div>
         </div>
         <div class="row">
             <div class="col-md-6 col-md-offset-3">
@@ -56,7 +59,18 @@
             </div>
         </div>
     </div>
+    <script>
+        setInterval(function() {
+            $.ajax({
+                url:"/time-now",
+                method:"GET",
+                success:function(data){
+                    $('#time-now').text(data);
+                }
+            });
 
+            }, 1000);
+    </script>
     {% block body %}
     {% endblock %}
 </div>
