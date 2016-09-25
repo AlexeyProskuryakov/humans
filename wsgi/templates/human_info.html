@@ -230,7 +230,7 @@
                                     <tr>
                                         <td>{{human_state_log | length - loop.index}}</td>
                                         <td>{{state.from_state}}</td>
-                                        <td> &gt </td>
+                                        <td> &gt</td>
                                         <td>{{state.to_state}}</td>
                                         <td>
                                             {{state.time | tst_to_dt}}
@@ -270,8 +270,60 @@
                         </div>
                     </div>
                     {%endfor%}
-                    <button class="btn btn-info btn-sm" onclick="recreate_counters('{{human_name}}')">Перезагрузить
+
+
+                    <!-- Button trigger modal -->
+                    <button type="button" class="btn btn-info btn-sm" data-toggle="modal"
+                            data-target="#recreate_counters">
+                        Перезагрузить
                     </button>
+
+                    <!-- Modal -->
+                    <div class="modal fade" id="recreate_counters" tabindex="-1" role="dialog"
+                         aria-labelledby="Удалить...">
+                        <div class="modal-dialog" role="document">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h1>Переустановка коэффициентов потребления для чувака
+                                    </h1>
+                                </div>
+                                <div class="modal-body">
+                                    Сначала указываешь мин и макс процентаж потребления:     <input id="consume" type="text" class="span2"
+                                                               value=""
+                                                               data-slider-min="0"
+                                                               data-slider-max="100"
+                                                               data-slider-step="1"
+                                                               data-slider-value="[{{counters_threshold_min_max['consume']['min']}},{{counters_threshold_min_max['consume']['max']}}]"/>
+
+                                    <hr>
+
+                                    Из того что останется от потребления выбираешь процентаж воутинга:     <input id="vote" type="text" class="span2"
+                                                            value=""
+                                                            data-slider-min="0"
+                                                            data-slider-max="100"
+                                                            data-slider-step="1"
+                                                            data-slider-value="[{{counters_threshold_min_max['vote']['min']}},{{counters_threshold_min_max['vote']['max']}}]"/>
+
+                                    <hr>
+                                    Из того что останется от вотуинга выбираешь процентаж комментирования:     <input id="comment" type="text" class="span2"
+                                                               value=""
+                                                               data-slider-min="0"
+                                                               data-slider-max="100"
+                                                               data-slider-step="0.5"
+                                                               data-slider-value="[{{counters_threshold_min_max['comment']['min']}},{{counters_threshold_min_max['comment']['max']}}]"/>
+
+                                    <hr>
+                                    <button class="btn btn-info btn-sm" onclick="recreate_counters('{{human_name}}')">
+                                        Постановить
+                                    </button>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-default" data-dismiss="modal">Да ебись оно конем!
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="accordion" id="info-accordion">
@@ -445,25 +497,45 @@
     </div>
 </div>
 <script src="{{url_for('static',filename='js/humans-script.js')}}"></script>
+<script>
+$(function(){
+     setInterval(function() {
+                refresh_counters('{{human_name}}');
+            }, 5000);
 
+     $("#comment").slider({
+     precision: 2,
+        tooltip:true,
+       });
+
+       $("#vote").slider({
+       precision: 2,
+        tooltip:true,
+       });
+
+       $("#consume").slider({
+       precision: 2,
+        tooltip:true,
+       });
+
+});
+
+
+</script>
 {%if politic == "work_hard"%}
 <script src="{{url_for('static',filename='js/sequences-script.js')}}"></script>
 <script>
     $(function(){
-    show_sequences('{{human_name}}', true);
-    setInterval(function() {
+        show_sequences('{{human_name}}', true);
 
-            refresh_counters('{{human_name}}');
-        }, 5000);
-    });
+        setInterval(function() {
+                show_sequences('{{human_name}}', false);
+            }, 60000);
 
-     $(function(){
-    show_sequences('{{human_name}}', true);
-    setInterval(function() {
-            show_sequences('{{human_name}}', false);
-            refresh_counters('{{human_name}}');
-        }, 60000);
-    });
+   });
+
+
+
 
 
 

@@ -288,7 +288,9 @@ class HumanStorage(DBHandler):
         self.human_config.update_one({"user": name}, {"$set": {"counters_thresholds": counter_th_mm}})
 
     def get_human_counters_thresholds_min_max(self, name):
-        return self.human_config.find_one({"user": name}, projection={'counters_thresholds': 1, "_id": False})
+        found = self.human_config.find_one({"user": name}, projection={'counters_thresholds': 1, "_id": False})
+        if found:
+            return found.get("counters_thresholds")
 
     def get_human_internal_state(self, name):
         found = self.human_config.find_one({"user": name}, projection={"ss": True, "frds": True})

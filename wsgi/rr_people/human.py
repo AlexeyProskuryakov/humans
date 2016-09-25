@@ -181,19 +181,16 @@ class Human(RedditHandler):
 
     def calculate_counters(self):
         cth = self.db.get_human_counters_thresholds_min_max(self.login) or properties.default_counters_thresholds
-        consuming = random.randint(cth.get('consuming').get('min'), cth.get('consuming').get('max'))
-        production = 100. - consuming
+        consuming = random.randint(cth.get(A_CONSUME).get('min'), cth.get(A_CONSUME).get('max'))
+        production_piece = 100. - consuming
 
-        prod_voting = random.randint(cth.get('voting').get('min'), cth.get('voting').get('max'))
-        prod_commenting = 100. - prod_voting
+        prod_voting = random.randint(cth.get(A_VOTE).get('min'), cth.get(A_VOTE).get('max'))
+        voting = (prod_voting * production_piece) / 100.
+        comment_post_piece = production_piece - voting
 
-        # prod_posting = prod_commenting / random.randint(2, 4)
-        prod_posting = prod_commenting / random.randint(2, 3)
-        prod_commenting -= prod_posting
-
-        voting = (prod_voting * production) / 100.
-        commenting = (prod_commenting * production) / 100.
-        posting = (prod_posting * production) / 100.
+        prod_commenting = random.randint(cth.get(A_COMMENT).get('min'), cth.get(A_COMMENT).get('max'))
+        commenting = (prod_commenting * comment_post_piece) / 100.
+        posting = comment_post_piece - commenting
 
         thresholds = {A_CONSUME: consuming,
                       A_VOTE: voting,

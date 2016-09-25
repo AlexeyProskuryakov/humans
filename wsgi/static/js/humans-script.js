@@ -112,7 +112,6 @@ function set_counter(name, result, result_perc, threshold){
         $("#"+name+"-threshold").css("width", threshold+"%");
         $("#"+name+"-threshold").text(threshold + "%");
     }
-
 }
 
 function recreate_counters(name){

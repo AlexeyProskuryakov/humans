@@ -63,3 +63,7 @@ table.sortable thead {
     background-color: #f10766;
     color: aqua;
 }
+
+#comment {
+    width:500px;
+}

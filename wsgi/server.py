@@ -346,6 +346,7 @@ def humans_info(name):
                                                  "counters": human_cfg.get("counters").get("counters"),
                                                  "counters_percents": human_cfg.get("counters").get("percents"),
                                                  "counters_threshold": human_cfg.get("counters").get("threshold", {}),
+                                                 "counters_threshold_min_max": human_cfg.get("counters_thresholds"),
                                                  "want_coefficient": want_coefficient_max,
                                                  "channel_id": human_cfg.get("channel_id"),
 

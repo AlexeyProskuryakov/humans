@@ -1,4 +1,5 @@
 from wsgi.db import HumanStorage
+from wsgi.properties import default_counters_thresholds
 from wsgi.rr_people.ae import AuthorsStorage
 
 
@@ -16,7 +17,12 @@ def ensure_normal_group_names():
         print "%s ==> %s" % (cur_name, change[cur_name])
 
 
+def set_default_counters(name):
+    hs = HumanStorage("scripts")
+    hs.set_human_counters_thresholds_min_max(name, default_counters_thresholds)
+
 if __name__ == '__main__':
     # ae_storage = AuthorsStorage("scripts")
     # print ae_storage.get_all_groups()
-    ensure_normal_group_names()
+    # ensure_normal_group_names()
+    set_default_counters("Shlak2k16")

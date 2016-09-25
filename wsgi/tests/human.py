@@ -20,7 +20,11 @@ def add_new_human(name = "testHuman"):
     hs = HumanStorage()
     hs.set_human_subs(name, ["funny", "videos"])
 
+
+
 if __name__ == '__main__':
     # prepare_comments_queue()
     # test_human_comment()
-    add_new_human()
+    # add_new_human()
+    h = Human("Shlak2k16")
+    print h.calculate_counters()
