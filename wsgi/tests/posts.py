@@ -38,9 +38,15 @@ def test_noise_and_important():
     ps.posts.delete_many({"human": human})
 
 
+def is_posts_in_storage():
+    ps = PostsBalancer(human)
+    post = ps.start_post()
+    ps.end_post(post,PS_POSTED)
+
 def test_posts_sequence():
     psh = PostsSequenceHandler(human)
     psh.is_post_time()
 
 if __name__ == '__main__':
-    test_noise_and_important()
+    # test_noise_and_important()
+    is_posts_in_storage()
