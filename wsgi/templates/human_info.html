@@ -246,7 +246,7 @@
 
 
                 <div class="counters">
-                    {%for name, count in counters_percents.items()%}
+                    {%for name in ['consume', 'vote', 'comment', 'post']%}
                     <div class="counter {%if name=='post' and politic == 'work_hard' %} more-opacity {%endif%}">
                         {{name}}
 
@@ -254,9 +254,9 @@
                             <div id="{{name}}-result"
                                  class="progress-bar progress-bar-success progress-bar-striped active"
                                  role="progressbar"
-                                 aria-valuenow="{{ count }}" aria-valuemin="0" aria-valuemax="100"
-                                 style="width:{{count}}%">
-                                {{counters[name]}} ({{count}}%)
+                                 aria-valuenow="{{ counters_percents[name] }}" aria-valuemin="0" aria-valuemax="100"
+                                 style="width:{{counters_percents[name]}}%">
+                                {{counters[name]}} ({{counters_percents[name]}}%)
                             </div>
                         </div>
                         <div class="progress">
