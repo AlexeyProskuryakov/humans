@@ -114,9 +114,9 @@ class Human(RedditHandler):
 
         # todo this cache must be persisted at mongo or another
         self._used = set()
-        self.cache_last_loads = {}
-        self.cache_sub_posts = {}
-        self._last_post_ids = defaultdict(int)
+        self._cache_last_loads = {}
+        self._cache_sub_posts = {}
+        self._consumed_posts = defaultdict(int)
 
         log.info("Human [%s] inited with credentials \n%s"
                  "\nConfiguration: \n%s"
@@ -493,29 +493,42 @@ class Human(RedditHandler):
             log.error("For %s not any subs at config :(", self.name)
             return
 
-        random_sub = random.choice(subs)
-        if random_sub not in self.cache_sub_posts or \
-                                time.time() - self.cache_last_loads.get(random_sub,
-                                                                        time.time()) > LIVE_RANDOM_SUB_DATA_REFRESH_TIME:
-            log.info("%s will load posts for live random in %s" % (self.name, random_sub))
-            sbrdt = self.get_subreddit(random_sub)
+        sub = random.choice(subs)
+        if sub not in self._cache_sub_posts or \
+                                time.time() - self._cache_last_loads.get(sub,
+                                                                         time.time()) > LIVE_RANDOM_SUB_DATA_REFRESH_TIME or \
+                        self._consumed_posts.get(sub, 0) >= posts_limit:
+            log.info("%s LR will load posts for live random in %s" % (self.name, sub))
+            sbrdt = self.get_subreddit(sub)
             posts = get_hot_or_new(sbrdt)
-            self.cache_sub_posts[random_sub] = posts
-            self.cache_last_loads[random_sub] = time.time()
+            if not posts:
+                log.warning("%s LR not load any posts for %s :(" % (self.name, sub))
+                return
+            self._cache_sub_posts[sub] = posts
+            self._cache_last_loads[sub] = time.time()
+            self._consumed_posts[sub] = 0
         else:
-            log.info("%s will use cached posts in %s" % (self.name, random_sub))
-            posts = self.cache_sub_posts[random_sub]
+            log.info("%s LR will use cached posts in %s" % (self.name, sub))
+            posts = self._cache_sub_posts[sub]
 
         w_k = random.randint(properties.want_coefficient_max / 2, properties.want_coefficient_max)
 
-        start_from = self._last_post_ids.get(random_sub, 0)
-        for i, post in enumerate(posts, start=start_from):
-            if post.fullname not in self._used and self._is_want_to(w_k):
+        start_from = self._consumed_posts.get(sub, 0)
+        if start_from > 0:
+            start_from += random.randint(-(start_from / 4), start_from / 10)
+
+        log.info("%s LR start see posts from %s" % (self.name, start_from))
+        for i, post in enumerate(posts):
+            if i < start_from:
+                continue
+
+            if random.randint(int(max_actions / 1.5), max_actions) < counter:
+                self._consumed_posts[sub] = i
+                return
+
+            if (post.fullname not in self._used and self._is_want_to(w_k)) or self._is_want_to(w_k / 3):
                 self.do_see_post(post)
                 counter += 1
-            if random.randint(int(max_actions / 1.5), max_actions) < counter:
-                self._last_post_ids[random_sub] = i
-                return
 
     def do_post(self):
         post_data = self.posts.start_post()
