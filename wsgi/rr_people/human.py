@@ -237,8 +237,9 @@ class Human(RedditHandler):
         else:
             self.db.add_to_statistic(self.name, A_CONSUME, 1)
 
-        self.db.update_human_internal_state(self.name, state=self.state)
-        log.info("step by [%s] |%s|: %s", self.name, step_type, info)
+        state = self.state
+        self.db.update_human_internal_state(self.name, state=state)
+        log.info("step by [%s] |%s|: %s; state: %s", self.name, step_type, info, state)
 
         if info and info.get("fullname"):
             self._used.add(info.get("fullname"))
