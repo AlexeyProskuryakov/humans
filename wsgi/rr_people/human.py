@@ -239,7 +239,7 @@ class Human(RedditHandler):
 
         state = self.state
         self.db.update_human_internal_state(self.name, state=state)
-        log.info("step by [%s] |%s|: %s; state: %s", self.name, step_type, info, state)
+        log.info("step by [%s] |%s|: %s; counters: %s", self.name, step_type, info, state.get("counters"))
 
         if info and info.get("fullname"):
             self._used.add(info.get("fullname"))
