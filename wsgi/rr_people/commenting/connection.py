@@ -50,17 +50,18 @@ class CommentsStorage(DBHandler):
             log.exception(e)
 
     def end_comment_post(self, comment_oid, by, error_info=None):
-        to_set = {"by": by,
-                  "time": time.time()}
-        if error_info:
-            to_set['state'] = CS_ERROR
-            to_set['error_info'] = str(error_info)
-        else:
-            to_set['state'] = CS_COMMENTED
+        with self.mutex:
+            to_set = {"by": by,
+                      "time": time.time()}
+            if error_info:
+                to_set['state'] = CS_ERROR
+                to_set['error_info'] = str(error_info)
+            else:
+                to_set['state'] = CS_COMMENTED
 
-        self.comments.update_one({"_id": ObjectId(comment_oid)},
-                                 {"$set": to_set,
-                                  "$unset": {"_lock": 1}})
+            self.comments.update_one({"_id": ObjectId(comment_oid)},
+                                     {"$set": to_set,
+                                      "$unset": {"_lock": 1}})
 
     def start_comment_post(self, comment_oid):
         with self.mutex:
