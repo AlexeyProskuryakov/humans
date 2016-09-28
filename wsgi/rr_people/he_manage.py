@@ -83,6 +83,7 @@ class HumanOrchestra():
             kplm = Kapellmeister(human_name, self.childs_results)
         kplm.start()
 
+        log.info("ORCHESTRA START kappelmeister %s", kplm.pid)
         self.mu.acquire()
         self._kappelmeisters[kplm.pid] = kplm
         self.mu.release()

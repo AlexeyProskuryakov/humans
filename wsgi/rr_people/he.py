@@ -191,7 +191,7 @@ class Kapellmeister(Process, Child):
         self.last_token_refresh_time = time_hash(datetime.now())
 
         while self.can_work():
-            log.info("[%s] will do next step...")
+            log.info("[%s] %s will do next step..."%(self.human_name, self.pid))
             try:
                 step = now_hash()
                 if not self.check_state(S_WORK):
