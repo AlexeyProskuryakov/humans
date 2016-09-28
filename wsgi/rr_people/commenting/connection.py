@@ -91,8 +91,10 @@ class CommentsStorage(DBHandler):
                                      projection=_projection):
             yield el
 
-    def check_comment_id(self, comment_id):
-        return self.comments.find_one({"_id": ObjectId(comment_id)}, projection={"state": 1})
+    def get_comment_state(self, comment_id):
+        found = self.comments.find_one({"_id": ObjectId(comment_id)}, projection={"state": 1})
+        if found:
+            return found.get('state')
 
 
 NEED_COMMENT = "need_comment"
@@ -121,8 +123,9 @@ class CommentRedisQueue(RedisHandler):
         self.redis.publish(NEED_COMMENT, sbrdt)
 
     def pop_comment_id(self, sbrdt):
-        result = self.redis.lpop(QUEUE_CF(sbrdt))
-        log.debug("redis: get by %s\nthis: %s" % (sbrdt, result))
+        key = QUEUE_CF(sbrdt)
+        result = self.redis.lpop(key)
+        log.debug("redis: get by %s\nthis: %s" % (key, result))
         return result
 
     def get_all_comments_ids(self, sbrdt):
@@ -139,12 +142,26 @@ class CommentHandler(CommentsStorage, CommentRedisQueue):
         CommentsStorage.__init__(self, "comment handler %s" % name).__init__()
         CommentRedisQueue.__init__(self, "comment handler %s" % name)
 
+    def get_sub_with_comments(self, human_subs):
+        subs_with_comments = self.comments.aggregate(
+            [{"$match": {'state': CS_READY_FOR_COMMENT}},
+             {"$group": {"_id": "$sub", "count": {"$sum": 1}, "time": {"$min": "$time"}}},
+             {"$match": {"count": {"$ne": 0}}},
+             {"$sort": {"time": 1}}
+             ])
+        for data in subs_with_comments:
+            sub = data.get("_id")
+            if sub in human_subs:
+                return sub
+
     def pop_comment_id(self, sbrdt):
         while 1:
             comment_id = CommentRedisQueue.pop_comment_id(self, sbrdt)
             if comment_id:
-                result = self.check_comment_id(comment_id)
+                result = self.get_comment_state(comment_id)
                 if result == CS_READY_FOR_COMMENT:
                     return comment_id
+                else:
+                    log.warn("Comment [%s] in [%s] is not ready. It is: [%s]" % (comment_id, sbrdt, result))
             else:
                 return

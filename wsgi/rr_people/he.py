@@ -149,7 +149,6 @@ class Kapellmeister(Process, SignalReceiver, Child):
         produce = False
         if action == A_COMMENT and self.human.can_do(A_COMMENT):
             self.wait_after_last(A_COMMENT, randomise=True)
-            log.info("[%s] will commenting" % self.human_name)
             comment_result = self.human.do_comment_post()
             if comment_result == A_COMMENT:
                 produce = True
