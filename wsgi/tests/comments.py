@@ -102,9 +102,15 @@ def test_comments_fullname():
 
 
 def test_comment_handler_pop_comment_id():
-    ch = CommentHandler()
+    ch = CommentHandler("test")
     ch.pop_comment_id("foo")
+
+
+def test_need_comments(for_sbrdt=None):
+    ch = CommentHandler("test")
+    ch.need_comment(for_sbrdt or "politic")
 
 if __name__ == '__main__':
     # test_comments_fullname()
-    test_comment_handler_pop_comment_id()
+    # test_comment_handler_pop_comment_id()
+    test_need_comments()

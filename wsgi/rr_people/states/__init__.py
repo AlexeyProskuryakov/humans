@@ -73,7 +73,6 @@ def get_command_result(command):
 
 
 def get_worked_pids():
-
     def get_all_pids():
         result = get_command_result("ps aux| grep %s | grep -v grep| awk '{print $2}'" % WORKED_PIDS_QUERY).split('\n')
         for el in result:

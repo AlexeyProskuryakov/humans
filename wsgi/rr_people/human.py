@@ -8,6 +8,7 @@ import praw
 import requests
 from praw import Reddit
 from praw.objects import MoreComments, Submission
+from requests.exceptions import ConnectionError
 
 from wsgi import properties
 from wsgi.db import HumanStorage
@@ -265,6 +266,28 @@ class Human(RedditHandler):
     def can_friendship_create(self, friend_name):
         return friend_name not in self.friends and time.time() - self.last_friend_add > random.randint(WEEK / 5, WEEK)
 
+    def get_comment_in_more(self, comment):
+        if isinstance(comment, MoreComments):
+            try:
+                time.sleep(1)
+                comments = comment.comments()
+                comment_ = random.choice(comments)
+                return comment_
+            except Exception as e:
+                log.error("Can not get comments in more comment %s" % e)
+                return
+
+        return comment
+
+    def get_comments_in_post(self, post):
+        try:
+            time.sleep(1)
+            comments = post.comments
+            return comments
+        except Exception as e:
+            log.error("Can not get comments in post %s" % e)
+            return
+
     def do_see_post(self, post):
         """
         1) go to his url with yours useragent, wait random
@@ -296,11 +319,13 @@ class Human(RedditHandler):
             self.wait(self.configuration.max_wait_time / 2)
 
         if self._is_want_to(self.configuration.comments) and wt > self.configuration.comment_mwt:  # go to post comments
-            for comment in post.comments:
-                if self._is_want_to(self.configuration.comment_vote) and self.can_do("vote"):  # voting comment
-                    if isinstance(comment, MoreComments):
-                        comment = random.choice(comment.comments())
+            comments = self.get_comments_in_post(post)
+            if not comments: return
 
+            for comment in comments:
+                if self._is_want_to(self.configuration.comment_vote) and self.can_do("vote"):  # voting comment
+                    comment = self.get_comment_in_more(comment)
+                    if not comment: return
                     vote_count = random.choice([1, -1])
                     try:
                         comment.vote(vote_count)
@@ -415,14 +440,14 @@ class Human(RedditHandler):
                         return A_COMMENT
                     return PS_ERROR
 
-    def _see_comments(self, _post):
-        try:
-            for comment in filter(lambda comment: isinstance(comment, MoreComments), _post.comments):
-                comment.comments()
-                if random.randint(0, 10) > 6:
-                    break
-        except Exception as e:
-            log.error(e)
+    def _see_comments(self, post):
+        comments = self.get_comments_in_post(post)
+        if not comments: return
+        for comment in comments:
+            comment = self.get_comment_in_more(comment)
+            if not comment: return
+            if random.randint(0, 10) > 6:
+                return
 
     def _comment_post(self, _post, comment_oid, sub):
         comment = self.comments_handler.start_comment_post(comment_oid)
@@ -449,7 +474,12 @@ class Human(RedditHandler):
         def get_hot_or_new(sbrdt):
             funcs = [lambda: sbrdt.get_hot(limit=posts_limit), lambda: sbrdt.get_new(limit=posts_limit)]
             f = random.choice(funcs)
-            return list(f())
+            try:
+                result = list(f())
+                return result
+            except Exception as e:
+                log.error("Cannot get hot or new for %s because %s" % (sbrdt, e))
+                return []
 
         counter = 0
         subs = self.db.get_subs_of_human(self.name)
