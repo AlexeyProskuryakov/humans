@@ -1,14 +1,12 @@
 # coding:utf-8
 import logging
 from multiprocessing.synchronize import Lock
-import os
-import signal
 
 import redis
 
 from wsgi.properties import process_director_redis_address, process_director_redis_port, process_director_redis_password
 from wsgi.rr_people.states import get_worked_pids
-from wsgi.rr_people.states.signals import STOP_SIGNAL
+
 
 log = logging.getLogger("process_director")
 

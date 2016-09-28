@@ -25,7 +25,6 @@ from wsgi.rr_people.states.entity_states import StatesHandler
 from wsgi.rr_people.states.processes import ProcessDirector
 from os import sys
 
-from wsgi.rr_people.states.signals import SignalReceiver
 
 log = logging.getLogger("he")
 
@@ -83,13 +82,12 @@ class Child():
         self.result_queue = result_queue
 
 
-class Kapellmeister(Process, SignalReceiver, Child):
+class Kapellmeister(Process, Child):
     def __init__(self, name, result_queue, human_class=Human, reddit=None, reddit_class=None, ):
         super(Kapellmeister, self).__init__()
         self.human_name = name
         self.name = "KPLM [%s]" % (self.human_name)
 
-        SignalReceiver.__init__(self, self.name)
         Child.__init__(self, result_queue)
 
         self.db = HumanStorage(name="main storage for [%s]" % name)
