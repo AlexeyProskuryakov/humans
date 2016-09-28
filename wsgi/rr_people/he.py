@@ -184,13 +184,16 @@ class Kapellmeister(Process, SignalReceiver, Child):
             self.last_token_refresh_time = step
             self.human.reload_counters()
 
+    def can_work(self):
+        return self.process_director.can_work(HE_ASPECT(self.human_name), self.pid)
+
     def run(self):
         log.info("kapelmiester [%s] starts..." % self.human_name)
         self.process_director.start_aspect(HE_ASPECT(self.human_name), self.pid)
 
         self.last_token_refresh_time = time_hash(datetime.now())
 
-        while self.can_work:
+        while self.can_work():
             try:
                 step = now_hash()
                 if not self.check_state(S_WORK):
@@ -227,6 +230,8 @@ class Kapellmeister(Process, SignalReceiver, Child):
 
     def end(self):
         self.result_queue.put(self.pid)
+        self.process_director.del_pid(HE_ASPECT(self.human_name), self.pid)
+        log.info("END WORK [%s]" % self.pid)
 
     def decide(self, step):
         politic = self.db.get_human_post_politic(self.human_name)
