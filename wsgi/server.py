@@ -52,17 +52,12 @@ def tst_to_dt(value):
     return dt.strftime(dt_format)
 
 
-def dt_now():
-    return tst_to_dt(time.time())
-
-
 def array_to_string(array):
     return " ".join([str(el) for el in array])
 
 
 app.jinja_env.filters["tst_to_dt"] = tst_to_dt
 app.jinja_env.globals.update(array_to_string=array_to_string)
-app.jinja_env.globals.update(dt_now=dt_now())
 
 if os.environ.get("test", False):
     log.info("will run at test mode")
@@ -80,7 +75,7 @@ wu.start()
 
 @app.route("/time-now")
 def time_now():
-    return dt_now()
+    return tst_to_dt(time.time())
 
 
 @app.route("/wake_up/<salt>", methods=["POST"])
