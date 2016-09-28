@@ -7,7 +7,6 @@ import redis
 from wsgi.properties import process_director_redis_address, process_director_redis_port, process_director_redis_password
 from wsgi.rr_people.states import get_worked_pids
 
-
 log = logging.getLogger("process_director")
 
 PREFIX = lambda x: "PD_%s" % x
@@ -34,11 +33,12 @@ class ProcessDirector(object):
         self.mutex = Lock()
         log.info("Process director [%s] inited." % name)
 
-    def _store_aspect_pid(self, aspect, pid):
+    def _store_aspect_pid(self, aspect, pid, imply_signals=True):
         p = self.redis.pipeline()
         p.delete(PREFIX(aspect))
         p.set(PREFIX(aspect), pid)
-        p.set(PREFIX_PID(aspect, pid), state_work)
+        if imply_signals:
+            p.set(PREFIX_PID(aspect, pid), state_work)
         p.execute()
 
     def can_work(self, aspect, pid):
@@ -60,17 +60,18 @@ class ProcessDirector(object):
         else:
             return False
 
-    def start_aspect(self, aspect, pid):
+    def start_aspect(self, aspect, pid, imply_signals=True):
         with self.mutex:
             aspect_pid_raw = self.redis.get(PREFIX(aspect))
             if aspect_pid_raw:
                 stored_pid = int(aspect_pid_raw)
                 if stored_pid in get_worked_pids():
                     log.info("will kill stored pid: %s", stored_pid)
-                    self.kill(aspect, stored_pid)
+                    if imply_signals:
+                        self.kill(aspect, stored_pid)
 
             log.info("will store new pid %s [%s]" % (aspect, pid))
-            self._store_aspect_pid(aspect, pid)
+            self._store_aspect_pid(aspect, pid, imply_signals)
 
     def get_state(self, aspect):
         pid_raw = self.redis.get(PREFIX(aspect))

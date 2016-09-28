@@ -31,7 +31,7 @@ class HumanOrchestra():
         if not self.process_director.is_aspect_worked(HUMAN_ORCHESTRA_ASPECT):
             log.info("Will auto start humans because i am first:)")
             self._auto_start_humans()
-            self.process_director.start_aspect(HUMAN_ORCHESTRA_ASPECT, os.getpid())
+            self.process_director.start_aspect(HUMAN_ORCHESTRA_ASPECT, os.getpid(), imply_signals=False)
         else:
             log.info("Another orchestra autostarted humans.")
 
@@ -59,7 +59,6 @@ class HumanOrchestra():
                 log.info("was end %s", to_join)
 
     def _auto_start_humans(self):
-        log.info("Will auto start humans")
         for human_name, state in self.states.get_all_humans_states().iteritems():
             if state != S_SUSPEND:
                 self.start_human(human_name)
