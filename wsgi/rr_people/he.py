@@ -162,10 +162,9 @@ class Kapellmeister(Process, Child):
             if self.human.can_do(A_CONSUME):
                 log.info("[%s] will consuming" % self.human_name)
                 self.check_state(WORK_STATE("live random"))
-                self.human.do_live_random(max_actions=random.randint(5, 20), posts_limit=random.randint(25, 50))
+                self.human.do_live_random(max_actions=random.randint(1, 5), posts_limit=random.randint(25, 50))
                 action_result = A_CONSUME
             else:
-                log.info("[%s] will decrementing counters and caching warming up" % self.human_name)
                 sleep_time = MINUTE / random.randint(1, 10)
                 self.check_state(WORK_STATE("sleeping because can not consume at: %s" % sleep_time))
                 time.sleep(sleep_time)
@@ -192,6 +191,7 @@ class Kapellmeister(Process, Child):
         self.last_token_refresh_time = time_hash(datetime.now())
 
         while self.can_work():
+            log.info("[%s] will do next step...")
             try:
                 step = now_hash()
                 if not self.check_state(S_WORK):

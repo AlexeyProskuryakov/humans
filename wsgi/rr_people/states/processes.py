@@ -60,28 +60,6 @@ class ProcessDirector(object):
         else:
             return False
 
-    def can_start_aspect(self, aspect, pid):
-        """
-        starting or returning False if aspect already started
-        :param aspect:
-        :param pid:
-        :return:
-        """
-        with self.mutex:
-            log.info("will check start aspect %s for %s" % (aspect, pid))
-            result = self.redis.setnx(PREFIX(aspect), pid)
-            if not result:
-                aspect_pid = int(self.redis.get(PREFIX(aspect)))
-                log.info("setnx result is None... stored aspect pid is: %s" % aspect_pid)
-
-                if aspect_pid in get_worked_pids():
-                    return {"state": "already work", "by": aspect_pid, "started": False}
-                else:
-                    self._store_aspect_pid(aspect, pid)
-                    return {"state": "restarted", "started": True}
-            else:
-                return {"state": "started", "started": True}
-
     def start_aspect(self, aspect, pid):
         with self.mutex:
             aspect_pid_raw = self.redis.get(PREFIX(aspect))

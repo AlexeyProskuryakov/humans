@@ -18,7 +18,7 @@ from werkzeug.utils import redirect
 from wsgi.db import HumanStorage
 from wsgi.properties import want_coefficient_max, WEEK, AE_GROUPS, AE_DEFAULT_GROUP, POLITICS, \
     default_counters_thresholds, DAY
-from wsgi.rr_people import A_POST, S_RELOAD_COUNTERS
+from wsgi.rr_people import A_POST, S_RELOAD_COUNTERS, A_CONSUME, A_VOTE
 from wsgi.rr_people.ae import AuthorsStorage, time_hash, hash_info
 from wsgi.rr_people.commenting.connection import CommentHandler
 from wsgi.rr_people.he_manage import HumanOrchestra
@@ -412,11 +412,11 @@ def human_refresh_counters(name):
 def human_set_threshold_counters(name):
     data = json.loads(request.data)
     counters_thresh = {
-        "consuming": {"min": int(data.get("consuming", {}).get("max", default_counters_thresholds["consuming"]["max"])),
+        "consuming": {"min": int(data.get("consuming", {}).get("max", default_counters_thresholds[A_CONSUME]["max"])),
                       "max": int(
-                          data.get("consuming", {}).get("min", default_counters_thresholds["consuming"]["min"]))},
-        "voting": {"min": int(data.get("voting", {}).get("max", default_counters_thresholds["voting"]["max"])),
-                   "max": int(data.get("voting", {}).get("min", default_counters_thresholds["voting"]["min"]))},
+                          data.get("consuming", {}).get("min", default_counters_thresholds[A_CONSUME]["min"]))},
+        "voting": {"min": int(data.get("voting", {}).get("max", default_counters_thresholds[A_VOTE]["max"])),
+                   "max": int(data.get("voting", {}).get("min", default_counters_thresholds[A_VOTE]["min"]))},
     }
     db.set_human_counters_thresholds_min_max(name, counters_thresh)
 
