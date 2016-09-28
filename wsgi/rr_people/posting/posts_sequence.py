@@ -93,6 +93,10 @@ class PostsSequence(object):
             return True
 
     def find_posts_between(self, cur_time):
+        #will check if was end of week in previous finding
+        if self.prev_time > cur_time and (self.prev_time - cur_time) > WEEK / 2:
+            self.prev_time = 0
+
         start, stop = None, None
         for i, post_time in enumerate(self.right):
             if post_time <= cur_time and post_time >= self.prev_time:
