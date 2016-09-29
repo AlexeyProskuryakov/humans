@@ -75,7 +75,7 @@ def get_command_result(command):
 def get_worked_pids():
     def get_all_pids():
         result = get_command_result("ps aux| grep %s | grep -v grep| awk '{print $2}'" % WORKED_PIDS_QUERY).split('\n')
-        return map(lambda x: int(x), result)
+        return map(lambda x: int(x), filter(lambda x: len(x.strip()), result))
 
     worked_pids = set(get_all_pids())
     return worked_pids
