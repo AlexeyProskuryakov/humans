@@ -16,10 +16,14 @@
                 <div class="col-md-2">
                     {{err.error}}
                 </div>
-                <div class="col-md-10">
+                <div class="col-md-9">
                     {{err.info}}
                 </div>
+                <div class="col-md-1">
+                    {{err.time | tst_to_dt}}
+                </div>
             </div>
+            <hr>
             {%endfor%}
         </div>
     </div>

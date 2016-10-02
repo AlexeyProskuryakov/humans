@@ -160,10 +160,10 @@ class HumanStorage(DBHandler):
             info = ''.join(traceback.format_stack())
 
         error = str(error)
-        self.human_errors.insert_one({"human_name": name, "error": error, "info": info})
+        self.human_errors.insert_one({"human_name": name, "error": error, "info": info, "time":time.time()})
 
     def get_errors(self, name):
-        return list(self.human_errors.find({"human_name": name}, projection={"error": 1, "info": 1}))
+        return list(self.human_errors.find({"human_name": name}, projection={"error": 1, "info": 1, "time":1}).sort({"time":1}))
 
     def clear_errors(self, name):
         self.human_errors.delete_many({"human_name": name})
