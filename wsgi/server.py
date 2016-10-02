@@ -15,6 +15,7 @@ from flask_login import LoginManager, login_user, login_required, logout_user
 
 from werkzeug.utils import redirect
 
+from wsgi import tst_to_dt
 from wsgi.db import HumanStorage
 from wsgi.properties import want_coefficient_max, WEEK, AE_GROUPS, AE_DEFAULT_GROUP, POLITICS, \
     default_counters_thresholds, DAY
@@ -44,12 +45,6 @@ app.secret_key = 'foo bar baz'
 app.config['SESSION_TYPE'] = 'filesystem'
 
 
-def tst_to_dt(value):
-    dt_format = "%H:%M:%S"
-    dt = datetime.fromtimestamp(value)
-    if (datetime.now() - dt).days > 1:
-        dt_format += " %d.%m.%Y"
-    return dt.strftime(dt_format)
 
 
 def array_to_string(array):

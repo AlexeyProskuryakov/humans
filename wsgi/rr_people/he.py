@@ -22,9 +22,8 @@ from wsgi.rr_people.ae import ActionGenerator, time_hash, now_hash
 from wsgi.rr_people.human import Human
 from wsgi.rr_people.posting.posts_sequence import PostsSequenceHandler
 from wsgi.rr_people.states.entity_states import StatesHandler
-from wsgi.rr_people.states.processes import ProcessDirector
+from wsgi.rr_people.states.processes import ProcessDirector, ProcessTracked
 from os import sys
-
 
 log = logging.getLogger("he")
 
@@ -77,18 +76,13 @@ WORK_STATE = lambda x: "%s: %s" % (S_WORK, x)
 HE_ASPECT = lambda x: "he_%s" % x
 
 
-class Child():
-    def __init__(self, result_queue):
-        self.result_queue = result_queue
-
-
-class Kapellmeister(Process, Child):
-    def __init__(self, name, result_queue, human_class=Human, reddit=None, reddit_class=None, ):
+class Kapellmeister(Process, ProcessTracked):
+    def __init__(self, name, human_class=Human, reddit=None, reddit_class=None, ):
         super(Kapellmeister, self).__init__()
         self.human_name = name
         self.name = "KPLM [%s]" % (self.human_name)
 
-        Child.__init__(self, result_queue)
+        ProcessTracked.__init__(self, HE_ASPECT(self.human_name))
 
         self.db = HumanStorage(name="main storage for [%s]" % name)
 
@@ -181,17 +175,12 @@ class Kapellmeister(Process, Child):
             self.last_token_refresh_time = step
             self.human.reload_counters()
 
-    def can_work(self):
-        return self.process_director.can_work(HE_ASPECT(self.human_name), self.pid)
-
     def run(self):
         log.info("kapelmiester [%s] starts..." % self.human_name)
-        self.process_director.start_aspect(HE_ASPECT(self.human_name), self.pid)
-
         self.last_token_refresh_time = time_hash(datetime.now())
 
-        while self.can_work():
-            log.info("[%s] %s will do next step..."%(self.human_name, self.pid))
+        while 1:
+            log.info("[%s] %s will do next step..." % (self.human_name, self.pid))
             try:
                 step = now_hash()
                 if not self.check_state(S_WORK):
@@ -224,12 +213,6 @@ class Kapellmeister(Process, Child):
                 self.db.store_error(self.human_name, e, " ".join(traceback.format_tb(tb)))
                 time.sleep(10)
 
-        self.end()
-
-    def end(self):
-        self.result_queue.put(self.pid)
-        self.process_director.del_pid(HE_ASPECT(self.human_name), self.pid)
-        log.info("END WORK [%s]" % self.pid)
 
     def decide(self, step):
         politic = self.db.get_human_post_politic(self.human_name)

@@ -77,7 +77,6 @@ AE_MAX_SLEEP_TIME = 12 * HOUR
 AE_AUTHOR_MIN_ACTIONS = 1000
 
 AE_GROUPS = ["eniki", "beniki"]
-
 AE_DEFAULT_GROUP = "eniki"
 
 # for posts sequence evaluate
