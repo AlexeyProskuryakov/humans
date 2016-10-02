@@ -1,22 +1,15 @@
 # coding:utf-8
 import logging
-
 import redis
 import time
-
 from threading import Thread
-from Queue import Queue
 
 from wsgi.properties import process_director_redis_address, process_director_redis_port, \
-    process_director_redis_password, \
-    AVG_ACTION_TIME
+    process_director_redis_password
 
 log = logging.getLogger("process_director")
 
 PREFIX_ALLOC = lambda x: "PD_%s" % x
-
-PREFIX_QUERY = "PD_*"
-PREFIX_GET_DATA = lambda x: x.replace("PD_", "") if isinstance(x, (str, unicode)) and x.count("PD_") == 1 else x
 
 TIME_TO_STATE_LIVE = 10
 
@@ -37,9 +30,9 @@ class TimeStateHandler(Thread):
         while 1:
             try:
                 self.pd.set_timed_state(self.aspect)
-                log.info("%s tick" % (self.aspect))
             except Exception as e:
                 log.exception(e)
+
             time.sleep(TIME_TO_STATE_LIVE)
 
 
@@ -69,4 +62,3 @@ class ProcessDirector(object):
     def is_aspect_work(self, aspect):
         alloc = self.redis.get(PREFIX_ALLOC(aspect))
         return alloc if alloc is not None else False
-
