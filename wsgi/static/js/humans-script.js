@@ -114,6 +114,34 @@ function set_counter(name, result, result_perc, threshold){
     }
 }
 
+function get_min_max(name){
+    var minMax = $("#"+name).slider("getValue");
+    return {"min":minMax[0], "max":minMax[1]};
+}
+
+function set_threshold_counters(name){
+        var data = {
+            "consume":get_min_max("consume"),
+            "vote":get_min_max("vote"),
+            "comment":get_min_max("comment")
+        };
+        $.ajax({
+        type:           "post",
+        url:            "/humans/"+name+"/counters/set_thresholds",
+        data:           JSON.stringify(data),
+        contentType:    'application/json',
+        dataType:       'json',
+        success:        function(data){
+                if (data.ok){
+                    for (var key in data.counters) {
+                        set_counter(key, data.counters[key], data.percents[key], data.threshold[key]);
+                    }
+                    location.reload();
+                }
+            }
+        });
+}
+
 function recreate_counters(name){
         $.ajax({
         type:           "post",

@@ -275,11 +275,14 @@
                     </div>
                     {%endfor%}
 
+                    <button type="button" class="btn btn-info btn-sm" onclick="recreate_counters('{{human_name}}')">
+                        Перезагрузить
+                    </button>
 
                     <!-- Button trigger modal -->
                     <button type="button" class="btn btn-info btn-sm" data-toggle="modal"
                             data-target="#recreate_counters">
-                        Перезагрузить
+                        Указать иные коеффициенты
                     </button>
 
                     <!-- Modal -->
@@ -317,7 +320,7 @@
                                                                data-slider-value="[{{counters_threshold_min_max['comment']['min']}},{{counters_threshold_min_max['comment']['max']}}]"/>
 
                                     <hr>
-                                    <button class="btn btn-info btn-sm" onclick="recreate_counters('{{human_name}}')">
+                                    <button class="btn btn-info btn-sm" onclick="set_threshold_counters('{{human_name}}')">
                                         Постановить
                                     </button>
                                 </div>
@@ -508,19 +511,19 @@ $(function(){
             }, 5000);
 
      $("#comment").slider({
-     precision: 2,
+        precision: 2,
         tooltip:true,
-       });
+     });
 
-       $("#vote").slider({
-       precision: 2,
+     $("#vote").slider({
+        precision: 2,
         tooltip:true,
-       });
+     });
 
-       $("#consume").slider({
-       precision: 2,
+     $("#consume").slider({
+        precision: 2,
         tooltip:true,
-       });
+     });
 
 });
 

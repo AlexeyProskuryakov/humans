@@ -19,7 +19,7 @@ from wsgi import tst_to_dt
 from wsgi.db import HumanStorage
 from wsgi.properties import want_coefficient_max, WEEK, AE_GROUPS, AE_DEFAULT_GROUP, POLITICS, \
     default_counters_thresholds, DAY
-from wsgi.rr_people import A_POST, S_RELOAD_COUNTERS, A_CONSUME, A_VOTE
+from wsgi.rr_people import A_POST, S_RELOAD_COUNTERS, A_CONSUME, A_VOTE, A_COMMENT
 from wsgi.rr_people.ae import AuthorsStorage, time_hash, hash_info
 from wsgi.rr_people.commenting.connection import CommentHandler
 from wsgi.rr_people.he_manage import HumanOrchestra
@@ -43,8 +43,6 @@ app = Flask("Humans", template_folder=cur_dir + "/templates", static_folder=cur_
 
 app.secret_key = 'foo bar baz'
 app.config['SESSION_TYPE'] = 'filesystem'
-
-
 
 
 def array_to_string(array):
@@ -407,13 +405,17 @@ def human_refresh_counters(name):
 def human_set_threshold_counters(name):
     data = json.loads(request.data)
     counters_thresh = {
-        "consuming": {"min": int(data.get("consuming", {}).get("max", default_counters_thresholds[A_CONSUME]["max"])),
-                      "max": int(
-                          data.get("consuming", {}).get("min", default_counters_thresholds[A_CONSUME]["min"]))},
-        "voting": {"min": int(data.get("voting", {}).get("max", default_counters_thresholds[A_VOTE]["max"])),
-                   "max": int(data.get("voting", {}).get("min", default_counters_thresholds[A_VOTE]["min"]))},
+        A_CONSUME: {"max": int(data.get(A_CONSUME, {}).get("max", default_counters_thresholds[A_CONSUME]["max"])),
+                    "min": int(data.get(A_CONSUME, {}).get("min", default_counters_thresholds[A_CONSUME]["min"]))},
+        A_VOTE: {"max": int(data.get(A_VOTE, {}).get("max", default_counters_thresholds[A_VOTE]["max"])),
+                 "min": int(data.get(A_VOTE, {}).get("min", default_counters_thresholds[A_VOTE]["min"]))},
+        A_COMMENT: {"max": int(data.get(A_COMMENT, {}).get("max", default_counters_thresholds[A_COMMENT]["max"])),
+                    "min": int(data.get(A_COMMENT, {}).get("min", default_counters_thresholds[A_COMMENT]["min"]))}
     }
     db.set_human_counters_thresholds_min_max(name, counters_thresh)
+    human_orchestra.states.set_human_state(name, S_RELOAD_COUNTERS)
+    counters = db.get_human_counters(name) or {}
+    return jsonify(**dict({"ok": True}, **counters))
 
 
 @app.route("/humans/<name>/counters", methods=["POST"])
