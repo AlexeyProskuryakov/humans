@@ -122,6 +122,7 @@ class HumanStorage(DBHandler):
                 "human_log",
                 capped=True,
                 max=1000,
+                size=1024*40,
             )
             self.human_log.create_index([("human_name", 1)])
             self.human_log.create_index([("time", 1)])
