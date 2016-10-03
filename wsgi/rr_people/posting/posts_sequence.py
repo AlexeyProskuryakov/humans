@@ -93,7 +93,7 @@ class PostsSequence(object):
             return True
 
     def find_posts_between(self, cur_time):
-        #will check if was end of week in previous finding
+        # will check if was end of week in previous finding
         if self.prev_time > cur_time and (self.prev_time - cur_time) > WEEK / 2:
             self.prev_time = 0
 
@@ -106,16 +106,16 @@ class PostsSequence(object):
                     stop = i
 
         if start is None:
-            log.info("Not found posts in [%s .. %s]" % (self.prev_time, cur_time))
+            log.info("Not found posts in [%s .. %s]" % (hash_info(self.prev_time), hash_info(cur_time)))
             return []
 
         if stop is None:
             stop = start + 1
 
         found = self.right[start:stop]
-        log.info("Found %s posts in [%s .. %s]" % (len(found), self.prev_time, cur_time))
+        log.info("Found %s posts in [%s .. %s]" % (len(found), hash_info(self.prev_time), hash_info(cur_time)))
         self.left.extend(found)
-        self.right = self.right[:start-1] + self.right[stop:]
+        self.right = self.right[:start - 1] + self.right[stop:]
         return found
 
     def is_end(self):
@@ -274,18 +274,6 @@ class PostsSequenceHandler(object):
 
 
 if __name__ == '__main__':
-    # res = generate_sequence_data(70, pass_count=50)
-    # print sum(res), res
-    import random
-
-    psh = PostsSequenceHandler("Shlak2k15")
-    psh.evaluate_new()
-
-    step = 0
-
-    while step <= WEEK:
-        print psh.is_post_time(step), \
-            step, '\n(', psh._sequence_cache.prev_time, ")\n", psh._sequence_cache.left, '\n', psh._sequence_cache.middle, '\n', psh._sequence_cache.right, '\n--------------\n\n'
-
-        step += random.randint(AVG_ACTION_TIME, AVG_ACTION_TIME * 5)
-        print "next step: ", step
+    p_store = PostsSequenceStore()
+    seq = p_store.get_posts_sequence("Shlak2k16")
+    print "\n".join(hash_info(el) for el in seq.right)
