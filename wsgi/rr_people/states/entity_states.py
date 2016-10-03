@@ -35,7 +35,8 @@ class StatesHandler(object):
 
     def set_human_state(self, human_name, state):
         old_state = self.get_human_state(human_name)
-        self.db.set_human_state_log(human_name, old_state, state)
+        if old_state != state:
+            self.db.set_human_state_log(human_name, old_state, state)
 
         pipe = self.redis.pipeline()
         pipe.hset(HUMAN_STATES, human_name, state)
