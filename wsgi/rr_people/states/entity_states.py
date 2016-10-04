@@ -42,7 +42,7 @@ class StatesHandler(object):
     def set_human_state(self, human_name, state):
         old_state = self.get_human_state(human_name)
         self._set_last_state(state)
-        if self._last_states[0] != self._last_states[-1]:
+        if self._last_states[0] != self._last_states[-1] or len(self._last_states) < 3:
             self.db.set_human_state_log(human_name, old_state, state)
 
         pipe = self.redis.pipeline()
