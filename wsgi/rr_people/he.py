@@ -40,7 +40,7 @@ def net_tryings(fn):
                 log.warning("can not load data for [%s]\n args: %s, kwargs: %s \n because %s" % (fn, args, kwargs, e))
                 if count >= properties.tryings_count:
                     raise e
-                time.sleep(properties.st_between_net_request)
+                time.sleep(properties.sleep_between_net_request_if_error)
                 count += 1
 
     return wrapped

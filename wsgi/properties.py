@@ -97,13 +97,8 @@ default_counters_thresholds = {"consume": {"min": 80, "max": 90},
                                "vote": {"min": 80, "max": 85},
                                "comment": {"min": 70, "max": 80}
                                }
-# max_consuming = 90
-# min_consuming = 80
-#
-# max_voting = 95
-# min_voting = 90
 
-st_between_net_request = 60
+sleep_between_net_request_if_error = 60
 tryings_count = 10
 
 MIN_STEP_TIME = 60

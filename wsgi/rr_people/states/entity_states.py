@@ -31,11 +31,18 @@ class StatesHandler(object):
             self.redis.flushdb()
 
         self.db = hs or HumanStorage("states handler %s"%name)
+        self._last_states = []
         log.info("States handler inited for [%s]" % name)
+
+    def _set_last_state(self,state):
+        if len(self._last_states) == 3:
+            self._last_states.pop(0)
+        self._last_states.append(state)
 
     def set_human_state(self, human_name, state):
         old_state = self.get_human_state(human_name)
-        if old_state != state:
+        self._set_last_state(state)
+        if self._last_states[0] != self._last_states[-1]:
             self.db.set_human_state_log(human_name, old_state, state)
 
         pipe = self.redis.pipeline()
