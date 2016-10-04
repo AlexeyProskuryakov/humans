@@ -115,7 +115,7 @@ class PostsSequence(object):
         found = self.right[start:stop]
         log.info("Found %s posts in [%s .. %s]" % (len(found), hash_info(self.prev_time), hash_info(cur_time)))
         self.left.extend(found)
-        self.right = self.right[:start - 1] + self.right[stop:]
+        self.right = self.right[:(start - 1) if start > 0 else start] + self.right[stop:]
         return found
 
     def is_end(self):
