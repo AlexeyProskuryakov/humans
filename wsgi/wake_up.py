@@ -10,19 +10,23 @@ from wsgi.db import DBHandler
 
 log = logging.getLogger("wake_up")
 
+S_BAD = "BAD"
+S_OK = "OK"
+
 
 class WakeUpStorage(DBHandler):
     def __init__(self, name="?"):
         super(WakeUpStorage, self).__init__(name=name)
-        collections = self.db.collection_names(include_system_collections=False)
-        if "wake_up" not in collections:
+
+        if "wake_up" not in self.collection_names:
             self.urls = self.db.create_collection("wake_up")
             self.urls.create_index("url_hash", unique=True)
+            self.urls.create_index("state")
         else:
             self.urls = self.db.get_collection("wake_up")
 
     def get_urls(self):
-        return map(lambda x: x.get("url"), self.urls.find({}, projection={'_id': False, "url_hash": False}))
+        return map(lambda x: x.get("url"), self.urls.find({}, projection={'url':True}))
 
     def add_url(self, url):
         hash_url = hash(url)
@@ -31,29 +35,51 @@ class WakeUpStorage(DBHandler):
             log.info("add new url [%s]" % url)
             self.urls.insert_one({"url_hash": hash_url, "url": url})
 
+    def set_url_state(self, url, state):
+        self.urls.update_one({"url": url}, {"$set": {"state": state}})
+
+    def get_urls_with_state(self, state):
+        return map(lambda x: x.get("url"), self.urls.find({"state": state}, projection={'url':True}))
+
 
 class WakeUp(Process):
     def __init__(self):
         super(WakeUp, self).__init__()
         self.store = WakeUpStorage("wake_up")
-        self.mutex = Lock()
+
+    def check_url(self, url):
+        salt = ''.join(random.choice(string.lowercase) for _ in range(20))
+        addr = "%s/wake_up/%s" % (url, salt)
+        result = requests.post(addr)
+        return result.status_code
+
+    def imply_url_code(self, url, code):
+        if code != 200:
+            log.info("send: [%s] BAD: [%s]" % (url, code))
+            self.store.set_url_state(url, S_BAD)
+        else:
+            log.info("send: [%s] OK" % url)
+            self.store.set_url_state(url, S_OK)
 
     def run(self):
         while 1:
-            time.sleep(3600)
+            log.info("Will check services...")
             try:
                 for url in self.store.get_urls():
-                    salt = ''.join(random.choice(string.lowercase) for _ in range(20))
-                    addr = "%s/wake_up/%s" % (url, salt)
+                    code = self.check_url(url)
+                    self.imply_url_code(url, code)
 
-                    result = requests.post(addr)
-                    if result.status_code != 200:
-                        time.sleep(1)
-                        log.info("send: [%s][%s] not work will trying next times..." % (addr,result.status_code))
-                        continue
-                    else:
-                        log.info("send: [%s] OK" % addr)
-                    time.sleep(10)
+                time.sleep(30)
+                for url in self.store.get_urls_with_state(S_BAD):
+                    code = self.check_url(url)
+                    self.imply_url_code(url, code)
+
+                time.sleep(3600)
 
             except Exception as e:
                 log.error(e)
+
+
+if __name__ == '__main__':
+    w = WakeUp()
+    w.start()

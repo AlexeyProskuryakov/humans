@@ -62,7 +62,6 @@ if os.environ.get("test", False):
 url = "http://rr-alexeyp.rhcloud.com"
 wu = WakeUp()
 wu.store.add_url(url)
-wu.daemon = True
 wu.start()
 
 
