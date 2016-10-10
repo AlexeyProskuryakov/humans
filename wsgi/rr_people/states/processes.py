@@ -4,8 +4,7 @@ import redis
 import time
 from threading import Thread
 
-from wsgi.properties import process_director_redis_address, process_director_redis_port, \
-    process_director_redis_password
+from wsgi import ConfigManager
 
 log = logging.getLogger("process_director")
 
@@ -38,9 +37,10 @@ class TimeStateHandler(Thread):
 
 class ProcessDirector(object):
     def __init__(self, name="?", clear=False, max_connections=2):
-        self.redis = redis.StrictRedis(host=process_director_redis_address,
-                                       port=process_director_redis_port,
-                                       password=process_director_redis_password,
+        cm = ConfigManager()
+        self.redis = redis.StrictRedis(host=cm.get('process_director_redis_address'),
+                                       port=cm.get('process_director_redis_port'),
+                                       password=cm.get('process_director_redis_password'),
                                        db=0,
                                        max_connections=max_connections
                                        )

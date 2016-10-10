@@ -6,9 +6,8 @@ from multiprocessing import RLock, Process
 
 from bson.objectid import ObjectId
 
+from wsgi import ConfigManager
 from wsgi.db import DBHandler
-from wsgi.properties import comment_redis_address, comment_redis_password, comment_redis_port, TIME_TO_COMMENT_SPOILED
-from wsgi.properties import comments_mongo_uri, comments_db_name
 from wsgi.rr_people.queue import RedisHandler
 
 log = logging.getLogger("comments")
@@ -22,7 +21,9 @@ _comments = "comments"
 
 class CommentsStorage(DBHandler):
     def __init__(self, name="?", clear=False):
-        super(CommentsStorage, self).__init__(name=name, uri=comments_mongo_uri, db_name=comments_db_name)
+        cm = ConfigManager()
+        super(CommentsStorage, self).__init__(name=name, uri=cm.get('comments_mongo_uri'),
+                                              db_name=cm.get('comments_db_name'))
         collections_names = self.db.collection_names(include_system_collections=False)
         if _comments not in collections_names or clear:
             self._clear()
@@ -114,10 +115,11 @@ class CommentRedisQueue(RedisHandler):
     """
 
     def __init__(self, name="?", clear=False, host=None, port=None, pwd=None, db=None):
+        cm = ConfigManager()
         super(CommentRedisQueue, self).__init__("comment queue %s" % name, clear,
-                                                comment_redis_address,
-                                                comment_redis_port,
-                                                comment_redis_password,
+                                                cm.get('comment_redis_address'),
+                                                cm.get('comment_redis_port'),
+                                                cm.get('comment_redis_password'),
                                                 0)
 
     def need_comment(self, sbrdt):

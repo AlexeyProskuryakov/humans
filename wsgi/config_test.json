@@ -1,4 +1,24 @@
 {
-	"mongo_uri":"mongodb://localhost:27017/reddit_people",
-	"db_name":"reddit_people"
+  "mongo_uri": "mongodb://localhost:27017/reddit_people",
+  "db_name": "reddit_people",
+  "ae_mongo_uri": "mongodb://localhost:27017/ae",
+  "ae_db_name": "ae",
+  "comments_mongo_uri": "mongodb://localhost:27017/humans_comments",
+  "comments_db_name": "humans_comments",
+  "comment_redis_address": "localhost",
+  "comment_redis_port": 6379,
+  "comment_redis_password": "sederfes100500",
+  "states_redis_address": "localhost",
+  "states_redis_port": 6379,
+  "states_redis_password": "sederfes100500",
+  "posts_redis_address": "localhost",
+  "posts_redis_port": 6379,
+  "posts_redis_password": "sederfes100500",
+  "process_director_redis_address": "localhost",
+  "process_director_redis_port": 6379,
+  "process_director_redis_password": "sederfes100500",
+  "ImgrClientID": "d7e9f9350ebe5a8",
+  "ImgrClientSecret": "945c124e48fd9ca208788c70028d7e8d8c7dc7c1",
+  "YOUTUBE_DEVELOPER_KEY": "AIzaSyCYF4GPkVpdYjZ5RpDaSMcbpRpfkavnUzc",
+  "YOUTUBE_API_SERVICE_NAME": "youtube"
 }

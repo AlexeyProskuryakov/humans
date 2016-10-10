@@ -4,7 +4,8 @@ import re
 from apiclient.discovery import build
 from apiclient.errors import HttpError
 
-from wsgi.properties import YOUTUBE_DEVELOPER_KEY, YOUTUBE_API_VERSION, YOUTUBE_API_SERVICE_NAME, YOUTUBE_SUB_TAG
+from wsgi import ConfigManager
+from wsgi.properties import YOUTUBE_API_VERSION, YOUTUBE_SUB_TAG
 from wsgi.rr_people.posting.posts import PostsStorage, PostSource
 
 log = logging.getLogger("youtube")
@@ -16,8 +17,10 @@ y_url_re = re.compile("((y2u|youtu)\.be\/|youtube\.com\/watch\?v\=)(?P<id>[a-zA-
 
 class YoutubeChannelsHandler(object):
     def __init__(self, ps=None):
-        self.youtube = build(YOUTUBE_API_SERVICE_NAME, YOUTUBE_API_VERSION,
-                             developerKey=YOUTUBE_DEVELOPER_KEY)
+        cm = ConfigManager()
+        self.youtube = build(cm.get('YOUTUBE_API_SERVICE_NAME'),
+                             YOUTUBE_API_VERSION,
+                             developerKey=cm.get('YOUTUBE_DEVELOPER_KEY'))
         self.posts_storage = ps or PostsStorage(name="youtube posts supplier")
 
     def _get_sub_on_tags(self, tags):

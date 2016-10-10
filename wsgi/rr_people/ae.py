@@ -10,10 +10,9 @@ from random import choice
 import praw
 import pymongo
 
+from wsgi import ConfigManager
 from wsgi.db import DBHandler
 from wsgi.properties import \
-    ae_mongo_uri, \
-    ae_db_name, \
     DAY, HOUR, MINUTE, SEC, WEEK_DAYS, WEEK, \
     AE_MIN_COMMENT_KARMA, \
     AE_MIN_LINK_KARMA, \
@@ -94,8 +93,9 @@ def weighted_choice_king(action_weights):
 
 
 class AuthorsStorage(DBHandler):
-    def __init__(self, name="?", mongo_uri=ae_mongo_uri, db_name=ae_db_name):
-        super(AuthorsStorage, self).__init__(name=name, uri=mongo_uri, db_name=db_name)
+    def __init__(self, name="?"):
+        cm = ConfigManager()
+        super(AuthorsStorage, self).__init__(name=name, uri=cm.get('ae_mongo_uri'), db_name=cm.get('ae_db_name'))
 
         self.steps = self.db.get_collection("ae_authors")
         if not self.steps:
