@@ -31,7 +31,7 @@ class ConfigManager(object):
     __metaclass__ = Singleton
 
     def __init__(self):
-        config_file = os.environ.get(CONFIG_FILE_NAME_ENV, None)
+        config_file = os.path.join(os.environ.get("OPENSHIFT_DATA_DIR"), os.environ.get("config_file", None))
         if not config_file:
             config_file = "%s/config.json" % module_path()
         if test_mode:
