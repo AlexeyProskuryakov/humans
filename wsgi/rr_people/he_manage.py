@@ -1,15 +1,12 @@
-from multiprocessing import Queue
 import logging
-import os
-from threading import Thread, RLock
 
-from wsgi import tst_to_dt
+from wsgi import tst_to_dt, Singleton
 from wsgi.db import HumanStorage
 from wsgi.properties import test_mode
-from wsgi.rr_people import Singleton, S_SUSPEND, S_WORK
+from wsgi.rr_people import S_SUSPEND, S_WORK
 from wsgi.rr_people.he import Kapellmeister, HE_ASPECT
 from wsgi.rr_people.states.entity_states import StatesHandler
-from wsgi.rr_people.states.processes import ProcessDirector, ProcessTracked
+from wsgi.rr_people.states.processes import ProcessDirector
 
 log = logging.getLogger("orchestra")
 
@@ -60,8 +57,8 @@ class HumanOrchestra():
     def get_human_state(self, human_name):
         human_state = self.states.get_human_state(human_name)
         process_state = self.process_director.is_aspect_work(HE_ASPECT(human_name))
-        return {"human_state": human_state, "process_state": tst_to_dt(float(process_state)) if process_state else False}
+        return {"human_state": human_state,
+                "process_state": tst_to_dt(float(process_state)) if process_state else False}
 
     def delete_human(self, human_name):
         self.states.delete_human_state(human_name)
-

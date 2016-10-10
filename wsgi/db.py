@@ -6,12 +6,12 @@ import threading
 import time
 import traceback
 from collections import defaultdict
-from datetime import datetime
 
 from pymongo import MongoClient
 from pymongo.errors import CollectionInvalid
 
-from wsgi.properties import mongo_uri, db_name, DEFAULT_POLITIC, AE_DEFAULT_GROUP, WEEK
+from wsgi.properties import DEFAULT_POLITIC, AE_DEFAULT_GROUP, WEEK
+from wsgi import ConfigManager
 
 __author__ = 'alesha'
 
@@ -98,11 +98,16 @@ def cached(ttl=None):
 
 
 class DBHandler(object):
-    def __init__(self, name="?", uri=mongo_uri, db_name=db_name):
-        log.info("start db handler for [%s] %s" % (name, uri))
+    def __init__(self, name="?", uri=None, db_name=None):
+        cm = ConfigManager()
+        uri = uri or cm.get("mongo_uri")
+        db_name = db_name or cm.get("db_name")
+
         self.client = MongoClient(host=uri, maxPoolSize=10, connect=False)
         self.db = self.client[db_name]
         self.collection_names = self.db.collection_names(include_system_collections=False)
+
+        log.info("start db handler for [%s] [%s/%s]" % (name, uri, db_name))
 
 
 class HumanStorage(DBHandler):
@@ -122,7 +127,7 @@ class HumanStorage(DBHandler):
                 "human_log",
                 capped=True,
                 max=1000,
-                size=1024*40,
+                size=1024 * 40,
             )
             self.human_log.create_index([("human_name", 1)])
             self.human_log.create_index([("time", 1)])

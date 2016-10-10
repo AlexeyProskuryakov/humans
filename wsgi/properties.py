@@ -133,9 +133,6 @@ logger.info(
 WORKED_PIDS_QUERY = "python"
 
 if test_mode:
-    mongo_uri = "mongodb://localhost:27017/reddit_people"
-    db_name = "reddit_people"
-
     ae_mongo_uri = "mongodb://localhost:27017/ae"
     ae_db_name = "ae"
 

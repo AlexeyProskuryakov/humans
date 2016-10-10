@@ -1,0 +1,4 @@
+{
+	"mongo_uri":"mongodb://localhost:27017/reddit_people",
+	"db_name":"reddit_people"
+}

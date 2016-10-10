@@ -7,7 +7,7 @@ import time
 from praw.objects import MoreComments
 from stemming.porter2 import stem
 
-from wsgi import properties
+from wsgi import properties, Singleton
 
 DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.106 Safari/537.36"
 
@@ -63,16 +63,6 @@ log = logging.getLogger("man")
 WORDS_HASH = "words_hash"
 
 POSTS_TTL = 60 * 10
-
-
-class Singleton(type):
-    _instances = {}
-
-    def __call__(cls, *args, **kwargs):
-        if cls not in cls._instances:
-            cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
-        return cls._instances[cls]
-
 
 class _RedditPostsCache():
     __metaclass__ = Singleton

@@ -46,7 +46,6 @@ app.config['SESSION_TYPE'] = 'filesystem'
 
 app.register_blueprint(wake_up_app, url_prefix="/wake_up")
 
-print app.url_map
 
 def array_to_string(array):
     return " ".join([str(el) for el in array])
@@ -540,10 +539,10 @@ def queue_of_comments(name):
 
 
 if __name__ == '__main__':
-    print os.path.dirname(__file__)
     port = 65010
     while 1:
         try:
+            print "starts at %s..."%port
             app.run(port=port)
         except Exception as e:
             port += 1
