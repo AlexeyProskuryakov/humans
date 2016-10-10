@@ -25,3 +25,4 @@ beautifulsoup4
 Crypto
 pycrypto
 praw
+-e git://github.com/AlexeyProskuryakov/wake_up.git#egg=wake_up

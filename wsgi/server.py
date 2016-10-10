@@ -27,7 +27,7 @@ from wsgi.rr_people.human import HumanConfiguration
 from wsgi.rr_people.posting.posts import PostsStorage
 from wsgi.rr_people.posting.posts_important import ImportantYoutubePostSupplier
 from wsgi.rr_people.posting.posts_sequence import PostsSequenceStore, PostsSequenceHandler
-from wsgi.wake_up.views import wake_up_app
+from wake_up.views import wake_up_app
 
 __author__ = '4ikist'
 
