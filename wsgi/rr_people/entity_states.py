@@ -8,7 +8,6 @@ from wsgi.db import HumanStorage
 from wsgi.properties import redis_max_connections
 from wsgi.rr_people import S_STOP
 
-HASH_STATES_PG = "pg_states_hashset"
 
 STATE_CF = lambda x: "cf_state_%s" % x
 STATE_PG = lambda x: "pg_state_%s" % x

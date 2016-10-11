@@ -1,15 +1,17 @@
 # coding=utf-8
+from datetime import datetime
 import logging
+from multiprocessing.process import Process
+from multiprocessing.synchronize import Lock
+from os import sys
 import random
 import time
 import traceback
-from datetime import datetime
-from multiprocessing.process import Process
-from multiprocessing.synchronize import Lock
 
 import requests
 import requests.auth
 from praw import Reddit
+from states.processes import ProcessDirector
 
 from wsgi import properties
 from wsgi.db import HumanStorage
@@ -21,9 +23,7 @@ from wsgi.rr_people import USER_AGENTS, \
 from wsgi.rr_people.ae import ActionGenerator, time_hash, now_hash
 from wsgi.rr_people.human import Human
 from wsgi.rr_people.posting.posts_sequence import PostsSequenceHandler
-from wsgi.rr_people.states.entity_states import StatesHandler
-from wsgi.rr_people.states.processes import ProcessDirector, ProcessTracked
-from os import sys
+from wsgi.rr_people.entity_states import StatesHandler
 
 log = logging.getLogger("he")
 
@@ -76,13 +76,11 @@ WORK_STATE = lambda x: "%s: %s" % (S_WORK, x)
 HE_ASPECT = lambda x: "he_%s" % x
 
 
-class Kapellmeister(Process, ProcessTracked):
+class Kapellmeister(Process):
     def __init__(self, name, human_class=Human, reddit=None, reddit_class=None, ):
         super(Kapellmeister, self).__init__()
         self.human_name = name
         self.name = "KPLM [%s]" % (self.human_name)
-
-        ProcessTracked.__init__(self, HE_ASPECT(self.human_name))
 
         self.db = HumanStorage(name="main storage for [%s]" % name)
 
@@ -176,6 +174,11 @@ class Kapellmeister(Process, ProcessTracked):
             self.human.reload_counters()
 
     def run(self):
+        process_tracked = self.process_director.start_aspect(HE_ASPECT(self.human_name))
+        if not process_tracked:
+            log.info("Can not start kappelmeister [%s] because another one is work :(" % self.human_name)
+            return
+
         log.info("kapelmiester [%s] starts..." % self.human_name)
         self.last_token_refresh_time = time_hash(datetime.now())
 
@@ -212,7 +215,6 @@ class Kapellmeister(Process, ProcessTracked):
                 log.exception(e)
                 self.db.store_error(self.human_name, e, " ".join(traceback.format_tb(tb)))
                 time.sleep(10)
-
 
     def decide(self, step):
         politic = self.db.get_human_post_politic(self.human_name)

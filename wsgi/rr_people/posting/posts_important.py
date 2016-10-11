@@ -8,7 +8,7 @@ from wsgi.db import HumanStorage
 from wsgi.properties import force_post_manager_sleep_iteration_time
 from wsgi.rr_people.posting.posts import PostsStorage
 from wsgi.rr_people.posting.youtube_posts import YoutubeChannelsHandler
-from wsgi.rr_people.states.processes import ProcessDirector
+from states.processes import ProcessDirector
 
 log = logging.getLogger("posts")
 
@@ -55,9 +55,9 @@ class ImportantYoutubePostSupplier(Process):
             return e.message, e
 
     def run(self):
-        self.pd.start_aspect(IMPORTANT_POSTS_SUPPLIER_PROCESS_ASPECT, self.pid)
+        self.pd.start_aspect(IMPORTANT_POSTS_SUPPLIER_PROCESS_ASPECT, 100)
 
-        while self.pd.can_work(IMPORTANT_POSTS_SUPPLIER_PROCESS_ASPECT, self.pid):
+        while True:
             humans_data = self.main_storage.get_humans_info(projection={"user": True, "subs": True, "channel_id": True})
             for human_data in humans_data:
                 channel_id = human_data.get("channel_id")
@@ -66,4 +66,3 @@ class ImportantYoutubePostSupplier(Process):
 
             time.sleep(force_post_manager_sleep_iteration_time)
 
-        self.pd.del_pid(IMPORTANT_POSTS_SUPPLIER_PROCESS_ASPECT, self.pid)

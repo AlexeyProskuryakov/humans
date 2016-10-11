@@ -7,8 +7,6 @@ import sys
 from wsgi.properties import module_path, test_mode
 
 log = logging.getLogger("wsgi")
-CONFIG_FILE_NAME_ENV = "config_file"
-
 
 def tst_to_dt(value):
     dt_format = "%H:%M:%S"

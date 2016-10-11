@@ -5,8 +5,8 @@ from wsgi.db import HumanStorage
 from wsgi.properties import test_mode
 from wsgi.rr_people import S_SUSPEND, S_WORK
 from wsgi.rr_people.he import Kapellmeister, HE_ASPECT
-from wsgi.rr_people.states.entity_states import StatesHandler
-from wsgi.rr_people.states.processes import ProcessDirector
+from wsgi.rr_people.entity_states import StatesHandler
+from states.processes import ProcessDirector
 
 log = logging.getLogger("orchestra")
 
@@ -36,8 +36,8 @@ class HumanOrchestra():
         self.states.set_human_state(human_name, S_SUSPEND)
 
     def start_human(self, human_name):
-        can_start = self.process_director.start_aspect(HE_ASPECT(human_name))
-        if not can_start:
+        is_work = self.process_director.is_aspect_work(HE_ASPECT(human_name))
+        if is_work:
             log.info("Can not start human %s, because already started." % human_name)
             return
 

@@ -26,3 +26,4 @@ Crypto
 pycrypto
 praw
 -e git://github.com/AlexeyProskuryakov/wake_up.git#egg=wake_up
+-e git://github.com/AlexeyProskuryakov/states.git#egg=states

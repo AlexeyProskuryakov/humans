@@ -87,9 +87,10 @@ want_coefficient_max = 100
 WORKED_PIDS_QUERY = "python"
 
 YOUTUBE_API_VERSION = "v3"
-YOUTUBE_SUB_TAG = "sub:"
+YOUTUBE_TAG_SUB = "sub:"
+YOUTUBE_TAG_TITLE = "pt:"
 
-force_post_manager_sleep_iteration_time = 3600  # время через которое он будет сканировать ютуб
+force_post_manager_sleep_iteration_time = 5 * MINUTE  # время через которое он будет сканировать ютуб
 
 test_mode = os.environ.get("RR_TEST", "false").strip().lower() in ("true", "1", "yes")
 print "TEST? ", test_mode
@@ -97,4 +98,3 @@ print "TEST? ", test_mode
 logger.info(
     "Reddit People MANAGEMENT SYSTEM STARTED... \nEnv:%s" % "\n".join(
         ["%s:\t%s" % (k, v) for k, v in os.environ.iteritems()]))
-
