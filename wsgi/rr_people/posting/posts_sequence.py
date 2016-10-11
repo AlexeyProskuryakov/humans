@@ -119,7 +119,7 @@ class PostsSequence(object):
         return found
 
     def is_end(self):
-        return len(self.right) == 0
+        return len(self.right) <= 1
 
 
 class PostsSequenceStore(DBHandler):

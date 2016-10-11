@@ -55,7 +55,10 @@ class ImportantYoutubePostSupplier(Process):
             return e.message, e
 
     def run(self):
-        self.pd.start_aspect(IMPORTANT_POSTS_SUPPLIER_PROCESS_ASPECT, 100)
+        tracker = self.pd.start_aspect(IMPORTANT_POSTS_SUPPLIER_PROCESS_ASPECT, tick_time=100)
+        if not tracker:
+            log.info("Another im po su is worked")
+            return
 
         while True:
             humans_data = self.main_storage.get_humans_info(projection={"user": True, "subs": True, "channel_id": True})

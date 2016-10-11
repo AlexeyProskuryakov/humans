@@ -49,9 +49,9 @@ class PostSource(object):
     def __repr__(self):
         result = "url: [%s] title: [%s] url_hash: [%s]" % (self.url, self.title, self.url_hash)
         if self.for_sub:
-            result = "%sfor sub: [%s] " % (result, self.for_sub)
+            result = "%s for sub: [%s] " % (result, self.for_sub)
         if self.at_time:
-            result = "%stime: [%s]" % (result, self.at_time)
+            result = "%s time: [%s]" % (result, self.at_time)
         return result
 
 

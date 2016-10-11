@@ -362,8 +362,9 @@ def human_politic(name):
 
 try:
     ips = ImportantYoutubePostSupplier()
+    ips.start()
 except Exception as e:
-    pass
+    log.exception(e)
 
 
 @app.route("/humans/<name>/counters/recreate", methods=["POST"])
