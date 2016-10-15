@@ -553,16 +553,18 @@ class Human(RedditHandler):
                 time.sleep(e.sleep_time + random.randint(5, 10))
                 continue
             except Exception as e:
-                log.error("exception at posting %s" % (post))
+                error_info = "Exception at posting %s" % (e)
+                self.posts.end_post(post_data, PS_ERROR, error_info)
+                self.db.store_error(self.name, error_info, post_data)
+                log.info("NOT OK :( result: %s" % (error_info))
                 log.exception(e)
-                self.posts.end_post(post_data, PS_ERROR)
-                self.db.store_error(self.name, "Exception at post: %s" % e, post_data)
                 return PS_ERROR
 
             if not isinstance(result, Submission):
-                self.posts.end_post(post_data, PS_ERROR)
-                log.info("NOT OK :( result: %s" % (result))
-                self.db.store_error(self.name, "Submit error: %s" % result, post_data)
+                error_info = "Submit error: %s" % result
+                self.posts.end_post(post_data, PS_ERROR, error_info)
+                self.db.store_error(self.name, error_info, post_data)
+                log.info("NOT OK :( result: %s" % (error_info))
                 return PS_ERROR
 
             self.register_step(A_POST,

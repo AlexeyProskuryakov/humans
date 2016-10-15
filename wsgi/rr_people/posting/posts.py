@@ -82,7 +82,7 @@ class PostsStorage(DBHandler):
         else:
             self.posts_counters = self.db.get_collection("posts_counters")
 
-        self.hs = hs or HumanStorage("ps %s"%name)
+        self.hs = hs or HumanStorage("ps %s" % name)
 
     # posts
     def get_post_state(self, url_hash):
@@ -123,7 +123,7 @@ class PostsStorage(DBHandler):
     def get_queued_post(self, human, important=False):
         lock_id = time.time()
 
-        q = {'human':human}
+        q = {'human': human}
         q["state"] = PS_READY
         q["_lock"] = {"$exists": False}
         q["important"] = important
@@ -139,15 +139,18 @@ class PostsStorage(DBHandler):
         for post in self.posts.find(q):
             yield post
 
-    def set_queued_post_used(self, post, state=PS_POSTED):
+    def set_queued_post_used(self, post, state=PS_POSTED, error_info=None):
         q = {}
         if '_id' in post:
             q['_id'] = post['_id']
         if '_lock' in post:
             q['_lock'] = post['_lock']
-        if not q:
-            raise Exception("add argument please _lock or _id")
-        self.posts.update_one(q, {"$set": {"state": state}, "$unset": {"_lock": ""}})
+
+        to_set = {"state": state}
+        if error_info:
+            to_set = {"error_info": error_info}
+
+        self.posts.update_one(q, {"$set": to_set, "$unset": {"_lock": ""}})
 
 
 CNT_NOISE = "noise"
@@ -182,12 +185,12 @@ class PostsBalancer(object):
 
         return post
 
-    def end_post(self, post, result):
+    def end_post(self, post, result_state, error_info=None):
         if not self._post_type_in_fly:
             raise Exception("Have not started posts %s" % self.human)
 
-        if result == PS_POSTED:
+        if result_state == PS_POSTED:
             self.post_store.increment_counter(self.human, self._post_type_in_fly)
 
-        self.post_store.set_queued_post_used(post, result)
+        self.post_store.set_queued_post_used(post, result_state, error_info)
         self._post_type_in_fly = None
