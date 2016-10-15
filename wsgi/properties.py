@@ -84,7 +84,6 @@ tryings_count = 10
 
 want_coefficient_max = 100
 
-WORKED_PIDS_QUERY = "python"
 
 YOUTUBE_API_VERSION = "v3"
 YOUTUBE_TAG_SUB = "sub:"

@@ -36,7 +36,11 @@ class YoutubeChannelsHandler(object):
             id = video_info.get("id")
             if id:
                 tags = video_info.get("snippet", {}).get("tags", [])
-                title = self._get_tag_value(tags, YOUTUBE_TAG_TITLE) or video_info.get("snippet", {}).get("title")
+                title = self._get_tag_value(tags, YOUTUBE_TAG_TITLE)
+                if not title:
+                    log.warn("Video have not pt: tag and title will be real title")
+                    title = video_info.get("snippet", {}).get("title")
+
                 sub = self._get_tag_value(tags, YOUTUBE_TAG_SUB)
                 if not sub:
                     log.warn("Video [%s] (%s) without sub; Skip this video :(" % (id, title))
@@ -44,7 +48,7 @@ class YoutubeChannelsHandler(object):
                 url = YOUTUBE_URL(id)
                 ps = PostSource(url=url, title=title, for_sub=sub)
                 result.append(ps)
-                log.info("Generate important post: %s", ps)
+                log.info("Found important post: %s", ps)
             else:
                 log.warn("video: \n%s\nis have not id :( " % video_info)
         return result
