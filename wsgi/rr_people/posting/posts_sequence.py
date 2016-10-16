@@ -121,6 +121,18 @@ class PostsSequence(object):
     def is_end(self):
         return len(self.right) <= 1
 
+    def get_time_for_nearest(self, date_hash, current_step):
+        counter = current_step
+        next_nearest = None
+        for post_time in self.right:
+            if post_time >= date_hash:
+                next_time_important = post_time
+                if next_nearest is None:
+                    next_nearest = next_time_important
+                counter -= 1
+                if counter <= 0:
+                    return next_nearest - date_hash, next_time_important - date_hash
+
 
 class PostsSequenceStore(DBHandler):
     coll_name = "posts_sequence"
@@ -162,8 +174,6 @@ class PostsSequenceHandler(object):
         self.ae_store = ae_store or AuthorsStorage(self.name)
         self.hs = hs or HumanStorage(self.name)
         self.ae_group = ae_group or self.hs.get_ae_group(self.human)
-
-        self.sequence = None
 
     def __evaluate_posts_time_sequence(self, min_posts, max_posts=None, iterations_count=10, current_datetime=None):
         '''

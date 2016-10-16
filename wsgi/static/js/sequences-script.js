@@ -74,6 +74,15 @@ function show_sequences(human_name, withLoader){
             if (sequence_metadata != undefined){
                 $("#sequence-metadata").text(sequence_metadata);
             }
+            counters = result["counters"];
+            if (counters != undefined){
+                   $("#sequence-metadata").append("<br> Counters: noise: "+counters['noise']+" important: "+counters['important'] + "<br> Next important after:"+ counters['next_important'] +" noise posts");
+            }
+            next_times = result["next_times"];
+            if  (next_times != undefined){
+                $("#sequence-metadata").append("<hr>"+next_times);
+            }
+
             $("#loader-gif").hide();
 
             var plot = $.plot(

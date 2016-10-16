@@ -54,6 +54,25 @@ __doc__ = """
     3) В модель можно добавлять или удалять авторов.
 
     """
+def hash_length_info(delta):
+    if not isinstance(delta, int):
+        return None
+    else:
+        _delta = int(delta)
+        d, r = divmod(_delta, DAY)
+        h, r = divmod(r, HOUR)
+        m, r = divmod(r, MINUTE)
+        s = r
+        result = ""
+        if d > 0:
+            result += "%s days "%d
+        if h > 0:
+            result += "%s hours "%h
+        if m > 0:
+            result += "%s minutes "%m
+        if s > 0:
+            result += "%s seconds"%s
+        return result
 
 
 def hash_info(delta):

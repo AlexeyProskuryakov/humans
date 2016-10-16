@@ -20,11 +20,11 @@ from wsgi.db import HumanStorage
 from wsgi.properties import want_coefficient_max, WEEK, AE_GROUPS, AE_DEFAULT_GROUP, POLITICS, \
     default_counters_thresholds, DAY
 from wsgi.rr_people import A_POST, S_RELOAD_COUNTERS, A_CONSUME, A_VOTE, A_COMMENT
-from wsgi.rr_people.ae import AuthorsStorage, time_hash, hash_info
+from wsgi.rr_people.ae import AuthorsStorage, time_hash, hash_info, hash_length_info
 from wsgi.rr_people.commenting.connection import CommentHandler
 from wsgi.rr_people.he_manage import HumanOrchestra
 from wsgi.rr_people.human import HumanConfiguration
-from wsgi.rr_people.posting.posts import PostsStorage
+from wsgi.rr_people.posting.posts import PostsStorage, CNT_NOISE, EVERY
 from wsgi.rr_people.posting.posts_important import ImportantYoutubePostSupplier
 from wsgi.rr_people.posting.posts_sequence import PostsSequenceStore, PostsSequenceHandler
 from wake_up.views import wake_up_app
@@ -65,7 +65,6 @@ if os.environ.get("test", False):
 @app.route("/time-now")
 def time_now():
     return tst_to_dt(time.time())
-
 
 
 login_manager = LoginManager()
@@ -440,6 +439,7 @@ def update_channel_id(name):
 
 sequence_storage = PostsSequenceStore("server")
 ae_storage = AuthorsStorage("as server")
+post_storage = PostsStorage(name="server")
 
 
 @app.route("/sequences/info/<name>", methods=["GET"])
@@ -466,6 +466,14 @@ def sequences(name):
             work_result.append([get_point_x(start), w_y, 1, (stop - start) * 1000])
 
     posts_sequence = sequence_storage.get_posts_sequence(name)
+    counters = post_storage.get_counters(name)
+    noise = int(counters.get(CNT_NOISE, 0))
+    counters["next_important"] = noise % EVERY
+    next_times = posts_sequence.get_time_for_nearest(time_hash(datetime.now()), noise % EVERY)
+    if next_times:
+        n_noise, n_important = next_times
+        next_times = "Next: noise: %s; important: %s." % (hash_length_info(n_noise), hash_length_info(n_important))
+
     if posts_sequence:
         real_posted = map(lambda x: [get_point_x(time_hash(datetime.fromtimestamp(x.get("time")))), p_y - 0.25, 1, 1],
                           db.get_last_actions(name, A_POST))
@@ -483,7 +491,10 @@ def sequences(name):
                 sum(posts_sequence.metadata),
                 hash_info(posts_sequence.prev_time),
                 tst_to_dt(float(posts_sequence.generate_time or time.time())),
-            )})
+            ),
+            "next_times": next_times,
+            "counters": counters,
+        })
     else:
         return jsonify(**{"work": work_result})
 
@@ -524,8 +535,6 @@ def configuration(name):
 # posts & comments
 comment_handler = CommentHandler("server")
 
-post_storage = PostsStorage(name="server")
-
 
 @app.route("/queue/comments/<name>", methods=["GET"])
 @login_required
@@ -543,7 +552,7 @@ if __name__ == '__main__':
     port = 65010
     while 1:
         try:
-            print "starts at %s..."%port
+            print "starts at %s..." % port
             app.run(port=port)
         except Exception as e:
             port += 1

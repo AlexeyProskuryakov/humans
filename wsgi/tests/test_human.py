@@ -54,10 +54,12 @@ class FakeHuman(Human):
         self.counters_thresholds = self.calculate_counters()
 
     def do_post(self):
+        post = self.posts.start_post()
         count = random.randint(0, AVG_ACTION_TIME / 10)
         log.info("DO POSTING...(%s)" % count)
         time.sleep(count)
         self.register_step(A_POST)
+        self.posts.end_post(post, "TEST")
         return A_POST
 
     def do_comment_post(self, sub=None):
