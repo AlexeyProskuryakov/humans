@@ -4,6 +4,8 @@ import random
 import time
 from datetime import datetime
 
+from bson.objectid import ObjectId
+
 from wsgi.db import DBHandler, HumanStorage
 from wsgi.rr_people.ae import time_hash
 
@@ -32,13 +34,14 @@ class PostSource(object):
                         )
         return ps
 
-    def __init__(self, url, title, for_sub=None, at_time=None, url_hash=None, important=False):
+    def __init__(self, url, title, for_sub=None, at_time=None, url_hash=None, important=False, video_id=None):
         self.url = url
         self.title = title
         self.for_sub = for_sub
         self.at_time = at_time
         self.url_hash = url_hash or str(hash(url))
         self.important = important
+        self.video_id = video_id
 
     def serialize(self):
         return json.dumps(self.__dict__)
@@ -72,6 +75,7 @@ class PostsStorage(DBHandler):
             self.posts.create_index("important")
             self.posts.create_index("state")
             self.posts.create_index("time")
+            self.posts.create_index("video_id")
             self.posts.create_index("_lock", sparse=True)
         else:
             self.posts = self.db.get_collection(collection_name)
@@ -86,9 +90,13 @@ class PostsStorage(DBHandler):
 
     # posts
     def get_post_state(self, url_hash):
-        found = self.posts.find_one({"url_hash": str(url_hash)}, projection={"state": 1})
+        found = self.posts.find_one({"url_hash": str(url_hash)}, projection={"state": 1, "_id": 1})
         if found:
-            return found.get("state")
+            return found.get("state"), found.get("_id")
+        return None, None
+
+    def is_video_id_present(self, video_id):
+        return self.posts.find_one({"video_id": video_id})
 
     def get_post(self, url_hash, projection=None):
         _projection = projection or {"_id": False}
@@ -102,7 +110,7 @@ class PostsStorage(DBHandler):
         if found: return True
         return False
 
-    def add_generated_post(self, post, sub, important=False, human=None, state=PS_READY):
+    def add_generated_post(self, post, sub, important=False, human=None, state=PS_READY, video_id=None):
         if isinstance(post, PostSource):
             if not self.check_post_hash_exists(post.url_hash):
                 data = post.to_dict()
@@ -111,6 +119,8 @@ class PostsStorage(DBHandler):
                 data['important'] = important
                 data['human'] = human or random.choice(self.hs.get_humans_of_sub(sub))
                 data['time'] = time.time()
+                if video_id or post.video_id is not None:
+                    data["video_id"] = video_id
                 return self.posts.insert_one(data)
 
     def increment_counter(self, human, counter_type):
@@ -151,6 +161,9 @@ class PostsStorage(DBHandler):
             to_set = {"error_info": error_info}
 
         self.posts.update_one(q, {"$set": to_set, "$unset": {"_lock": ""}})
+
+    def delete_post(self, post_id):
+        return self.posts.delete_one({"_id": ObjectId(post_id)})
 
 
 CNT_NOISE = "noise"

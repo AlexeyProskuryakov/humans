@@ -45,7 +45,9 @@ class ImportantYoutubePostSupplier(Process):
                 self.posts_storage.add_generated_post(post,
                                                       post.for_sub,
                                                       important=True,
-                                                      human=human_name)
+                                                      human=human_name,
+                                                      video_id=post.video_id
+                                                      )
 
             return len(new_posts), None
 
@@ -55,7 +57,8 @@ class ImportantYoutubePostSupplier(Process):
             return e.message, e
 
     def run(self):
-        tracker = self.pd.start_aspect(IMPORTANT_POSTS_SUPPLIER_PROCESS_ASPECT, tick_time=100)
+        tracker = self.pd.start_aspect(IMPORTANT_POSTS_SUPPLIER_PROCESS_ASPECT,
+                                       tick_time=force_post_manager_sleep_iteration_time / 5)
         if not tracker:
             log.info("Another im po su is worked")
             return
@@ -69,3 +72,7 @@ class ImportantYoutubePostSupplier(Process):
 
             time.sleep(force_post_manager_sleep_iteration_time)
 
+
+if __name__ == '__main__':
+    iyps = ImportantYoutubePostSupplier()
+    iyps.start()
