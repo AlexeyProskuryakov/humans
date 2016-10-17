@@ -53,7 +53,7 @@ class CommentsStorage(DBHandler):
     def end_comment_post(self, comment_oid, by, error_info=None):
         with self.mutex:
             to_set = {"by": by,
-                      "time": time.time()}
+                      "c_time": time.time()}
             if error_info:
                 to_set['state'] = CS_ERROR
                 to_set['error_info'] = str(error_info)
