@@ -2,12 +2,15 @@
 import calendar
 import json
 import os
+import random
+import string
 from collections import defaultdict
 from datetime import datetime, timedelta
 from uuid import uuid4
 import time
 
 import praw
+import requests
 from flask import Flask, logging, request, render_template, session, url_for, g, flash
 from flask.json import jsonify
 from flask_debugtoolbar import DebugToolbarExtension
@@ -18,14 +21,13 @@ from werkzeug.utils import redirect
 from wsgi import tst_to_dt
 from wsgi.db import HumanStorage
 from wsgi.properties import want_coefficient_max, WEEK, AE_GROUPS, AE_DEFAULT_GROUP, POLITICS, \
-    default_counters_thresholds, DAY
+    default_counters_thresholds, DAY, test_mode
 from wsgi.rr_people import A_POST, S_RELOAD_COUNTERS, A_CONSUME, A_VOTE, A_COMMENT
 from wsgi.rr_people.ae import AuthorsStorage, time_hash, hash_info, hash_length_info
 from wsgi.rr_people.commenting.connection import CommentHandler
 from wsgi.rr_people.he_manage import HumanOrchestra
 from wsgi.rr_people.human import HumanConfiguration
 from wsgi.rr_people.posting.posts import PostsStorage, CNT_NOISE, EVERY
-from wsgi.rr_people.posting.posts_important import ImportantYoutubePostSupplier
 from wsgi.rr_people.posting.posts_sequence import PostsSequenceStore, PostsSequenceHandler
 from wake_up.views import wake_up_app
 
@@ -359,13 +361,6 @@ def human_politic(name):
     return redirect(url_for('humans_info', name=name))
 
 
-try:
-    ips = ImportantYoutubePostSupplier()
-    ips.start()
-except Exception as e:
-    log.exception(e)
-
-
 @app.route("/humans/<name>/counters/recreate", methods=["POST"])
 @login_required
 def human_refresh_counters(name):
@@ -422,6 +417,9 @@ def human_clear_log(name):
     return jsonify(**{"ok": True})
 
 
+generators_url = "http://generators-shlak0bl0k.rhcloud.com/load_important" if not test_mode else "http://localhost:65010/load_important"
+
+
 @app.route("/humans/<name>/channel_id", methods=["POST"])
 @login_required
 def update_channel_id(name):
@@ -429,13 +427,18 @@ def update_channel_id(name):
     channel_id = data.get("channel_id")
     db.set_human_channel_id(name, channel_id)
     if channel_id:
-        result, err = ips.load_new_posts_for_human(name, channel_id)
-        if not err:
-            return jsonify(**{"ok": True, "loaded": result})
-        return jsonify(**{"ok": False, "error": err})
+        key = ''.join(random.choice(string.lowercase) for _ in range(20))
+        result = requests.post(generators_url, data=json.dumps({
+            "name": name,
+            "channel_id": channel_id,
+            "key": key}))
+        if result.status_code != 200:
+            return jsonify(**{"ok": False, "error": result.content})
 
+        result = json.loads(result.content)
+        if result.get("key") == key:
+            return jsonify(**result)
     return jsonify(**{"ok": True, "loaded": 0})
-
 
 sequence_storage = PostsSequenceStore("server")
 ae_storage = AuthorsStorage("as server")

@@ -15,7 +15,6 @@ function getInitTimestamp() {
 }
 
 function show_sequences(human_name, withLoader){
-    console.log("will show sequences for:",human_name);
     if (withLoader){
         $("#loader-gif").show();
     }
@@ -24,8 +23,6 @@ function show_sequences(human_name, withLoader){
         "/sequences/info/"+human_name,
         function(result){
             work_times = result["work"];
-            console.log(result);
-
             var points_cfg = {
                 show: true,
                 radius: 1,
@@ -38,50 +35,28 @@ function show_sequences(human_name, withLoader){
                 {color:"green", points:points_cfg, data:work_times, label:"Work time"}
             ];
 
-            var posts_times = result["posts"];
-            if (posts_times != undefined){
-                data.push({color:"red", points:points_cfg, data:posts_times, label:"New posts"});
-            }
-
-            var posts_passed_times = result["posts_passed"];
-            if (posts_passed_times != undefined){
-                data.push({color:"blue", points:points_cfg, data:posts_passed_times, label:"Old posts"});
-            }
-
-            var real_posted = result["real"];
-            if (real_posted != undefined){
-                data.push({color:"black", points:points_cfg, data:real_posted, label:"Real passed"});
-            }
-
-            var current_point_data = result['current'];
-            if (current_point_data != undefined){
-                var current_point = {
-                    color:  "black",
-                    points: {
-                        show:true,
-                        radius:2,
-                        errorbars:"y",
-                        yerr:{show:true, asymmetric:false, upperCap:"-", lowerCap:"-"}
-                        },
-                    data:[current_point_data]
-                };
-                console.log(current_point);
-                data.push(current_point);
-            }
+            data.push({color:"red", points:points_cfg, data:result["posts"], label:"New posts"});
+            data.push({color:"blue", points:points_cfg, data:result["posts_passed"], label:"Old posts"});
+            data.push({color:"black", points:points_cfg, data:result["real"], label:"Real passed"});
 
 
-            sequence_metadata = result["metadata"];
-            if (sequence_metadata != undefined){
-                $("#sequence-metadata").text(sequence_metadata);
-            }
-            counters = result["counters"];
-            if (counters != undefined){
-                   $("#sequence-metadata").append("<br> Counters: noise: "+counters['noise']+" important: "+counters['important'] + "<br> Next important after:"+ counters['next_important'] +" noise posts");
-            }
-            next_times = result["next_times"];
-            if  (next_times != undefined){
-                $("#sequence-metadata").append("<hr>"+next_times);
-            }
+            var current_point = {
+                color:  "black",
+                points: {
+                    show:true,
+                    radius:2,
+                    errorbars:"y",
+                    yerr:{show:true, asymmetric:false, upperCap:"-", lowerCap:"-"}
+                    },
+                data:[result['current']]
+            };
+            data.push(current_point);
+
+            $("#sequence-metadata").text(result["metadata"]);
+
+            var counters = result["counters"];
+            $("#sequence-metadata").append("<br> Counters: noise: "+counters['noise']+" important: "+counters['important'] + "<br> Next important after:"+ counters['next_important'] +" noise posts");
+            $("#sequence-metadata").append("<hr>"+result["next_times"]);
 
             $("#loader-gif").hide();
 

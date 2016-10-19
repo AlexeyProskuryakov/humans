@@ -27,13 +27,10 @@ function show_human_live_state(){
         if (name == "") {
             return
         }
-//        console.log("will send... to "+name);
-
         $.ajax({
             type:"POST",
             url:"/humans/"+name+"/state",
             success:function(x){
-//                 console.log(x);
                  if (x.human == name){
                     $("#human-live-state").text(x.state.human_state+" [process last tick: "+x.state.process_state+"]");
                  }

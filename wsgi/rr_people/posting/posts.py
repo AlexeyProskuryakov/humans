@@ -30,7 +30,8 @@ class PostSource(object):
                         data.get("for_sub"),
                         data.get("at_time"),
                         data.get("url_hash"),
-                        data.get("important")
+                        data.get("important"),
+                        data.get("video_id")
                         )
         return ps
 

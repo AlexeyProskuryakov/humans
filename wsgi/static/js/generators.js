@@ -3,7 +3,7 @@ function generator_action(name, state){
     if (sub_name == undefined){
         sub_name = $("#sub-choose option:selected").attr("value");
     }
-    console.log("sub name: ", sub_name);
+    //("sub name: ", sub_name);
 
     $.ajax({
             type:"post",
@@ -12,7 +12,7 @@ function generator_action(name, state){
             contentType:    'application/json',
             dataType:       'json',
             success:function(data){
-                console.log(data);
+                //(data);
 
                 if (data.ok == true){
                     if (name ==  undefined){
@@ -32,7 +32,7 @@ function prepare_for_posting(name){
     if (sub_name == undefined){
         sub_name = $("#sub-choose option:selected").attr("value");
     }
-    console.log("sub name: ", sub_name);
+    //("sub name: ", sub_name);
 
     $.ajax({
             type:"post",
@@ -41,7 +41,7 @@ function prepare_for_posting(name){
             contentType:    'application/json',
             dataType:       'json',
             success:function(data){
-                console.log(data);
+                //(data);
                 if (data.ok == true){
                         $("#"+sub_name).addClass("more-opacity");
                 }
@@ -51,7 +51,7 @@ function prepare_for_posting(name){
 };
 
 function delete_post(sub, url_hash){
-    console.log(sub,url_hash);
+    //(sub,url_hash);
     $.ajax({
             type:"post",
             url:"/generators/del_post",
@@ -59,7 +59,7 @@ function delete_post(sub, url_hash){
             contentType:    'application/json',
             dataType:       'json',
             success:function(data){
-                console.log(data);
+                //(data);
                 if (data.ok == true){
                     $("#"+url_hash).addClass("more-opacity");
                 }
@@ -76,7 +76,7 @@ function delete_sub(name){
             contentType:    'application/json',
             dataType:       'json',
             success:function(data){
-                console.log(data);
+                //(data);
                 if (data.ok == true){
                         $("."+name+"-main").addClass("more-opacity");
                         $("#"+name+"-result-info").text("Удалил везде все.");
