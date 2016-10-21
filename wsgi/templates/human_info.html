@@ -493,12 +493,15 @@
             <tr>
                 <th class="col-md-2">
                     {{row.get("action")}}
+                    {% if row.get('info').get('force') == True %}
+                    (FORCE)
+                    {%endif%}
                 </th>
                 <th class="col-md-8">
                     {% if "permalink" in row.get("info") %}
                     <a href="{{row.get('info')['permalink']}}" target="_blank">{{row.get('info')}}</a>
 
-                    {%elif "fullname" in row.get("info")%}
+                    {%elif "fullname" in row.get("info") and row.get("info").get("fullname")%}
                     <a href="https://redd.it/{{row.get('info')['fullname'][3:]}}"
                        target="_blank">{{row.get('info')}}</a>
 

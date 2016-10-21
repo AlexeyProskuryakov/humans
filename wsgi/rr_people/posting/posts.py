@@ -1,13 +1,13 @@
 import json
+import logging
 import random
 
 import time
-from datetime import datetime
+import uuid
 
 from bson.objectid import ObjectId
 
 from wsgi.db import DBHandler, HumanStorage
-from wsgi.rr_people.ae import time_hash
 
 PS_READY = "ready"
 PS_POSTED = "posted"
@@ -15,6 +15,8 @@ PS_NO_POSTS = "no_posts"
 PS_BAD = "bad"
 PS_AT_QUEUE = "at_queue"
 PS_ERROR = "error"
+
+log = logging.getLogger("posts")
 
 
 class PostSource(object):
@@ -124,15 +126,15 @@ class PostsStorage(DBHandler):
                     data["video_id"] = video_id
                 return self.posts.insert_one(data)
 
-    def increment_counter(self, human, counter_type):
-        self.posts_counters.update_one({"human": human}, {"$inc": {counter_type: 1}}, upsert=True)
+    def set_posting_counters(self, human, counters):
+        self.posts_counters.update_one({"human": human}, {"$set": counters}, upsert=True)
 
-    def get_counters(self, human):
+    def get_posting_counters(self, human):
         found = self.posts_counters.find_one({"human": human}, projection={"_id": False})
         return found or {}
 
     def get_queued_post(self, human, important=False):
-        lock_id = time.time()
+        lock_id = uuid.uuid4().get_hex()
 
         q = {'human': human}
         q["state"] = PS_READY
@@ -175,36 +177,48 @@ EVERY = 9
 class PostsBalancer(object):
     def __init__(self, human_name, post_store=None):
         self.post_store = post_store or PostsStorage(name="posts manager")
-
         self.human = human_name
-        self._post_type_in_fly = None
 
-    def start_post(self):
+        self._post_type_in_fly = None
+        self._counters = None
+
+    def start_post(self, force=False):
         if self._post_type_in_fly:
             raise Exception("Have not ended posts for %s" % self.human)
 
-        counters = self.post_store.get_counters(self.human)
-        noise = int(counters.get(CNT_NOISE, 0))
+        counters = self.post_store.get_posting_counters(self.human)
         important = int(counters.get(CNT_IMPORTANT, 0))
+        noise = int(counters.get(CNT_NOISE, 0))
+        self._counters = {CNT_NOISE: noise, CNT_IMPORTANT: important}
 
-        if important == 0 or (noise % EVERY == 0 and noise / EVERY >= important):
+        if important == 0 or force:
             post = self.post_store.get_queued_post(human=self.human, important=True)
             if post:
                 self._post_type_in_fly = CNT_IMPORTANT
                 return post
+            else:
+                raise Exception("No important posts for %s", self.human)
 
         post = self.post_store.get_queued_post(human=self.human, important=False)
         if post:
             self._post_type_in_fly = CNT_NOISE
-
-        return post
+            return post
+        else:
+            raise Exception("No noise posts for %s", self.human)
 
     def end_post(self, post, result_state, error_info=None):
-        if not self._post_type_in_fly:
+        if self._post_type_in_fly is None or self._counters is None:
             raise Exception("Have not started posts %s" % self.human)
 
         if result_state == PS_POSTED:
-            self.post_store.increment_counter(self.human, self._post_type_in_fly)
+            self._counters[self._post_type_in_fly] += 1
+            if self._counters[CNT_NOISE] == EVERY:
+                log.info("will refresh posts counters")
+                self._counters = {CNT_NOISE: 0, CNT_IMPORTANT: 0}
+
+            self.post_store.set_posting_counters(self.human, self._counters)
 
         self.post_store.set_queued_post_used(post, result_state, error_info)
+
         self._post_type_in_fly = None
+        self._counters = None

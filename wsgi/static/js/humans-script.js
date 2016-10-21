@@ -174,6 +174,12 @@ function force_post_important(name){
         success:        function(data){
                 if (data.ok){
                     $('#force-post-important-result').text("Скоро будет. Жди.");
+                    setTimeout(function(){
+                        $('#force-post-important-result').text("Ну че запостилось?");
+                        setTimeout(function(){
+                            $('#force-post-important-result').text("Я сам-то хуй знает... Гляди в логе экшн должен быть с пометкой FORCE");
+                        }, 3000);
+                    }, 5000);
                 }
         }
     });

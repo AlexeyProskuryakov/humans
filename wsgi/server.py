@@ -370,9 +370,9 @@ def sequences(name):
             work_result.append([get_point_x(start), w_y, 1, (stop - start) * 1000])
 
     posts_sequence = sequence_storage.get_posts_sequence(name)
-    counters = post_storage.get_counters(name)
+    counters = post_storage.get_posting_counters(name)
     noise = int(counters.get(CNT_NOISE, 0))
-    counters["next_important"] = noise % EVERY
+    counters["next_important"] = EVERY - noise
     next_times = posts_sequence.get_time_for_nearest(time_hash(datetime.now()), noise % EVERY)
     if next_times:
         n_noise, n_important = next_times

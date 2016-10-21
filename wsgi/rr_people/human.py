@@ -112,8 +112,6 @@ class Human(RedditHandler):
         self.init_engine(login_credentials)
         log.info("MY [%s] WORK CYCLE: %s" % (self.name, self.counters_thresholds))
 
-        # todo this cache must be persisted at mongo or another
-        self._used = set()
         self._cache_last_loads = {}
         self._cache_sub_posts = {}
         self._consumed_posts = defaultdict(int)
@@ -167,9 +165,6 @@ class Human(RedditHandler):
 
     def incr_counter(self, name):
         self.counters[name] += 1
-
-    def decr_counter(self, name, by=1):
-        self.counters[name] -= by
 
     @property
     def counters_thresholds(self):
@@ -240,9 +235,6 @@ class Human(RedditHandler):
         state = self.state
         self.db.update_human_internal_state(self.name, state=state)
         log.info("step by [%s] |%s|: %s;", self.name, step_type, info)
-
-        if info and info.get("fullname"):
-            self._used.add(info.get("fullname"))
 
     def get_actions_percent(self, counters):
         summ = sum(counters.values())
@@ -527,15 +519,12 @@ class Human(RedditHandler):
                 self._consumed_posts[sub] = i
                 return
 
-            if (post.fullname not in self._used and self._is_want_to(w_k)) or self._is_want_to(w_k / 3):
+            if self._is_want_to(w_k):
                 self.do_see_post(post)
                 counter += 1
 
-    def do_post(self):
-        post_data = self.posts.start_post()
-        if not post_data:
-            log.warn("no posts for me [%s] :(" % self.name)
-            raise Exception("For %s is %s" % (self.name, PS_NO_POSTS))
+    def do_post(self, force=False):
+        post_data = self.posts.start_post(force)
 
         post = PostSource.from_dict(post_data)
         while 1:
@@ -543,8 +532,9 @@ class Human(RedditHandler):
                 subreddit = self.get_subreddit(post.for_sub)
                 _wait_time_to_write(post.title)
                 result = subreddit.submit(save=True, title=post.title, url=post.url)
-                log.info("%s was post at [%s]; title: [%s]; url: [%s]" % (
+                log.info("%s was post at [%s] %s; title: [%s]; url: [%s]" % (
                     "!!!important!!!" if post.important else "noise",
+                    "!!!FORCE!!!" if force else "",
                     post.for_sub,
                     post.title,
                     post.url))
@@ -568,8 +558,11 @@ class Human(RedditHandler):
                 return PS_ERROR
 
             self.register_step(A_POST,
-                               {"fullname": result.fullname, "sub": post.for_sub, 'title': post.title,
-                                'url': post.url})
+                               {"fullname": result.fullname,
+                                "sub": post.for_sub,
+                                'title': post.title,
+                                'url': post.url,
+                                "force": force})
             self.posts.end_post(post_data, PS_POSTED)
             log.info("OK! result: %s" % (result))
             return PS_POSTED

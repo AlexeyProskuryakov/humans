@@ -19,7 +19,7 @@ from wsgi.properties import HOUR, MINUTE, POLITIC_WORK_HARD, MIN_TIMES_BETWEEN
 from wsgi.rr_people import USER_AGENTS, \
     A_COMMENT, A_POST, A_SLEEP, \
     S_WORK, S_BAN, S_SLEEP, S_SUSPEND, \
-    A_CONSUME, A_PRODUCE, S_RELOAD_COUNTERS
+    A_CONSUME, A_PRODUCE, S_RELOAD_COUNTERS, S_FORCE_POST_IMPORTANT
 from wsgi.rr_people.ae import ActionGenerator, time_hash, now_hash
 from wsgi.rr_people.human import Human
 from wsgi.rr_people.posting.posts_sequence import PostsSequenceHandler
@@ -109,6 +109,9 @@ class Kapellmeister(Process):
         if state == S_RELOAD_COUNTERS:
             log.info("%s reload counters" % self.human_name)
             self.human.reload_counters()
+
+        if state == S_FORCE_POST_IMPORTANT:
+            self.human.do_post(True)
 
         self.states_handler.set_human_state(self.human_name, new_state)
         log.info("[%s] now is %s" % (self.human_name, new_state))

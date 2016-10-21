@@ -11,6 +11,7 @@ from wsgi.properties import WEEK
 from wsgi.rr_people import A_COMMENT, A_POST, A_SLEEP, A_CONSUME, A_VOTE
 from wsgi.rr_people.he import Kapellmeister
 from wsgi.rr_people.human import Human
+from wsgi.rr_people.posting.posts import PS_POSTED, PS_ERROR
 
 log = logging.getLogger("HUMAN TEST")
 
@@ -53,13 +54,13 @@ class FakeHuman(Human):
         log.info("REFRESH TOKEN")
         self.counters_thresholds = self.calculate_counters()
 
-    def do_post(self):
-        post = self.posts.start_post()
+    def do_post(self, force=False):
+        post = self.posts.start_post(force)
         count = random.randint(0, AVG_ACTION_TIME / 10)
-        log.info("DO POSTING...(%s)" % count)
+        log.info("DO POSTING (%s)...(%s)" % (force, count))
         time.sleep(count)
-        self.register_step(A_POST)
-        self.posts.end_post(post, "TEST")
+        self.register_step(A_POST, {"fullname": post.get("fullname"), "force": force})
+        self.posts.end_post(post, random.choice([PS_POSTED, PS_ERROR]))
         return A_POST
 
     def do_comment_post(self, sub=None):
@@ -77,7 +78,6 @@ class FakeHuman(Human):
         count = random.randint(0, AVG_ACTION_TIME / 10)
         log.info("DO SEEE POST...(%s)" % count)
         time.sleep(count)
-
 
     def do_live_random(self, max_actions=100, posts_limit=500):
         if self.can_do(A_VOTE):
@@ -101,7 +101,7 @@ def test_kapelmeister():
     db = HumanStorage()
     db.update_human_access_credentials_info(user, {"scope": ["read"], "access_token": "foo", "refresh_token": "bar"})
 
-    kplm = Kapellmeister(user, None, human_class=FakeHuman, reddit=FakeRedditHandler, reddit_class=FakeRedditHandler)
+    kplm = Kapellmeister(user, human_class=FakeHuman, reddit=FakeRedditHandler, reddit_class=FakeRedditHandler)
     kplm.psh.evaluate_new()
 
     sleep = 0
