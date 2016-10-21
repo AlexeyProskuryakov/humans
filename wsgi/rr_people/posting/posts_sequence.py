@@ -11,6 +11,7 @@ from flask import logging
 from wsgi.db import DBHandler, HumanStorage
 from wsgi.properties import WEEK, AVG_ACTION_TIME, DEFAULT_MIN_POSTS_COUNT, DEFAULT_POSTS_SEQUENCE_CACHED_TTL
 from wsgi.rr_people.ae import AuthorsStorage, time_hash, hash_info
+from wsgi.rr_people.posting.posts import EVERY
 
 __doc__ = """
 Нужно отправлять посты таким образом:
@@ -129,8 +130,8 @@ class PostsSequence(object):
                 next_time_important = post_time
                 if next_nearest is None:
                     next_nearest = next_time_important
-                counter -= 1
-                if counter <= 0:
+                counter += 1
+                if counter == EVERY:
                     return next_nearest - date_hash, next_time_important - date_hash
 
 
