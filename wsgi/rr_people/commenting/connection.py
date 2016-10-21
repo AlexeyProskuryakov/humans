@@ -6,7 +6,7 @@ from multiprocessing import RLock, Process
 
 from bson.objectid import ObjectId
 
-from wsgi import ConfigManager
+from rr_lib.cm import ConfigManager
 from wsgi.db import DBHandler
 from wsgi.rr_people.queue import RedisHandler
 

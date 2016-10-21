@@ -20,5 +20,9 @@
   "ImgrClientID": "d7e9f9350ebe5a8",
   "ImgrClientSecret": "945c124e48fd9ca208788c70028d7e8d8c7dc7c1",
   "YOUTUBE_DEVELOPER_KEY": "AIzaSyCYF4GPkVpdYjZ5RpDaSMcbpRpfkavnUzc",
-  "YOUTUBE_API_SERVICE_NAME": "youtube"
+  "YOUTUBE_API_SERVICE_NAME": "youtube",
+  "default_user": {
+    "name": "alesha",
+    "pwd": "123"
+  }
 }

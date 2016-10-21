@@ -1,12 +1,14 @@
 import logging
 
-from wsgi import tst_to_dt, Singleton
+from wsgi import tst_to_dt
 from wsgi.db import HumanStorage
 from wsgi.properties import test_mode
 from wsgi.rr_people import S_SUSPEND, S_WORK
 from wsgi.rr_people.he import Kapellmeister, HE_ASPECT
 from wsgi.rr_people.entity_states import StatesHandler
+
 from states.processes import ProcessDirector
+from rr_lib.cm import Singleton
 
 log = logging.getLogger("orchestra")
 

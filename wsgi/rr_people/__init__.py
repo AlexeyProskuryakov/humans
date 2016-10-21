@@ -7,7 +7,8 @@ import time
 from praw.objects import MoreComments
 from stemming.porter2 import stem
 
-from wsgi import properties, Singleton
+from wsgi import properties
+from rr_lib.cm import Singleton
 
 DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.106 Safari/537.36"
 

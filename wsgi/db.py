@@ -11,7 +11,7 @@ from pymongo import MongoClient
 from pymongo.errors import CollectionInvalid
 
 from wsgi.properties import DEFAULT_POLITIC, AE_DEFAULT_GROUP, WEEK
-from wsgi import ConfigManager
+from rr_lib.cm import ConfigManager
 
 __author__ = 'alesha'
 

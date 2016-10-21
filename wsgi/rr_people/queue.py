@@ -2,7 +2,7 @@ import logging
 
 import redis
 
-from wsgi import ConfigManager
+from rr_lib.cm import ConfigManager
 
 log = logging.getLogger("queue")
 

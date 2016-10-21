@@ -11,17 +11,17 @@ import time
 
 import praw
 import requests
-from flask import Flask, logging, request, render_template, session, url_for, g, flash
+from flask import Flask, logging, request, render_template, url_for, g, flash
+from flask import session
 from flask.json import jsonify
-from flask_debugtoolbar import DebugToolbarExtension
-from flask_login import LoginManager, login_user, login_required, logout_user
+from flask_login import LoginManager, login_required
 
 from werkzeug.utils import redirect
 
-from wsgi import tst_to_dt
+from wsgi import tst_to_dt, array_to_string
 from wsgi.db import HumanStorage
 from wsgi.properties import want_coefficient_max, WEEK, AE_GROUPS, AE_DEFAULT_GROUP, POLITICS, \
-    default_counters_thresholds, DAY, test_mode
+    default_counters_thresholds, test_mode
 from wsgi.rr_people import A_POST, S_RELOAD_COUNTERS, A_CONSUME, A_VOTE, A_COMMENT
 from wsgi.rr_people.ae import AuthorsStorage, time_hash, hash_info, hash_length_info
 from wsgi.rr_people.commenting.connection import CommentHandler
@@ -30,15 +30,16 @@ from wsgi.rr_people.human import HumanConfiguration
 from wsgi.rr_people.posting.posts import PostsStorage, CNT_NOISE, EVERY
 from wsgi.rr_people.posting.posts_sequence import PostsSequenceStore, PostsSequenceHandler
 from wake_up.views import wake_up_app
+from rr_lib.users.views import users_app, usersHandler
 
 __author__ = '4ikist'
 
 import sys
 
-log = logging.getLogger("web")
-
 reload(sys)
 sys.setdefaultencoding('utf-8')
+
+log = logging.getLogger("web")
 
 cur_dir = os.path.dirname(__file__)
 app = Flask("Humans", template_folder=cur_dir + "/templates", static_folder=cur_dir + "/static")
@@ -47,104 +48,16 @@ app.secret_key = 'foo bar baz'
 app.config['SESSION_TYPE'] = 'filesystem'
 
 app.register_blueprint(wake_up_app, url_prefix="/wake_up")
-
-
-def array_to_string(array):
-    return " ".join([str(el) for el in array])
+app.register_blueprint(users_app, url_prefix="/u")
 
 
 app.jinja_env.filters["tst_to_dt"] = tst_to_dt
 app.jinja_env.globals.update(array_to_string=array_to_string)
 
-if os.environ.get("test", False):
-    log.info("will run at test mode")
-    app.config["SECRET_KEY"] = "foo bar baz"
-    app.debug = True
-    app.config['DEBUG_TB_INTERCEPT_REDIRECTS'] = False
-    toolbar = DebugToolbarExtension(app)
-
-
-@app.route("/time-now")
-def time_now():
-    return tst_to_dt(time.time())
-
 
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
-
-db = HumanStorage(name="hs server")
-
-
-class User(object):
-    def __init__(self, name, pwd):
-        self.id = str(uuid4().get_hex())
-        self.auth = False
-        self.active = False
-        self.anonymous = False
-        self.name = name
-        self.pwd = pwd
-
-    def is_authenticated(self):
-        return self.auth
-
-    def is_active(self):
-        return True
-
-    def is_anonymous(self):
-        return False
-
-    def get_id(self):
-        return self.id
-
-
-class UsersHandler(object):
-    def __init__(self):
-        self.users = {}
-        self.auth_users = {}
-
-    def get_guest(self):
-        user = User("Guest", "")
-        user.anonymous = True
-        self.users[user.id] = user
-        return user
-
-    def get_by_id(self, id):
-        found = self.users.get(id)
-        if not found:
-            found = db.users.find_one({"user_id": id})
-            if found:
-                user = User(found.get('name'), found.get("pwd"))
-                user.id = found.get("user_id")
-                self.users[user.id] = user
-                found = user
-        return found
-
-    def auth_user(self, name, pwd):
-        authed = db.check_user(name, pwd)
-        if authed:
-            user = self.get_by_id(authed)
-            if not user:
-                user = User(name, pwd)
-                user.id = authed
-            user.auth = True
-            user.active = True
-            self.users[user.id] = user
-            return user
-
-    def logout(self, user):
-        user.auth = False
-        user.active = False
-        self.users[user.id] = user
-
-    def add_user(self, user):
-        self.users[user.id] = user
-        db.add_user(user.name, user.pwd, user.id)
-
-
-usersHandler = UsersHandler()
-log.info("users handler was initted")
-usersHandler.add_user(User("3030", "89231950908zozo"))
 
 
 @app.before_request
@@ -152,7 +65,6 @@ def load_user():
     if session.get("user_id"):
         user = usersHandler.get_by_id(session.get("user_id"))
     else:
-        # user = None
         user = usersHandler.get_guest()
     g.user = user
 
@@ -164,31 +76,15 @@ def load_user(userid):
 
 @login_manager.unauthorized_handler
 def unauthorized_callback():
-    return redirect(url_for('login'))
+    return redirect(url_for('users_api.login'))
 
 
-@app.route("/login", methods=["GET", "POST"])
-def login():
-    if request.method == "POST":
-        login = request.form.get("name")
-        password = request.form.get("password")
-        remember_me = request.form.get("remember") == u"on"
-        user = usersHandler.auth_user(login, password)
-        if user:
-            try:
-                login_user(user, remember=remember_me)
-                return redirect(url_for("main"))
-            except Exception as e:
-                log.exception(e)
 
-    return render_template("login.html")
+@app.route("/time-now")
+def time_now():
+    return tst_to_dt(time.time())
 
 
-@app.route('/logout')
-@login_required
-def logout():
-    logout_user()
-    return redirect(url_for('login'))
 
 
 @app.route("/")
@@ -197,6 +93,8 @@ def main():
     user = g.user
     return render_template("main.html", **{"username": user.name})
 
+
+db = HumanStorage(name="hs server")
 
 REDIRECT_URI = "http://rr-alexeyp.rhcloud.com/authorize_callback"
 C_ID = None
@@ -439,6 +337,7 @@ def update_channel_id(name):
         if result.get("key") == key:
             return jsonify(**result)
     return jsonify(**{"ok": True, "loaded": 0})
+
 
 sequence_storage = PostsSequenceStore("server")
 ae_storage = AuthorsStorage("as server")

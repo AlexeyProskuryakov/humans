@@ -10,7 +10,7 @@ from random import choice
 import praw
 import pymongo
 
-from wsgi import ConfigManager
+from rr_lib.cm import ConfigManager
 from wsgi.db import DBHandler
 from wsgi.properties import \
     DAY, HOUR, MINUTE, SEC, WEEK_DAYS, WEEK, \
