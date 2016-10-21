@@ -6,7 +6,6 @@ import random
 import string
 from collections import defaultdict
 from datetime import datetime, timedelta
-from uuid import uuid4
 import time
 
 import praw
@@ -373,10 +372,11 @@ def sequences(name):
     counters = post_storage.get_posting_counters(name)
     noise = int(counters.get(CNT_NOISE, 0))
     counters["next_important"] = EVERY - noise
-    next_times = posts_sequence.get_time_for_nearest(time_hash(datetime.now()), noise % EVERY)
+    next_times = posts_sequence.get_time_for_nearest(time_hash(datetime.now()), EVERY - noise)
     if next_times:
         n_noise, n_important = next_times
-        next_times = "Next: noise: %s; important: %s." % (hash_length_info(n_noise), hash_length_info(n_important))
+        next_times = {"noise": hash_length_info(n_noise),
+                      "important": hash_length_info(n_important)}
 
     if posts_sequence:
         real_posted = map(lambda x: [get_point_x(time_hash(datetime.fromtimestamp(x.get("time")))), p_y - 0.25, 1, 1],

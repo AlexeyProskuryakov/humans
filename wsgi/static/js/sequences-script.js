@@ -55,8 +55,8 @@ function show_sequences(human_name, withLoader){
             $("#sequence-metadata").text(result["metadata"]);
 
             var counters = result["counters"];
-            $("#sequence-metadata").append("<br> Counters: noise: "+counters['noise']+" important: "+counters['important'] + "<br> Next important after:"+ counters['next_important'] +" noise posts");
-            $("#sequence-metadata").append("<hr>"+result["next_times"]);
+            $("#sequence-metadata").append("<hr> Next important after: <b>"+ counters['next_important'] +"</b> noise posts <br>");
+            $("#sequence-metadata").append(" Next noise: <b>"+result["next_times"]["noise"]+"</b> <br> Next important: <b>" +result["next_times"]["important"]+"</b>");
 
             $("#loader-gif").hide();
 
