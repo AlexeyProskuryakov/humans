@@ -56,6 +56,8 @@ S_UNKNOWN = "unknown"
 S_STOP = "stop"
 S_SUSPEND = "suspend"
 S_RELOAD_COUNTERS = "reload counters"
+S_FORCE_POST_IMPORTANT = "force post important"
+
 re_url = re.compile("https?://[^\s/$.?#].[^\s]*")
 re_crying_chars = re.compile("[A-Z!]{2,}")
 

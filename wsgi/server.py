@@ -22,7 +22,7 @@ from wsgi import tst_to_dt, array_to_string
 from wsgi.db import HumanStorage
 from wsgi.properties import want_coefficient_max, WEEK, AE_GROUPS, AE_DEFAULT_GROUP, POLITICS, \
     default_counters_thresholds, test_mode
-from wsgi.rr_people import A_POST, S_RELOAD_COUNTERS, A_CONSUME, A_VOTE, A_COMMENT
+from wsgi.rr_people import A_POST, S_RELOAD_COUNTERS, A_CONSUME, A_VOTE, A_COMMENT, S_FORCE_POST_IMPORTANT
 from wsgi.rr_people.ae import AuthorsStorage, time_hash, hash_info, hash_length_info
 from wsgi.rr_people.commenting.connection import CommentHandler
 from wsgi.rr_people.he_manage import HumanOrchestra
@@ -50,10 +50,8 @@ app.config['SESSION_TYPE'] = 'filesystem'
 app.register_blueprint(wake_up_app, url_prefix="/wake_up")
 app.register_blueprint(users_app, url_prefix="/u")
 
-
 app.jinja_env.filters["tst_to_dt"] = tst_to_dt
 app.jinja_env.globals.update(array_to_string=array_to_string)
-
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -79,12 +77,9 @@ def unauthorized_callback():
     return redirect(url_for('users_api.login'))
 
 
-
 @app.route("/time-now")
 def time_now():
     return tst_to_dt(time.time())
-
-
 
 
 @app.route("/")
@@ -233,10 +228,17 @@ def humans_info(name):
                                                  })
 
 
-@app.route("/humans/<name>/state", methods=["post"])
+@app.route("/humans/<name>/state", methods=["POST"])
 @login_required
 def human_state(name):
     return jsonify(**{"state": human_orchestra.get_human_state(name), "human": name})
+
+
+@app.route("/humans/<name>/post_important", methods=["POST"])
+@login_required
+def human_post_important(name):
+    human_orchestra.states.set_human_state(name, S_FORCE_POST_IMPORTANT)
+    return jsonify(**{"ok": True})
 
 
 @app.route("/humans/<name>/config", methods=["GET"])

@@ -167,3 +167,25 @@ function refresh_counters(name){
     });
 }
 
+function force_post_important(name){
+        $.ajax({
+        type:           "post",
+        url:            "/humans/"+name+"/post_important",
+        success:        function(data){
+                if (data.ok){
+                    $('#force-post-important-result').text("Скоро будет. Жди.");
+                }
+        }
+    });
+}
+
+
+$("#force-post-important").on('click', function(event){
+        var name = $("#human-name").text();
+        if (name == "") {
+            console.log("Can not find human name :(");
+            return
+        }
+        force_post_important(name);
+});
+
